@@ -39,10 +39,10 @@ import { useAuth } from "@/hooks/use-auth";
 
 const formSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters" }),
-  sku: z.string().min(3, { message: "SKU must be at least 3 characters" }),
-  description: z.string().optional(),
+  sku: z.string().min(1, { message: "SKU is required" }),
+  description: z.string().nullable().optional(),
   minStockLevel: z.string().transform(val => parseInt(val)),
-  categoryId: z.string().optional(),
+  categoryId: z.string(),
   unit: z.string().default("pcs"),
 });
 
@@ -79,11 +79,17 @@ export default function ItemMasterPage() {
 
   const createItemMutation = useMutation({
     mutationFn: async (data: FormValues) => {
+      // Explicitly convert the values to match the expected types
       const payload = {
-        ...data,
+        name: data.name,
+        sku: data.sku,
+        description: data.description || null,
         minStockLevel: parseInt(data.minStockLevel),
-        categoryId: data.categoryId === "0" ? null : data.categoryId ? parseInt(data.categoryId) : null,
+        categoryId: data.categoryId === "0" ? null : parseInt(data.categoryId),
+        unit: data.unit,
       };
+      
+      console.log("Submitting item data:", payload);
       
       if (isEditMode && editItemId) {
         const res = await apiRequest("PUT", `/api/items/${editItemId}`, payload);
