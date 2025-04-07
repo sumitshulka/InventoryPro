@@ -95,19 +95,18 @@ export default function Sidebar({ user, isOpen, onClose }: SidebarProps) {
               <ul>
                 {group.items.map((item, itemIndex) => (
                   <li key={itemIndex}>
-                    <Link href={item.path}>
-                      <a 
-                        className={cn(
-                          "sidebar-nav-item flex items-center px-3 py-2 rounded-md",
-                          isActive(item.path) 
-                            ? "active bg-primary/10 border-l-4 border-primary text-primary" 
-                            : "text-gray-700 hover:text-primary hover:bg-primary/5"
-                        )}
-                        onClick={onClose}
-                      >
-                        <span className="material-icons mr-3">{item.icon}</span>
-                        {item.name}
-                      </a>
+                    <Link 
+                      href={item.path}
+                      className={cn(
+                        "sidebar-nav-item flex items-center px-3 py-2 rounded-md",
+                        isActive(item.path) 
+                          ? "active bg-primary/10 border-l-4 border-primary text-primary" 
+                          : "text-gray-700 hover:text-primary hover:bg-primary/5"
+                      )}
+                      onClick={onClose}
+                    >
+                      <span className="material-icons mr-3">{item.icon}</span>
+                      {item.name}
                     </Link>
                   </li>
                 ))}

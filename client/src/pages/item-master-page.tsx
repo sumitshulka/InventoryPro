@@ -72,7 +72,7 @@ export default function ItemMasterPage() {
       sku: "",
       description: "",
       minStockLevel: "10",
-      categoryId: "",
+      categoryId: "0",
       unit: "pcs",
     },
   });
@@ -82,7 +82,7 @@ export default function ItemMasterPage() {
       const payload = {
         ...data,
         minStockLevel: parseInt(data.minStockLevel),
-        categoryId: data.categoryId ? parseInt(data.categoryId) : undefined,
+        categoryId: data.categoryId === "0" ? null : data.categoryId ? parseInt(data.categoryId) : null,
       };
       
       if (isEditMode && editItemId) {
@@ -118,7 +118,7 @@ export default function ItemMasterPage() {
       sku: "",
       description: "",
       minStockLevel: "10",
-      categoryId: "",
+      categoryId: "0",
       unit: "pcs",
     });
     setIsEditMode(false);
@@ -132,7 +132,7 @@ export default function ItemMasterPage() {
       sku: item.sku,
       description: item.description || "",
       minStockLevel: item.minStockLevel.toString(),
-      categoryId: item.categoryId ? item.categoryId.toString() : "",
+      categoryId: item.categoryId ? item.categoryId.toString() : "0",
       unit: item.unit,
     });
     setIsEditMode(true);
@@ -334,7 +334,7 @@ export default function ItemMasterPage() {
                       <SelectValue placeholder="Select a category" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Uncategorized</SelectItem>
+                      <SelectItem value="0">Uncategorized</SelectItem>
                       {categories?.map((category: any) => (
                         <SelectItem key={category.id} value={category.id.toString()}>
                           {category.name}
