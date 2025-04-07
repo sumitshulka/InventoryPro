@@ -106,7 +106,7 @@ export default function Sidebar({ user, isOpen, onClose }: SidebarProps) {
                       onClick={onClose}
                     >
                       <span className="material-icons mr-3">{item.icon}</span>
-                      <span>{item.name}</span>
+                      <span className="whitespace-nowrap">{item.name}</span>
                     </Link>
                   </li>
                 ))}

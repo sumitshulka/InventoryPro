@@ -11,3 +11,17 @@
     @apply font-sans antialiased bg-background text-foreground;
   }
 }
+
+@layer components {
+  .sidebar-nav-item {
+    @apply flex items-center;
+  }
+  
+  .sidebar-nav-item .material-icons {
+    @apply inline-block mr-3;
+  }
+  
+  .sidebar-nav-item span:last-child {
+    @apply inline-block whitespace-nowrap;
+  }
+}

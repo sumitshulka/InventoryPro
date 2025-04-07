@@ -41,8 +41,8 @@ const formSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters" }),
   sku: z.string().min(1, { message: "SKU is required" }),
   description: z.string().nullable().optional(),
-  minStockLevel: z.string().transform(val => parseInt(val)),
-  categoryId: z.string(),
+  minStockLevel: z.coerce.number().min(0),
+  categoryId: z.coerce.number().nullable(),
   unit: z.string().default("pcs"),
 });
 
@@ -71,8 +71,8 @@ export default function ItemMasterPage() {
       name: "",
       sku: "",
       description: "",
-      minStockLevel: "10",
-      categoryId: "0",
+      minStockLevel: 10,
+      categoryId: null,
       unit: "pcs",
     },
   });
@@ -84,8 +84,8 @@ export default function ItemMasterPage() {
         name: data.name,
         sku: data.sku,
         description: data.description || null,
-        minStockLevel: parseInt(data.minStockLevel),
-        categoryId: data.categoryId === "0" ? null : parseInt(data.categoryId),
+        minStockLevel: data.minStockLevel,
+        categoryId: data.categoryId,
         unit: data.unit,
       };
       
@@ -123,8 +123,8 @@ export default function ItemMasterPage() {
       name: "",
       sku: "",
       description: "",
-      minStockLevel: "10",
-      categoryId: "0",
+      minStockLevel: 10,
+      categoryId: null,
       unit: "pcs",
     });
     setIsEditMode(false);
@@ -137,8 +137,8 @@ export default function ItemMasterPage() {
       name: item.name,
       sku: item.sku,
       description: item.description || "",
-      minStockLevel: item.minStockLevel.toString(),
-      categoryId: item.categoryId ? item.categoryId.toString() : "0",
+      minStockLevel: item.minStockLevel,
+      categoryId: item.categoryId || null,
       unit: item.unit,
     });
     setIsEditMode(true);
@@ -333,8 +333,8 @@ export default function ItemMasterPage() {
                 <div className="space-y-2">
                   <Label htmlFor="categoryId">Category</Label>
                   <Select
-                    onValueChange={(value) => form.setValue("categoryId", value)}
-                    defaultValue={form.getValues("categoryId")}
+                    onValueChange={(value) => form.setValue("categoryId", Number(value) || null)}
+                    defaultValue={form.getValues("categoryId")?.toString() || "0"}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select a category" />
