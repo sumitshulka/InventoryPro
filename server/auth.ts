@@ -44,12 +44,14 @@ export function setupAuth(app: Express) {
   
   const sessionSettings: session.SessionOptions = {
     secret: SESSION_SECRET,
-    resave: false,
-    saveUninitialized: false,
+    resave: true,
+    saveUninitialized: true,
     store: storage.sessionStore,
     cookie: {
       httpOnly: true,
-      maxAge: 24 * 60 * 60 * 1000 // 24 hours
+      maxAge: 24 * 60 * 60 * 1000, // 24 hours
+      secure: false,
+      sameSite: 'lax'
     }
   };
 
@@ -93,7 +95,15 @@ export function setupAuth(app: Express) {
       
       req.login(user, (err) => {
         if (err) return next(err);
-        return res.status(200).json(user);
+        console.log("User logged in successfully:", user.id, user.username);
+        console.log("Session after login:", req.session);
+        req.session.save((err) => {
+          if (err) {
+            console.error("Session save error:", err);
+            return next(err);
+          }
+          return res.status(200).json(user);
+        });
       });
     })(req, res, next);
   });
@@ -133,7 +143,15 @@ export function setupAuth(app: Express) {
       // Log the user in
       req.login(user, (err) => {
         if (err) return next(err);
-        return res.status(201).json(userWithoutPassword);
+        console.log("User registered successfully:", user.id, user.username);
+        console.log("Session after registration:", req.session);
+        req.session.save((err) => {
+          if (err) {
+            console.error("Session save error after registration:", err);
+            return next(err);
+          }
+          return res.status(201).json(userWithoutPassword);
+        });
       });
     } catch (error: any) {
       if (error instanceof z.ZodError) {
@@ -154,8 +172,10 @@ export function setupAuth(app: Express) {
   // Get current user route
   app.get("/api/user", (req, res) => {
     if (!req.isAuthenticated()) {
+      console.log("User not authenticated:", req.session);
       return res.status(401).json({ message: "Not authenticated" });
     }
+    console.log("User authenticated:", req.user);
     res.json(req.user);
   });
 }

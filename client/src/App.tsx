@@ -1,6 +1,6 @@
 import { Switch, Route } from "wouter";
 import { Toaster } from "@/components/ui/toaster";
-import { AuthProvider } from "@/hooks/use-auth";
+import { AuthProvider, useAuth } from "@/hooks/use-auth";
 import NotFound from "@/pages/not-found";
 import AuthPage from "@/pages/auth-page";
 import DashboardPage from "@/pages/dashboard-page";
@@ -16,9 +16,22 @@ import UserManagementPage from "@/pages/user-management-page";
 import { ProtectedRoute } from "./lib/protected-route";
 
 function Router() {
+  const { user, isLoading } = useAuth();
+  console.log("Router user state:", { user, isLoading });
+  
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin h-12 w-12 border-4 border-primary border-t-transparent rounded-full"></div>
+      </div>
+    );
+  }
+  
   return (
     <Switch>
-      <Route path="/auth" component={AuthPage} />
+      <Route path="/auth">
+        {user ? <Route path="/" component={DashboardPage} /> : <AuthPage />}
+      </Route>
       <ProtectedRoute path="/" component={DashboardPage} />
       <ProtectedRoute path="/inventory" component={InventoryPage} />
       <ProtectedRoute path="/items" component={ItemMasterPage} />

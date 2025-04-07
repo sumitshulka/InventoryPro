@@ -37,7 +37,9 @@ export default function AuthPage() {
   
   // If user is already logged in, redirect to dashboard
   useEffect(() => {
+    console.log("AuthPage effect, user:", user);
     if (user) {
+      console.log("User is logged in, redirecting to dashboard");
       setLocation("/");
     }
   }, [user, setLocation]);
