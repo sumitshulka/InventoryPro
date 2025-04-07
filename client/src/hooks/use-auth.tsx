@@ -28,9 +28,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     data: user,
     error,
     isLoading,
+    refetch
   } = useQuery<SelectUser | undefined, Error>({
     queryKey: ["/api/user"],
     queryFn: getQueryFn({ on401: "returnNull" }),
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true
   });
 
   const loginMutation = useMutation({
@@ -44,6 +48,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         title: "Login successful",
         description: `Welcome back, ${user.name}!`,
       });
+      
+      // Force a refetch to ensure latest session data
+      refetch();
+      
+      // Use direct navigation
+      window.location.href = "/";
     },
     onError: (error: Error) => {
       toast({
@@ -65,6 +75,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         title: "Registration successful",
         description: `Welcome, ${user.name}!`,
       });
+      
+      // Force a refetch to ensure latest session data
+      refetch();
+      
+      // Use direct navigation
+      window.location.href = "/";
     },
     onError: (error: Error) => {
       toast({
@@ -85,6 +101,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         title: "Logged out",
         description: "You have been successfully logged out.",
       });
+      
+      // Redirect to auth page
+      window.location.href = "/auth";
     },
     onError: (error: Error) => {
       toast({

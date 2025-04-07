@@ -50,9 +50,11 @@ export function setupAuth(app: Express) {
     cookie: {
       httpOnly: true,
       maxAge: 24 * 60 * 60 * 1000, // 24 hours
-      secure: false,
-      sameSite: 'lax'
-    }
+      secure: false, // Set to true in production with HTTPS
+      sameSite: 'lax',
+      path: '/'
+    },
+    name: 'inventory.sid' // Specific name helps with identification
   };
 
   app.set("trust proxy", 1);
@@ -163,9 +165,22 @@ export function setupAuth(app: Express) {
 
   // Logout route
   app.post("/api/logout", (req, res, next) => {
+    console.log("Logging out user:", req.user?.id, req.user?.username);
     req.logout((err) => {
       if (err) return next(err);
-      res.status(200).json({ message: "Logged out successfully" });
+      
+      // Destroy the session completely
+      req.session.destroy((err) => {
+        if (err) {
+          console.error("Error destroying session:", err);
+          return next(err);
+        }
+        
+        // Clear the cookie on the client
+        res.clearCookie('inventory.sid', { path: '/' });
+        
+        res.status(200).json({ message: "Logged out successfully" });
+      });
     });
   });
 
