@@ -23,14 +23,14 @@ export default function Sidebar({ user, isOpen, onClose }: SidebarProps) {
       items: [
         { name: "Dashboard", path: "/", icon: "dashboard" },
         { name: "Inventory", path: "/inventory", icon: "inventory_2" },
-        { name: "Item Master", path: "/items", icon: "category" },
+        { name: "Items", path: "/items", icon: "category" },
         { name: "Warehouses", path: "/warehouses", icon: "store" },
       ],
     },
     {
       category: "OPERATIONS",
       items: [
-        { name: "Check-In", path: "/check-in", icon: "login" },
+        { name: "CheckIn", path: "/check-in", icon: "login" },
         { name: "Requests", path: "/requests", icon: "assignment" },
         { name: "Transfers", path: "/transfers", icon: "swap_horiz" },
       ],
@@ -38,8 +38,8 @@ export default function Sidebar({ user, isOpen, onClose }: SidebarProps) {
     {
       category: "REPORTS",
       items: [
-        { name: "Stock Report", path: "/stock-report", icon: "bar_chart" },
-        { name: "Movement Report", path: "/movement-report", icon: "timeline" },
+        { name: "Stock", path: "/stock-report", icon: "bar_chart" },
+        { name: "Movement", path: "/movement-report", icon: "timeline" },
       ],
     },
   ];
@@ -49,7 +49,7 @@ export default function Sidebar({ user, isOpen, onClose }: SidebarProps) {
     navigationItems.push({
       category: "SYSTEM",
       items: [
-        { name: "User Management", path: "/users", icon: "people" },
+        { name: "Users", path: "/users", icon: "people" },
       ],
     });
   }
