@@ -1,0 +1,987 @@
+import type { Express, Request, Response } from "express";
+import { createServer, type Server } from "http";
+import { storage } from "./storage";
+import { setupAuth } from "./auth";
+import { z } from "zod";
+import { 
+  insertItemSchema, 
+  insertWarehouseSchema, 
+  insertCategorySchema, 
+  insertInventorySchema, 
+  insertTransactionSchema, 
+  insertRequestSchema, 
+  insertRequestItemSchema 
+} from "@shared/schema";
+
+// Utility function to check required role
+const checkRole = (requiredRole: string) => {
+  return (req: Request, res: Response, next: Function) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    const user = req.user;
+    if (
+      (requiredRole === "admin" && user.role !== "admin") ||
+      (requiredRole === "manager" && user.role !== "admin" && user.role !== "manager")
+    ) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+
+    next();
+  };
+};
+
+export async function registerRoutes(app: Express): Promise<Server> {
+  // Setup authentication routes
+  setupAuth(app);
+
+  // Get current user
+  app.get("/api/current-user", (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    res.json(req.user);
+  });
+
+  // ==== User Management Routes ====
+  // Get all users (admin only)
+  app.get("/api/users", checkRole("admin"), async (req, res) => {
+    const users = await storage.getAllUsers();
+    res.json(users);
+  });
+
+  // Create new user (admin only)
+  app.post("/api/users", checkRole("admin"), async (req, res) => {
+    try {
+      const existingUser = await storage.getUserByUsername(req.body.username);
+      if (existingUser) {
+        return res.status(400).json({ message: "Username already exists" });
+      }
+
+      const user = await storage.createUser(req.body);
+      res.status(201).json(user);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Update user (admin only)
+  app.put("/api/users/:id", checkRole("admin"), async (req, res) => {
+    const userId = parseInt(req.params.id, 10);
+    try {
+      const updatedUser = await storage.updateUser(userId, req.body);
+      if (!updatedUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      res.json(updatedUser);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Delete user (admin only)
+  app.delete("/api/users/:id", checkRole("admin"), async (req, res) => {
+    const userId = parseInt(req.params.id, 10);
+    const success = await storage.deleteUser(userId);
+    if (!success) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    res.status(204).send();
+  });
+
+  // ==== Category Routes ====
+  // Get all categories
+  app.get("/api/categories", async (req, res) => {
+    const categories = await storage.getAllCategories();
+    res.json(categories);
+  });
+
+  // Create category (manager+)
+  app.post("/api/categories", checkRole("manager"), async (req, res) => {
+    try {
+      const categoryData = insertCategorySchema.parse(req.body);
+      const existingCategory = await storage.getCategoryByName(categoryData.name);
+      if (existingCategory) {
+        return res.status(400).json({ message: "Category already exists" });
+      }
+
+      const category = await storage.createCategory(categoryData);
+      res.status(201).json(category);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Update category (manager+)
+  app.put("/api/categories/:id", checkRole("manager"), async (req, res) => {
+    const categoryId = parseInt(req.params.id, 10);
+    try {
+      const categoryData = insertCategorySchema.partial().parse(req.body);
+      const updatedCategory = await storage.updateCategory(categoryId, categoryData);
+      if (!updatedCategory) {
+        return res.status(404).json({ message: "Category not found" });
+      }
+      res.json(updatedCategory);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Delete category (manager+)
+  app.delete("/api/categories/:id", checkRole("manager"), async (req, res) => {
+    const categoryId = parseInt(req.params.id, 10);
+    const success = await storage.deleteCategory(categoryId);
+    if (!success) {
+      return res.status(404).json({ message: "Category not found" });
+    }
+    res.status(204).send();
+  });
+
+  // ==== Warehouse Routes ====
+  // Get all warehouses
+  app.get("/api/warehouses", async (req, res) => {
+    const warehouses = await storage.getAllWarehouses();
+    res.json(warehouses);
+  });
+
+  // Create warehouse (admin only)
+  app.post("/api/warehouses", checkRole("admin"), async (req, res) => {
+    try {
+      const warehouseData = insertWarehouseSchema.parse(req.body);
+      const existingWarehouse = await storage.getWarehouseByName(warehouseData.name);
+      if (existingWarehouse) {
+        return res.status(400).json({ message: "Warehouse already exists" });
+      }
+
+      const warehouse = await storage.createWarehouse(warehouseData);
+      res.status(201).json(warehouse);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Update warehouse (admin only)
+  app.put("/api/warehouses/:id", checkRole("admin"), async (req, res) => {
+    const warehouseId = parseInt(req.params.id, 10);
+    try {
+      const warehouseData = insertWarehouseSchema.partial().parse(req.body);
+      const updatedWarehouse = await storage.updateWarehouse(warehouseId, warehouseData);
+      if (!updatedWarehouse) {
+        return res.status(404).json({ message: "Warehouse not found" });
+      }
+      res.json(updatedWarehouse);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Delete warehouse (admin only)
+  app.delete("/api/warehouses/:id", checkRole("admin"), async (req, res) => {
+    const warehouseId = parseInt(req.params.id, 10);
+    const success = await storage.deleteWarehouse(warehouseId);
+    if (!success) {
+      return res.status(404).json({ message: "Warehouse not found" });
+    }
+    res.status(204).send();
+  });
+
+  // ==== Item Routes ====
+  // Get all items
+  app.get("/api/items", async (req, res) => {
+    const items = await storage.getAllItems();
+    res.json(items);
+  });
+
+  // Create item (manager+)
+  app.post("/api/items", checkRole("manager"), async (req, res) => {
+    try {
+      const itemData = insertItemSchema.parse(req.body);
+      const existingItem = await storage.getItemBySku(itemData.sku);
+      if (existingItem) {
+        return res.status(400).json({ message: "Item with this SKU already exists" });
+      }
+
+      const item = await storage.createItem(itemData);
+      res.status(201).json(item);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Update item (manager+)
+  app.put("/api/items/:id", checkRole("manager"), async (req, res) => {
+    const itemId = parseInt(req.params.id, 10);
+    try {
+      const itemData = insertItemSchema.partial().parse(req.body);
+      const updatedItem = await storage.updateItem(itemId, itemData);
+      if (!updatedItem) {
+        return res.status(404).json({ message: "Item not found" });
+      }
+      res.json(updatedItem);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Delete item (manager+)
+  app.delete("/api/items/:id", checkRole("manager"), async (req, res) => {
+    const itemId = parseInt(req.params.id, 10);
+    const success = await storage.deleteItem(itemId);
+    if (!success) {
+      return res.status(404).json({ message: "Item not found" });
+    }
+    res.status(204).send();
+  });
+
+  // ==== Inventory Routes ====
+  // Get all inventory
+  app.get("/api/inventory", async (req, res) => {
+    const inventory = await storage.getAllInventory();
+    res.json(inventory);
+  });
+
+  // Get inventory for specific warehouse
+  app.get("/api/inventory/warehouse/:warehouseId", async (req, res) => {
+    const warehouseId = parseInt(req.params.warehouseId, 10);
+    const inventory = await storage.getInventoryByWarehouse(warehouseId);
+    res.json(inventory);
+  });
+
+  // Create or update inventory (manager+)
+  app.post("/api/inventory", checkRole("manager"), async (req, res) => {
+    try {
+      const inventoryData = insertInventorySchema.parse(req.body);
+      
+      // Check if item exists
+      const item = await storage.getItem(inventoryData.itemId);
+      if (!item) {
+        return res.status(404).json({ message: "Item not found" });
+      }
+      
+      // Check if warehouse exists
+      const warehouse = await storage.getWarehouse(inventoryData.warehouseId);
+      if (!warehouse) {
+        return res.status(404).json({ message: "Warehouse not found" });
+      }
+      
+      // Check if inventory already exists for this item in this warehouse
+      const existingInventory = await storage.getInventoryByItemAndWarehouse(
+        inventoryData.itemId,
+        inventoryData.warehouseId
+      );
+      
+      let inventory;
+      if (existingInventory) {
+        // Update existing inventory
+        inventory = await storage.updateInventory(existingInventory.id, {
+          quantity: inventoryData.quantity
+        });
+      } else {
+        // Create new inventory
+        inventory = await storage.createInventory(inventoryData);
+      }
+      
+      res.status(201).json(inventory);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Update inventory quantity (manager+)
+  app.put("/api/inventory/update-quantity", checkRole("manager"), async (req, res) => {
+    try {
+      const data = z.object({
+        itemId: z.number(),
+        warehouseId: z.number(),
+        quantity: z.number()
+      }).parse(req.body);
+      
+      const inventory = await storage.updateInventoryQuantity(
+        data.itemId,
+        data.warehouseId,
+        data.quantity
+      );
+      
+      res.json(inventory);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // ==== Transaction Routes ====
+  // Get all transactions
+  app.get("/api/transactions", async (req, res) => {
+    const transactions = await storage.getAllTransactions();
+    res.json(transactions);
+  });
+
+  // Get transactions by type
+  app.get("/api/transactions/type/:type", async (req, res) => {
+    const { type } = req.params;
+    if (!['check-in', 'issue', 'transfer'].includes(type)) {
+      return res.status(400).json({ message: "Invalid transaction type" });
+    }
+    
+    const transactions = await storage.getTransactionsByType(type as any);
+    res.json(transactions);
+  });
+
+  // Get transactions for a warehouse
+  app.get("/api/transactions/warehouse/:warehouseId", async (req, res) => {
+    const warehouseId = parseInt(req.params.warehouseId, 10);
+    const transactions = await storage.getTransactionsByWarehouse(warehouseId);
+    res.json(transactions);
+  });
+
+  // Create transaction (check-in, issue, transfer) (manager+)
+  app.post("/api/transactions", checkRole("manager"), async (req, res) => {
+    try {
+      const transactionData = insertTransactionSchema.parse(req.body);
+      
+      // Generate transaction code
+      const transactionCode = `TRX-${(await storage.getAllTransactions()).length + 873}`; // Start from where sample data left off
+      
+      // Create transaction
+      const transaction = await storage.createTransaction({
+        ...transactionData,
+        transactionCode,
+        userId: req.user!.id, // Use the authenticated user's ID
+      });
+      
+      // Update inventory based on transaction type
+      if (transaction.transactionType === "check-in" && transaction.destinationWarehouseId) {
+        // Check if inventory already exists
+        const existingInventory = await storage.getInventoryByItemAndWarehouse(
+          transaction.itemId,
+          transaction.destinationWarehouseId
+        );
+        
+        if (existingInventory) {
+          // Update existing inventory
+          await storage.updateInventory(existingInventory.id, {
+            quantity: existingInventory.quantity + transaction.quantity
+          });
+        } else {
+          // Create new inventory
+          await storage.createInventory({
+            itemId: transaction.itemId,
+            warehouseId: transaction.destinationWarehouseId,
+            quantity: transaction.quantity
+          });
+        }
+      } else if (transaction.transactionType === "issue" && transaction.sourceWarehouseId) {
+        // Check if inventory exists and has enough quantity
+        const existingInventory = await storage.getInventoryByItemAndWarehouse(
+          transaction.itemId,
+          transaction.sourceWarehouseId
+        );
+        
+        if (!existingInventory) {
+          return res.status(400).json({ message: "Item not in inventory" });
+        }
+        
+        if (existingInventory.quantity < transaction.quantity) {
+          return res.status(400).json({ message: "Not enough quantity in inventory" });
+        }
+        
+        // Update inventory
+        await storage.updateInventory(existingInventory.id, {
+          quantity: existingInventory.quantity - transaction.quantity
+        });
+      } else if (transaction.transactionType === "transfer" && transaction.sourceWarehouseId && transaction.destinationWarehouseId) {
+        // Check if source inventory exists and has enough quantity
+        const sourceInventory = await storage.getInventoryByItemAndWarehouse(
+          transaction.itemId,
+          transaction.sourceWarehouseId
+        );
+        
+        if (!sourceInventory) {
+          return res.status(400).json({ message: "Item not in source warehouse inventory" });
+        }
+        
+        if (sourceInventory.quantity < transaction.quantity) {
+          return res.status(400).json({ message: "Not enough quantity in source warehouse" });
+        }
+        
+        // Update source inventory
+        await storage.updateInventory(sourceInventory.id, {
+          quantity: sourceInventory.quantity - transaction.quantity
+        });
+        
+        // If transaction is completed, update destination inventory
+        if (transaction.status === "completed") {
+          const destinationInventory = await storage.getInventoryByItemAndWarehouse(
+            transaction.itemId,
+            transaction.destinationWarehouseId
+          );
+          
+          if (destinationInventory) {
+            // Update existing destination inventory
+            await storage.updateInventory(destinationInventory.id, {
+              quantity: destinationInventory.quantity + transaction.quantity
+            });
+          } else {
+            // Create new destination inventory
+            await storage.createInventory({
+              itemId: transaction.itemId,
+              warehouseId: transaction.destinationWarehouseId,
+              quantity: transaction.quantity
+            });
+          }
+        }
+      }
+      
+      res.status(201).json(transaction);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Update transaction status (manager+)
+  app.put("/api/transactions/:id/status", checkRole("manager"), async (req, res) => {
+    const transactionId = parseInt(req.params.id, 10);
+    
+    try {
+      const { status } = z.object({
+        status: z.string().refine(
+          s => ['pending', 'in-transit', 'completed', 'cancelled'].includes(s),
+          { message: "Invalid status" }
+        )
+      }).parse(req.body);
+      
+      // Get transaction
+      const transaction = await storage.getTransaction(transactionId);
+      if (!transaction) {
+        return res.status(404).json({ message: "Transaction not found" });
+      }
+      
+      // If completing a transfer transaction, update destination inventory
+      if (
+        status === "completed" && 
+        transaction.status !== "completed" &&
+        transaction.transactionType === "transfer" &&
+        transaction.sourceWarehouseId &&
+        transaction.destinationWarehouseId
+      ) {
+        const destinationInventory = await storage.getInventoryByItemAndWarehouse(
+          transaction.itemId,
+          transaction.destinationWarehouseId
+        );
+        
+        if (destinationInventory) {
+          // Update existing destination inventory
+          await storage.updateInventory(destinationInventory.id, {
+            quantity: destinationInventory.quantity + transaction.quantity
+          });
+        } else {
+          // Create new destination inventory
+          await storage.createInventory({
+            itemId: transaction.itemId,
+            warehouseId: transaction.destinationWarehouseId,
+            quantity: transaction.quantity
+          });
+        }
+      }
+      
+      // Update transaction status
+      const updatedTransaction = await storage.updateTransaction(transactionId, { status });
+      
+      res.json(updatedTransaction);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // ==== Request Routes ====
+  // Get all requests
+  app.get("/api/requests", async (req, res) => {
+    // Regular users can only see their own requests
+    if (req.user!.role === "user") {
+      const requests = await storage.getRequestsByUser(req.user!.id);
+      return res.json(requests);
+    }
+    
+    // Managers and admins can see all requests
+    const requests = await storage.getAllRequests();
+    res.json(requests);
+  });
+
+  // Get requests by status
+  app.get("/api/requests/status/:status", async (req, res) => {
+    const { status } = req.params;
+    
+    // Regular users can only see their own requests
+    if (req.user!.role === "user") {
+      const allUserRequests = await storage.getRequestsByUser(req.user!.id);
+      const filteredRequests = allUserRequests.filter(r => r.status === status);
+      return res.json(filteredRequests);
+    }
+    
+    // Managers and admins can see all requests with given status
+    const requests = await storage.getRequestsByStatus(status);
+    res.json(requests);
+  });
+
+  // Get request details including items
+  app.get("/api/requests/:id", async (req, res) => {
+    const requestId = parseInt(req.params.id, 10);
+    
+    const request = await storage.getRequest(requestId);
+    if (!request) {
+      return res.status(404).json({ message: "Request not found" });
+    }
+    
+    // Regular users can only see their own requests
+    if (req.user!.role === "user" && request.userId !== req.user!.id) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+    
+    // Get items in request
+    const requestItems = await storage.getRequestItemsByRequest(requestId);
+    
+    res.json({
+      ...request,
+      items: requestItems
+    });
+  });
+
+  // Create request (all authenticated users)
+  app.post("/api/requests", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    
+    try {
+      const requestData = insertRequestSchema.parse({
+        ...req.body,
+        userId: req.user!.id
+      });
+      
+      // Create request
+      const request = await storage.createRequest(requestData);
+      
+      // Add items to request
+      if (req.body.items && Array.isArray(req.body.items)) {
+        for (const item of req.body.items) {
+          try {
+            const requestItemData = insertRequestItemSchema.parse({
+              ...item,
+              requestId: request.id
+            });
+            
+            await storage.createRequestItem(requestItemData);
+          } catch (error) {
+            console.error("Error adding item to request:", error);
+          }
+        }
+      }
+      
+      res.status(201).json(request);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Update request status (manager+)
+  app.put("/api/requests/:id/status", checkRole("manager"), async (req, res) => {
+    const requestId = parseInt(req.params.id, 10);
+    
+    try {
+      const { status } = z.object({
+        status: z.string().refine(
+          s => ['pending', 'approved', 'rejected', 'completed'].includes(s),
+          { message: "Invalid status" }
+        )
+      }).parse(req.body);
+      
+      // Get request
+      const request = await storage.getRequest(requestId);
+      if (!request) {
+        return res.status(404).json({ message: "Request not found" });
+      }
+      
+      // If approving or completing a request, handle the inventory changes
+      if ((status === "approved" || status === "completed") && request.status === "pending") {
+        // Get all items in the request
+        const requestItems = await storage.getRequestItemsByRequest(requestId);
+        
+        // Check if items are available in the warehouse
+        for (const requestItem of requestItems) {
+          const inventory = await storage.getInventoryByItemAndWarehouse(
+            requestItem.itemId,
+            request.warehouseId
+          );
+          
+          // If item is not in the requested warehouse, check if it's available in other warehouses
+          if (!inventory || inventory.quantity < requestItem.quantity) {
+            let foundInOtherWarehouse = false;
+            
+            // Check other warehouses
+            const allWarehouses = await storage.getAllWarehouses();
+            
+            for (const warehouse of allWarehouses) {
+              if (warehouse.id === request.warehouseId) continue;
+              
+              const otherInventory = await storage.getInventoryByItemAndWarehouse(
+                requestItem.itemId,
+                warehouse.id
+              );
+              
+              if (otherInventory && otherInventory.quantity >= requestItem.quantity) {
+                // Create a transfer transaction
+                await storage.createTransaction({
+                  transactionCode: `TRX-${(await storage.getAllTransactions()).length + 873}`,
+                  itemId: requestItem.itemId,
+                  quantity: requestItem.quantity,
+                  transactionType: "transfer",
+                  sourceWarehouseId: warehouse.id,
+                  destinationWarehouseId: request.warehouseId,
+                  requestId: request.id,
+                  userId: req.user!.id,
+                  status: "in-transit"
+                });
+                
+                // Update source warehouse inventory
+                await storage.updateInventoryQuantity(
+                  requestItem.itemId,
+                  warehouse.id,
+                  otherInventory.quantity - requestItem.quantity
+                );
+                
+                foundInOtherWarehouse = true;
+                break;
+              }
+            }
+            
+            if (!foundInOtherWarehouse) {
+              return res.status(400).json({ 
+                message: `Not enough quantity of item ID ${requestItem.itemId} available in any warehouse` 
+              });
+            }
+          } else {
+            // Item is available in the requested warehouse, create an issue transaction
+            await storage.createTransaction({
+              transactionCode: `TRX-${(await storage.getAllTransactions()).length + 873}`,
+              itemId: requestItem.itemId,
+              quantity: requestItem.quantity,
+              transactionType: "issue",
+              sourceWarehouseId: request.warehouseId,
+              requestId: request.id,
+              userId: req.user!.id,
+              status: "completed"
+            });
+            
+            // Update inventory
+            await storage.updateInventoryQuantity(
+              requestItem.itemId,
+              request.warehouseId,
+              inventory.quantity - requestItem.quantity
+            );
+          }
+        }
+      }
+      
+      // Update request status
+      const updatedRequest = await storage.updateRequest(requestId, { status });
+      
+      res.json(updatedRequest);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // ==== Report Routes ====
+  // Get inventory stock report
+  app.get("/api/reports/inventory-stock", async (req, res) => {
+    try {
+      const allInventory = await storage.getAllInventory();
+      const allItems = await storage.getAllItems();
+      const allWarehouses = await storage.getAllWarehouses();
+      
+      // Create a map of item details by ID
+      const itemMap = new Map();
+      allItems.forEach(item => {
+        itemMap.set(item.id, item);
+      });
+      
+      // Create a map of warehouse details by ID
+      const warehouseMap = new Map();
+      allWarehouses.forEach(warehouse => {
+        warehouseMap.set(warehouse.id, warehouse);
+      });
+      
+      // Create inventory report with item and warehouse details
+      const inventoryReport = allInventory.map(inv => {
+        const item = itemMap.get(inv.itemId);
+        const warehouse = warehouseMap.get(inv.warehouseId);
+        
+        return {
+          ...inv,
+          item,
+          warehouse,
+          isLowStock: item && inv.quantity < item.minStockLevel
+        };
+      });
+      
+      res.json(inventoryReport);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Get inventory movement report (transactions)
+  app.get("/api/reports/inventory-movement", async (req, res) => {
+    try {
+      const { startDate, endDate, warehouseId, type } = req.query;
+      
+      // Get all transactions
+      let transactions = await storage.getAllTransactions();
+      
+      // Filter by date range if provided
+      if (startDate) {
+        const start = new Date(startDate as string);
+        transactions = transactions.filter(t => new Date(t.createdAt) >= start);
+      }
+      
+      if (endDate) {
+        const end = new Date(endDate as string);
+        end.setHours(23, 59, 59, 999); // End of the day
+        transactions = transactions.filter(t => new Date(t.createdAt) <= end);
+      }
+      
+      // Filter by warehouse if provided
+      if (warehouseId) {
+        const warehouseIdNum = parseInt(warehouseId as string, 10);
+        transactions = transactions.filter(t => 
+          t.sourceWarehouseId === warehouseIdNum || 
+          t.destinationWarehouseId === warehouseIdNum
+        );
+      }
+      
+      // Filter by transaction type if provided
+      if (type && ['check-in', 'issue', 'transfer'].includes(type as string)) {
+        transactions = transactions.filter(t => t.transactionType === type);
+      }
+      
+      // Enrich transactions with item and warehouse details
+      const allItems = await storage.getAllItems();
+      const allWarehouses = await storage.getAllWarehouses();
+      const allUsers = await storage.getAllUsers();
+      
+      // Create maps for lookup
+      const itemMap = new Map();
+      allItems.forEach(item => {
+        itemMap.set(item.id, item);
+      });
+      
+      const warehouseMap = new Map();
+      allWarehouses.forEach(warehouse => {
+        warehouseMap.set(warehouse.id, warehouse);
+      });
+      
+      const userMap = new Map();
+      allUsers.forEach(user => {
+        userMap.set(user.id, user);
+      });
+      
+      // Enrich data
+      const enrichedTransactions = transactions.map(t => {
+        return {
+          ...t,
+          item: itemMap.get(t.itemId),
+          sourceWarehouse: t.sourceWarehouseId ? warehouseMap.get(t.sourceWarehouseId) : null,
+          destinationWarehouse: t.destinationWarehouseId ? warehouseMap.get(t.destinationWarehouseId) : null,
+          user: userMap.get(t.userId)
+        };
+      });
+      
+      res.json(enrichedTransactions);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Get dashboard summary
+  app.get("/api/dashboard/summary", async (req, res) => {
+    try {
+      const totalItems = (await storage.getAllItems()).length;
+      
+      // Count low stock items
+      const allInventory = await storage.getAllInventory();
+      const allItems = await storage.getAllItems();
+      
+      const itemMap = new Map();
+      allItems.forEach(item => {
+        itemMap.set(item.id, item);
+      });
+      
+      const lowStockItems = allInventory.filter(inv => {
+        const item = itemMap.get(inv.itemId);
+        return item && inv.quantity < item.minStockLevel;
+      });
+      
+      // Count pending requests
+      const pendingRequests = await storage.getRequestsByStatus('pending');
+      
+      // Count active transfers
+      const activeTransfers = (await storage.getAllTransactions())
+        .filter(t => t.transactionType === 'transfer' && t.status === 'in-transit');
+      
+      // Get most recent transactions
+      let recentTransactions = await storage.getAllTransactions();
+      recentTransactions.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      recentTransactions = recentTransactions.slice(0, 5);
+      
+      res.json({
+        totalItems,
+        lowStockItemsCount: lowStockItems.length,
+        pendingRequestsCount: pendingRequests.length,
+        activeTransfersCount: activeTransfers.length,
+        recentTransactions,
+        lowStockItems: lowStockItems.slice(0, 5).map(inv => ({
+          ...inv,
+          item: itemMap.get(inv.itemId)
+        })),
+        pendingRequests: pendingRequests.slice(0, 3)
+      });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Get warehouse statistics
+  app.get("/api/warehouses/stats", async (req, res) => {
+    try {
+      const warehouses = await storage.getAllWarehouses();
+      const allInventory = await storage.getAllInventory();
+      const allItems = await storage.getAllItems();
+      
+      // Create a map of item details by ID
+      const itemMap = new Map();
+      allItems.forEach(item => {
+        itemMap.set(item.id, item);
+      });
+      
+      // Calculate statistics for each warehouse
+      const warehouseStats = await Promise.all(warehouses.map(async warehouse => {
+        const warehouseInventory = allInventory.filter(inv => inv.warehouseId === warehouse.id);
+        
+        // Count total items
+        const totalItems = warehouseInventory.reduce((sum, inv) => sum + inv.quantity, 0);
+        
+        // Count low stock items
+        const lowStockItems = warehouseInventory.filter(inv => {
+          const item = itemMap.get(inv.itemId);
+          return item && inv.quantity < item.minStockLevel;
+        });
+        
+        // Calculate capacity usage (rough estimation)
+        const capacityUsed = Math.round((totalItems / warehouse.capacity) * 100);
+        
+        return {
+          ...warehouse,
+          totalItems,
+          lowStockItems: lowStockItems.length,
+          capacityUsed
+        };
+      }));
+      
+      res.json(warehouseStats);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // ==== Export Routes ====
+  // Export inventory stock as CSV
+  app.get("/api/export/inventory-stock", async (req, res) => {
+    try {
+      const allInventory = await storage.getAllInventory();
+      const allItems = await storage.getAllItems();
+      const allWarehouses = await storage.getAllWarehouses();
+      
+      // Create maps for lookup
+      const itemMap = new Map();
+      allItems.forEach(item => {
+        itemMap.set(item.id, item);
+      });
+      
+      const warehouseMap = new Map();
+      allWarehouses.forEach(warehouse => {
+        warehouseMap.set(warehouse.id, warehouse);
+      });
+      
+      // Create CSV header
+      let csv = "Item ID,SKU,Item Name,Warehouse,Quantity,Min Stock Level,Low Stock\n";
+      
+      // Add inventory data
+      allInventory.forEach(inv => {
+        const item = itemMap.get(inv.itemId);
+        const warehouse = warehouseMap.get(inv.warehouseId);
+        
+        if (item && warehouse) {
+          const isLowStock = inv.quantity < item.minStockLevel;
+          
+          csv += `${item.id},${item.sku},"${item.name}","${warehouse.name}",${inv.quantity},${item.minStockLevel},${isLowStock}\n`;
+        }
+      });
+      
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', 'attachment; filename=inventory-stock.csv');
+      res.send(csv);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Export transactions as CSV
+  app.get("/api/export/transactions", async (req, res) => {
+    try {
+      const transactions = await storage.getAllTransactions();
+      const allItems = await storage.getAllItems();
+      const allWarehouses = await storage.getAllWarehouses();
+      const allUsers = await storage.getAllUsers();
+      
+      // Create maps for lookup
+      const itemMap = new Map();
+      allItems.forEach(item => {
+        itemMap.set(item.id, item);
+      });
+      
+      const warehouseMap = new Map();
+      allWarehouses.forEach(warehouse => {
+        warehouseMap.set(warehouse.id, warehouse);
+      });
+      
+      const userMap = new Map();
+      allUsers.forEach(user => {
+        userMap.set(user.id, user);
+      });
+      
+      // Create CSV header
+      let csv = "Transaction ID,Code,Date,Type,Item SKU,Item Name,Quantity,Source Warehouse,Destination Warehouse,Status,User\n";
+      
+      // Add transaction data
+      transactions.forEach(t => {
+        const item = itemMap.get(t.itemId);
+        const sourceWarehouse = t.sourceWarehouseId ? warehouseMap.get(t.sourceWarehouseId) : null;
+        const destWarehouse = t.destinationWarehouseId ? warehouseMap.get(t.destinationWarehouseId) : null;
+        const user = userMap.get(t.userId);
+        
+        if (item) {
+          csv += `${t.id},${t.transactionCode},"${new Date(t.createdAt).toISOString().split('T')[0]}",${t.transactionType},${item.sku},"${item.name}",${t.quantity},"${sourceWarehouse ? sourceWarehouse.name : ''}","${destWarehouse ? destWarehouse.name : ''}",${t.status},"${user ? user.name : ''}"\n`;
+        }
+      });
+      
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', 'attachment; filename=transactions.csv');
+      res.send(csv);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  const httpServer = createServer(app);
+  return httpServer;
+}
