@@ -44,7 +44,8 @@ const formSchema = z.object({
   requesterId: z.string().optional(),
   checkInDate: z.date().optional(),
   transactionType: z.literal("check-in"),
-  status: z.literal("completed")
+  status: z.literal("completed"),
+  sourceWarehouseId: z.null()
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -98,7 +99,7 @@ export default function CheckInPage() {
         status: "completed",
         cost: data.cost ? parseFloat(data.cost) : null,
         requesterId: data.requesterId ? parseInt(data.requesterId) : null,
-        checkInDate: data.checkInDate || new Date(),
+        checkInDate: data.checkInDate ? new Date(data.checkInDate).toISOString() : new Date().toISOString(),
         sourceWarehouseId: null
       };
 
