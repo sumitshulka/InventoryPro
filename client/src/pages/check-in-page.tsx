@@ -79,8 +79,7 @@ export default function CheckInPage() {
         status: "completed" as const,
         cost: values.cost ? Number(values.cost) : null,
         requesterId: values.requesterId ? Number(values.requesterId) : null,
-        checkInDate: new Date(values.checkInDate),
-        createdAt: new Date(),
+        checkInDate: values.checkInDate.toISOString(),
         sourceWarehouseId: null
       };
 
