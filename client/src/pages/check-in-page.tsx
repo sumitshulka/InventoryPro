@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { z } from "zod";
@@ -6,7 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { format } from "date-fns";
 import AppLayout from "@/components/layout/app-layout";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Calendar } from "@/components/ui/calendar";
@@ -20,15 +21,12 @@ import { useAuth } from "@/hooks/use-auth";
 import { formatDateTime, getStatusColor, cn } from "@/lib/utils";
 
 const formSchema = z.object({
-    itemId: z.string().min(1, { message: "Item is required" }),
-    quantity: z.string().min(1, { message: "Quantity is required" }),
-    destinationWarehouseId: z.string().min(1, { message: "Destination warehouse is required" }),
-    cost: z.string().optional(),
-    requesterId: z.string().optional(),
-    checkInDate: z.date(),
-    transactionType: z.literal("check-in"),
-    status: z.literal("completed"),
-    sourceWarehouseId: z.null()
+  itemId: z.string().min(1, { message: "Item is required" }),
+  quantity: z.string().min(1, { message: "Quantity is required" }),
+  destinationWarehouseId: z.string().min(1, { message: "Destination warehouse is required" }),
+  cost: z.string().optional(),
+  requesterId: z.string().optional(),
+  checkInDate: z.date(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -63,9 +61,6 @@ export default function CheckInPage() {
       cost: "",
       requesterId: "",
       checkInDate: new Date(),
-      transactionType: "check-in",
-      status: "completed",
-      sourceWarehouseId: null
     },
   });
 
@@ -74,13 +69,13 @@ export default function CheckInPage() {
       const payload = {
         itemId: parseInt(values.itemId),
         quantity: parseInt(values.quantity),
-        transactionType: "check-in" as const,
         destinationWarehouseId: parseInt(values.destinationWarehouseId),
+        transactionType: "check-in" as const,
         status: "completed" as const,
         cost: values.cost ? parseFloat(values.cost) : null,
         requesterId: values.requesterId ? parseInt(values.requesterId) : null,
+        sourceWarehouseId: null,
         checkInDate: values.checkInDate,
-        sourceWarehouseId: null
       };
 
       const response = await apiRequest("POST", "/api/transactions", payload);
@@ -107,9 +102,6 @@ export default function CheckInPage() {
         cost: "",
         requesterId: "",
         checkInDate: new Date(),
-        transactionType: "check-in",
-        status: "completed",
-        sourceWarehouseId: null
       });
 
       setIsTransactionSuccess(true);
@@ -358,7 +350,6 @@ export default function CheckInPage() {
                     checkInTransactions?.slice(0, 10).map((transaction: any) => {
                       const item = items?.find((i: any) => i.id === transaction.itemId);
                       const warehouse = warehouses?.find((w: any) => w.id === transaction.destinationWarehouseId);
-                      const requester = users?.find((u: any) => u.id === transaction.requesterId);
 
                       return (
                         <TableRow key={transaction.id}>
