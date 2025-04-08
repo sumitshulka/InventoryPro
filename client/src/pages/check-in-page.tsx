@@ -67,7 +67,7 @@ export default function CheckInPage() {
   const { data: users, isLoading: usersLoading } = useQuery({
     queryKey: ["/api/users"],
   });
-  
+
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -118,7 +118,7 @@ export default function CheckInPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/transactions/type/check-in"] });
       queryClient.invalidateQueries({ queryKey: ["/api/reports/inventory-stock"] });
       queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
-      
+
       toast({
         title: "Check-in successful",
         description: "The items have been checked into inventory successfully.",
@@ -289,9 +289,11 @@ export default function CheckInPage() {
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
                     <Calendar
-                      mode="single" 
-                      selected={form.getValues("checkInDate") ? new Date(form.getValues("checkInDate")) : undefined}
-                      onSelect={(date) => form.setValue("checkInDate", date || new Date())}
+                      mode="single"
+                      selected={form.getValues("checkInDate")}
+                      onSelect={(date) => {
+                        form.setValue("checkInDate", date || undefined);
+                      }}
                       disabled={(date) => date > new Date()}
                       initialFocus
                     />
@@ -332,7 +334,7 @@ export default function CheckInPage() {
                   "Check-In Items"
                 )}
               </Button>
-              
+
               {isTransactionSuccess && (
                 <div className="bg-green-100 text-green-800 p-3 rounded-md text-sm">
                   Check-in completed successfully!
@@ -375,7 +377,7 @@ export default function CheckInPage() {
                       const item = items?.find((i: any) => i.id === transaction.itemId);
                       const warehouse = warehouses?.find((w: any) => w.id === transaction.destinationWarehouseId);
                       const requester = users?.find((u: any) => u.id === transaction.requesterId);
-                      
+
                       return (
                         <TableRow key={transaction.id}>
                           <TableCell className="font-medium">{transaction.transactionCode}</TableCell>
