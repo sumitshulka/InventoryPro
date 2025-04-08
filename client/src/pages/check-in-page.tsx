@@ -89,13 +89,13 @@ export default function CheckInPage() {
       const payload = {
         itemId: parseInt(data.itemId),
         quantity: parseInt(data.quantity),
-        transactionType: "check-in",
+        transactionType: "check-in" as const,
         destinationWarehouseId: parseInt(data.destinationWarehouseId),
-        status: "completed",
-        cost: data.cost && data.cost !== "" ? parseFloat(data.cost) : null,
-        requesterId: data.requesterId && data.requesterId !== "" ? parseInt(data.requesterId) : null,
-        checkInDate: data.checkInDate ? data.checkInDate.toISOString() : new Date().toISOString(),
-        sourceWarehouseId: null
+        status: "completed" as const,
+        cost: data.cost && data.cost !== "" ? parseFloat(data.cost) : undefined,
+        requesterId: data.requesterId && data.requesterId !== "" ? parseInt(data.requesterId) : undefined,
+        checkInDate: data.checkInDate ?? undefined,
+        sourceWarehouseId: undefined
       };
 
       try {
