@@ -77,8 +77,11 @@ export default function CheckInPage() {
       return res.json();
     },
     onSuccess: () => {
+      // Invalidate all relevant queries to update the UI
       queryClient.invalidateQueries({ queryKey: ["/api/transactions/type/check-in"] });
       queryClient.invalidateQueries({ queryKey: ["/api/reports/inventory-stock"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
+      
       toast({
         title: "Check-in successful",
         description: "The items have been checked into inventory successfully.",

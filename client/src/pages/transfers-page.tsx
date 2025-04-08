@@ -92,8 +92,11 @@ export default function TransfersPage() {
       return res.json();
     },
     onSuccess: () => {
+      // Invalidate all relevant queries
       queryClient.invalidateQueries({ queryKey: ["/api/transactions/type/transfer"] });
       queryClient.invalidateQueries({ queryKey: ["/api/reports/inventory-stock"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
+      
       toast({
         title: "Transfer initiated",
         description: "The inventory transfer has been initiated successfully.",
@@ -120,8 +123,11 @@ export default function TransfersPage() {
       return res.json();
     },
     onSuccess: () => {
+      // Invalidate all relevant queries
       queryClient.invalidateQueries({ queryKey: ["/api/transactions/type/transfer"] });
       queryClient.invalidateQueries({ queryKey: ["/api/reports/inventory-stock"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
+      
       toast({
         title: "Transfer completed",
         description: "The inventory transfer has been completed successfully.",
