@@ -86,6 +86,10 @@ export default function CheckInPage() {
         throw new Error("Required fields are missing");
       }
 
+      if (!data.itemId || !data.quantity || !data.destinationWarehouseId) {
+        throw new Error("Please fill in all required fields");
+      }
+
       const payload = {
         itemId: parseInt(data.itemId),
         quantity: parseInt(data.quantity),
@@ -94,7 +98,7 @@ export default function CheckInPage() {
         status: "completed" as const,
         cost: data.cost && data.cost !== "" ? parseFloat(data.cost) : undefined,
         requesterId: data.requesterId && data.requesterId !== "" ? parseInt(data.requesterId) : undefined,
-        checkInDate: data.checkInDate ?? undefined,
+        checkInDate: data.checkInDate ? new Date(data.checkInDate).toISOString() : undefined,
         sourceWarehouseId: undefined
       };
 
