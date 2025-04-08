@@ -391,7 +391,37 @@ export default function InventoryPage() {
               </TableHeader>
               <TableBody>
                 {inventory?.filter((item: any) => item.item.sku === selectedSku)
-                  .flatMap((item: any) => item.movements || [])
+                  .flatMap((item: any) => {
+                    const movements = [];
+                    // Add check-in transactions
+                    if (item.checkInTransactions) {
+                      movements.push(...item.checkInTransactions.map((t: any) => ({
+                        ...t,
+                        type: 'check-in',
+                        quantity: t.quantity,
+                        warehouse: t.destinationWarehouse
+                      })));
+                    }
+                    // Add issue transactions
+                    if (item.issueTransactions) {
+                      movements.push(...item.issueTransactions.map((t: any) => ({
+                        ...t,
+                        type: 'issue',
+                        quantity: -t.quantity,
+                        warehouse: t.sourceWarehouse
+                      })));
+                    }
+                    // Add transfer transactions
+                    if (item.transferTransactions) {
+                      movements.push(...item.transferTransactions.map((t: any) => ({
+                        ...t,
+                        type: 'transfer',
+                        quantity: t.sourceWarehouseId === item.warehouseId ? -t.quantity : t.quantity,
+                        warehouse: t.sourceWarehouseId === item.warehouseId ? t.destinationWarehouse : t.sourceWarehouse
+                      })));
+                    }
+                    return movements.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+                  })
                   .map((movement: any) => (
                     <TableRow key={movement.id}>
                       <TableCell>{formatDateTime(movement.createdAt)}</TableCell>
@@ -400,14 +430,10 @@ export default function InventoryPage() {
                           {movement.type}
                         </span>
                       </TableCell>
-                      <TableCell>{movement.quantity}</TableCell>
-                      <TableCell>
-                        {movement.type === 'transfer' 
-                          ? `${movement.sourceWarehouse?.name || 'Unknown'} → ${movement.destinationWarehouse?.name || 'Unknown'}`
-                          : movement.type === 'check-in'
-                            ? movement.destinationWarehouse?.name
-                            : movement.sourceWarehouse?.name}
+                      <TableCell className={movement.quantity < 0 ? 'text-red-600' : 'text-green-600'}>
+                        {movement.quantity > 0 ? '+' : ''}{movement.quantity}
                       </TableCell>
+                      <TableCell>{movement.warehouse?.name || 'Unknown'}</TableCell>
                     </TableRow>
                   ))}
               </TableBody>
