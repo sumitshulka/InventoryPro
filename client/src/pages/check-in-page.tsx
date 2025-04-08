@@ -38,11 +38,13 @@ import { formatDateTime, getStatusColor, cn } from "@/lib/utils";
 
 const formSchema = z.object({
   itemId: z.string().min(1, { message: "Item is required" }),
-  quantity: z.string().min(1, { message: "Quantity is required" }).transform(val => parseInt(val)),
+  quantity: z.string().min(1, { message: "Quantity is required" }),
   destinationWarehouseId: z.string().min(1, { message: "Destination warehouse is required" }),
-  cost: z.string().optional().transform(val => val ? parseFloat(val) : undefined),
+  cost: z.string().optional(),
   requesterId: z.string().optional(),
   checkInDate: z.date().optional(),
+  transactionType: z.literal("check-in"),
+  status: z.literal("completed")
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -77,6 +79,8 @@ export default function CheckInPage() {
       cost: "",
       requesterId: "",
       checkInDate: new Date(),
+      transactionType: "check-in",
+      status: "completed"
     },
   });
 
@@ -89,13 +93,13 @@ export default function CheckInPage() {
       const payload = {
         itemId: parseInt(data.itemId),
         quantity: parseInt(data.quantity),
-        transactionType: "check-in" as const,
+        transactionType: "check-in",
         destinationWarehouseId: parseInt(data.destinationWarehouseId),
-        status: "completed" as const,
-        cost: data.cost && data.cost !== "" ? parseFloat(data.cost) : undefined,
-        requesterId: data.requesterId && data.requesterId !== "" ? parseInt(data.requesterId) : undefined,
-        checkInDate: data.checkInDate instanceof Date ? data.checkInDate.toISOString() : new Date().toISOString(),
-        sourceWarehouseId: undefined
+        status: "completed",
+        cost: data.cost ? parseFloat(data.cost) : null,
+        requesterId: data.requesterId ? parseInt(data.requesterId) : null,
+        checkInDate: data.checkInDate || new Date(),
+        sourceWarehouseId: null
       };
 
       try {
