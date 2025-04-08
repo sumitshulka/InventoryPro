@@ -278,20 +278,22 @@ export default function CheckInPage() {
                       variant="outline"
                       className={cn(
                         "w-full justify-start text-left font-normal",
-                        !form.getValues("checkInDate") && "text-muted-foreground"
+                        !form.watch("checkInDate") && "text-muted-foreground"
                       )}
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
-                      {form.getValues("checkInDate") ? format(form.getValues("checkInDate"), "PPP") : <span>Pick a date</span>}
+                      {form.watch("checkInDate") ? format(form.watch("checkInDate"), "dd/MM/yyyy") : <span>Pick a date</span>}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
                     <Calendar
                       mode="single"
-                      selected={form.getValues("checkInDate")}
+                      selected={form.watch("checkInDate")}
                       onSelect={(date) => form.setValue("checkInDate", date || new Date())}
                       disabled={(date) => date > new Date()}
                       initialFocus
+                      fromDate={new Date(2020, 0, 1)}
+                      toDate={new Date()}
                     />
                   </PopoverContent>
                 </Popover>
