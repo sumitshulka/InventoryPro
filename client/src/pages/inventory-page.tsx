@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { getTransactionTypeColor, formatDateTime } from "@/lib/utils";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -51,6 +53,8 @@ export default function InventoryPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [warehouseFilter, setWarehouseFilter] = useState("all");
+  const [selectedSku, setSelectedSku] = useState<string | null>(null);
+  const [isSheetOpen, setIsSheetOpen] = useState(false);
 
   const { data: inventory, isLoading: inventoryLoading } = useQuery({
     queryKey: ["/api/reports/inventory-stock"],
@@ -239,7 +243,14 @@ export default function InventoryPage() {
                   </TableRow>
                 ) : (
                   filteredInventory.map((inv: any) => (
-                    <TableRow key={inv.id}>
+                    <TableRow 
+                      key={inv.id} 
+                      className="cursor-pointer hover:bg-gray-50"
+                      onClick={() => {
+                        setSelectedSku(inv.item.sku);
+                        setIsSheetOpen(true);
+                      }}
+                    >
                       <TableCell className="font-medium">{inv.item.sku}</TableCell>
                       <TableCell>{inv.item.name}</TableCell>
                       <TableCell>{inv.warehouse.name}</TableCell>
@@ -361,6 +372,49 @@ export default function InventoryPage() {
           </form>
         </DialogContent>
       </Dialog>
+
+      <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
+        <SheetContent className="w-full sm:w-[600px]">
+          <SheetHeader>
+            <SheetTitle>Movement History - {selectedSku}</SheetTitle>
+          </SheetHeader>
+          
+          <div className="mt-6">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Quantity</TableHead>
+                  <TableHead>Source/Destination</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {inventory?.filter((item: any) => item.item.sku === selectedSku)
+                  .flatMap((item: any) => item.movements || [])
+                  .map((movement: any) => (
+                    <TableRow key={movement.id}>
+                      <TableCell>{formatDateTime(movement.createdAt)}</TableCell>
+                      <TableCell>
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${getTransactionTypeColor(movement.type)}`}>
+                          {movement.type}
+                        </span>
+                      </TableCell>
+                      <TableCell>{movement.quantity}</TableCell>
+                      <TableCell>
+                        {movement.type === 'transfer' 
+                          ? `${movement.sourceWarehouse?.name || 'Unknown'} → ${movement.destinationWarehouse?.name || 'Unknown'}`
+                          : movement.type === 'check-in'
+                            ? movement.destinationWarehouse?.name
+                            : movement.sourceWarehouse?.name}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+              </TableBody>
+            </Table>
+          </div>
+        </SheetContent>
+      </Sheet>
     </AppLayout>
   );
 }
