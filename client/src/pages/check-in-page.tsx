@@ -148,11 +148,12 @@ export default function CheckInPage() {
   const handleSubmit = (values: FormValues) => {
     const payload = {
       ...values,
-      itemId: parseInt(values.itemId),
-      quantity: parseInt(values.quantity),
-      destinationWarehouseId: parseInt(values.destinationWarehouseId),
-      cost: values.cost ? parseFloat(values.cost) : null,
-      requesterId: values.requesterId ? parseInt(values.requesterId) : null,
+      itemId: values.itemId,
+      quantity: values.quantity,
+      destinationWarehouseId: values.destinationWarehouseId,
+      cost: values.cost || null,
+      requesterId: values.requesterId || null,
+      checkInDate: values.checkInDate,
       sourceWarehouseId: null
     };
     checkInMutation.mutate(payload);
