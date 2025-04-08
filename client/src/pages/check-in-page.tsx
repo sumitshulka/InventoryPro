@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { z } from "zod";
@@ -21,16 +20,23 @@ import { useAuth } from "@/hooks/use-auth";
 import { formatDateTime, getStatusColor, cn } from "@/lib/utils";
 
 const formSchema = z.object({
-  itemId: z.string().min(1, { message: "Item is required" }),
-  quantity: z.string().min(1, { message: "Quantity is required" }),
-  destinationWarehouseId: z.string().min(1, { message: "Destination warehouse is required" }),
-  cost: z.string().optional(),
-  requesterId: z.string().optional(),
-  checkInDate: z.date(),
-  transactionType: z.literal("check-in"),
-  status: z.literal("completed"),
-  sourceWarehouseId: z.null()
-});
+    itemId: z.string().min(1, { message: "Item is required" }),
+    quantity: z.string().min(1, { message: "Quantity is required" }),
+    destinationWarehouseId: z.string().min(1, { message: "Destination warehouse is required" }),
+    cost: z.string().optional(),
+    requesterId: z.string().optional(),
+    checkInDate: z.date(),
+    transactionType: z.literal("check-in"),
+    status: z.literal("completed"),
+    sourceWarehouseId: z.null()
+}).transform(data => ({
+    ...data,
+    itemId: parseInt(data.itemId),
+    quantity: parseInt(data.quantity),
+    destinationWarehouseId: parseInt(data.destinationWarehouseId),
+    requesterId: data.requesterId ? parseInt(data.requesterId) : null,
+    cost: data.cost ? parseFloat(data.cost) : null
+}));
 
 type FormValues = z.infer<typeof formSchema>;
 
@@ -73,13 +79,13 @@ export default function CheckInPage() {
   const checkInMutation = useMutation({
     mutationFn: async (data: FormValues) => {
       const payload = {
-        itemId: parseInt(data.itemId),
-        quantity: parseInt(data.quantity),
+        itemId: data.itemId,
+        quantity: data.quantity,
         transactionType: "check-in" as const,
-        destinationWarehouseId: parseInt(data.destinationWarehouseId),
+        destinationWarehouseId: data.destinationWarehouseId,
         status: "completed" as const,
-        cost: data.cost ? parseFloat(data.cost) : null,
-        requesterId: data.requesterId ? parseInt(data.requesterId) : null,
+        cost: data.cost,
+        requesterId: data.requesterId,
         checkInDate: data.checkInDate,
         sourceWarehouseId: null
       };
