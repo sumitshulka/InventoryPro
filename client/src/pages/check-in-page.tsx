@@ -70,16 +70,17 @@ export default function CheckInPage() {
   });
 
   const checkInMutation = useMutation({
-    mutationFn: async (data: FormValues) => {
+    mutationFn: async (values: FormValues) => {
+      // Convert form values to correct types before submission
       const payload = {
-        itemId: data.itemId,
-        quantity: data.quantity,
+        itemId: Number(values.itemId),
+        quantity: Number(values.quantity),
         transactionType: "check-in" as const,
-        destinationWarehouseId: data.destinationWarehouseId,
+        destinationWarehouseId: Number(values.destinationWarehouseId),
         status: "completed" as const,
-        cost: data.cost,
-        requesterId: data.requesterId,
-        checkInDate: data.checkInDate,
+        cost: values.cost ? Number(values.cost) : null,
+        requesterId: values.requesterId ? Number(values.requesterId) : null,
+        checkInDate: values.checkInDate.toISOString().split('T')[0],
         sourceWarehouseId: null
       };
 
