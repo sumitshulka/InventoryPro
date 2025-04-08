@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, unique } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, unique, numeric } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -106,7 +106,10 @@ export const transactions = pgTable("transactions", {
   destinationWarehouseId: integer("destination_warehouse_id"),
   requestId: integer("request_id"),
   userId: integer("user_id").notNull(),
+  requesterId: integer("requester_id"),
   status: text("status").notNull().default("completed"),
+  cost: numeric("cost", { precision: 10, scale: 2 }),
+  checkInDate: timestamp("check_in_date"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   completedAt: timestamp("completed_at"),
 });
