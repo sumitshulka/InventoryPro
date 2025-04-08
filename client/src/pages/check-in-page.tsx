@@ -80,7 +80,7 @@ export default function CheckInPage() {
         status: "completed" as const,
         cost: values.cost ? Number(values.cost) : null,
         requesterId: values.requesterId ? Number(values.requesterId) : null,
-        checkInDate: values.checkInDate.toISOString().split('T')[0],
+        checkInDate: values.checkInDate,
         sourceWarehouseId: null
       };
 
