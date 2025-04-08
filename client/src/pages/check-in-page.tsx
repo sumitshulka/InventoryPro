@@ -37,15 +37,15 @@ import { useAuth } from "@/hooks/use-auth";
 import { formatDateTime, getStatusColor, cn } from "@/lib/utils";
 
 const formSchema = z.object({
-    itemId: z.string().min(1, { message: "Item is required" }),
-    quantity: z.string().min(1, { message: "Quantity is required" }),
-    destinationWarehouseId: z.string().min(1, { message: "Destination warehouse is required" }),
-    cost: z.string().optional().nullable(),
-    requesterId: z.string().optional().nullable(),
-    checkInDate: z.date().default(() => new Date()),
-    transactionType: z.literal("check-in").default("check-in"),
-    status: z.literal("completed").default("completed"),
-    sourceWarehouseId: z.null().default(null)
+    itemId: z.string().min(1, { message: "Item is required" }).transform(val => parseInt(val)),
+    quantity: z.string().min(1, { message: "Quantity is required" }).transform(val => parseInt(val)),
+    destinationWarehouseId: z.string().min(1, { message: "Destination warehouse is required" }).transform(val => parseInt(val)),
+    cost: z.string().optional().transform(val => val ? parseFloat(val) : null),
+    requesterId: z.string().optional().transform(val => val ? parseInt(val) : null),
+    checkInDate: z.date(),
+    transactionType: z.literal("check-in"),
+    status: z.literal("completed"),
+    sourceWarehouseId: z.null()
   });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -146,17 +146,8 @@ export default function CheckInPage() {
   });
 
   const handleSubmit = (values: FormValues) => {
-    const payload = {
-      ...values,
-      itemId: values.itemId,
-      quantity: values.quantity,
-      destinationWarehouseId: values.destinationWarehouseId,
-      cost: values.cost || null,
-      requesterId: values.requesterId || null,
-      checkInDate: values.checkInDate,
-      sourceWarehouseId: null
-    };
-    checkInMutation.mutate(payload);
+    // Schema transform will handle type conversions
+    checkInMutation.mutate(values);
   };
 
   const isManager = user?.role === "admin" || user?.role === "manager";
