@@ -82,16 +82,26 @@ export default function CheckInPage() {
 
   const checkInMutation = useMutation({
     mutationFn: async (data: FormValues) => {
-      const payload = {
+      const payload: any = {
         itemId: parseInt(data.itemId),
         quantity: parseInt(data.quantity),
         transactionType: "check-in",
         destinationWarehouseId: parseInt(data.destinationWarehouseId),
-        status: "completed",
-        cost: data.cost ? parseFloat(data.cost) : undefined,
-        requesterId: data.requesterId ? parseInt(data.requesterId) : undefined,
-        checkInDate: data.checkInDate
+        status: "completed"
       };
+      
+      // Only add optional fields if they have values
+      if (data.cost) {
+        payload.cost = parseFloat(data.cost);
+      }
+      
+      if (data.requesterId) {
+        payload.requesterId = parseInt(data.requesterId);
+      }
+      
+      if (data.checkInDate) {
+        payload.checkInDate = data.checkInDate;
+      }
       
       const res = await apiRequest("POST", "/api/transactions", payload);
       return res.json();
@@ -259,6 +269,7 @@ export default function CheckInPage() {
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button
+                      type="button"
                       variant="outline"
                       className={cn(
                         "w-full justify-start text-left font-normal",
@@ -266,14 +277,15 @@ export default function CheckInPage() {
                       )}
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
-                      {form.getValues("checkInDate") ? format(form.getValues("checkInDate"), "PPP") : <span>Pick a date</span>}
+                      {form.getValues("checkInDate") ? format(new Date(form.getValues("checkInDate")), "PPP") : <span>Pick a date</span>}
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
+                  <PopoverContent className="w-auto p-0" align="start">
                     <Calendar
                       mode="single"
-                      selected={form.getValues("checkInDate")}
-                      onSelect={(date) => date && form.setValue("checkInDate", date)}
+                      selected={form.getValues("checkInDate") ? new Date(form.getValues("checkInDate")) : undefined}
+                      onSelect={(date) => form.setValue("checkInDate", date || new Date())}
+                      disabled={(date) => date > new Date()}
                       initialFocus
                     />
                   </PopoverContent>

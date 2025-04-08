@@ -337,17 +337,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create transaction (check-in, issue, transfer) (manager+)
   app.post("/api/transactions", checkRole("manager"), async (req, res) => {
     try {
-      const transactionData = insertTransactionSchema.parse(req.body);
+      // Use safeParse and handle any validation errors manually
+      const parseResult = insertTransactionSchema.safeParse(req.body);
+      
+      if (!parseResult.success) {
+        return res.status(400).json({ message: parseResult.error.message });
+      }
+      
+      const transactionData = parseResult.data;
       
       // Generate transaction code
       const transactionCode = `TRX-${(await storage.getAllTransactions()).length + 873}`; // Start from where sample data left off
       
-      // Create transaction
-      const transaction = await storage.createTransaction({
+      // Create transaction with the correct fields
+      let transactionPayload: any = {
         ...transactionData,
         transactionCode,
         userId: req.user!.id, // Use the authenticated user's ID
-      });
+      };
+      
+      // Create the transaction
+      const transaction = await storage.createTransaction(transactionPayload);
       
       // Update inventory based on transaction type
       if (transaction.transactionType === "check-in" && transaction.destinationWarehouseId) {
@@ -630,8 +640,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
               
               if (otherInventory && otherInventory.quantity >= requestItem.quantity) {
                 // Create a transfer transaction
+                const trxCode = `TRX-${(await storage.getAllTransactions()).length + 873}`;
                 await storage.createTransaction({
-                  transactionCode: `TRX-${(await storage.getAllTransactions()).length + 873}`,
                   itemId: requestItem.itemId,
                   quantity: requestItem.quantity,
                   transactionType: "transfer",
@@ -639,7 +649,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   destinationWarehouseId: request.warehouseId,
                   requestId: request.id,
                   userId: req.user!.id,
-                  status: "in-transit"
+                  status: "in-transit",
+                  transactionCode: trxCode
                 });
                 
                 // Update source warehouse inventory
@@ -661,15 +672,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
           } else {
             // Item is available in the requested warehouse, create an issue transaction
+            const issueCode = `TRX-${(await storage.getAllTransactions()).length + 873}`;
             await storage.createTransaction({
-              transactionCode: `TRX-${(await storage.getAllTransactions()).length + 873}`,
               itemId: requestItem.itemId,
               quantity: requestItem.quantity,
               transactionType: "issue",
               sourceWarehouseId: request.warehouseId,
               requestId: request.id,
               userId: req.user!.id,
-              status: "completed"
+              status: "completed",
+              transactionCode: issueCode
             });
             
             // Update inventory
