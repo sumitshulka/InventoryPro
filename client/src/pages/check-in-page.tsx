@@ -29,14 +29,7 @@ const formSchema = z.object({
     transactionType: z.literal("check-in"),
     status: z.literal("completed"),
     sourceWarehouseId: z.null()
-}).transform(data => ({
-    ...data,
-    itemId: parseInt(data.itemId),
-    quantity: parseInt(data.quantity),
-    destinationWarehouseId: parseInt(data.destinationWarehouseId),
-    requesterId: data.requesterId ? parseInt(data.requesterId) : null,
-    cost: data.cost ? parseFloat(data.cost) : null
-}));
+});
 
 type FormValues = z.infer<typeof formSchema>;
 
@@ -141,7 +134,20 @@ export default function CheckInPage() {
       });
       return;
     }
-    checkInMutation.mutate(values);
+
+    const payload = {
+      itemId: parseInt(values.itemId),
+      quantity: parseInt(values.quantity),
+      destinationWarehouseId: parseInt(values.destinationWarehouseId),
+      cost: values.cost ? parseFloat(values.cost) : null,
+      requesterId: values.requesterId ? parseInt(values.requesterId) : null,
+      checkInDate: values.checkInDate,
+      transactionType: "check-in" as const,
+      status: "completed" as const,
+      sourceWarehouseId: null
+    };
+
+    checkInMutation.mutate(payload);
   };
 
   const isManager = user?.role === "admin" || user?.role === "manager";
