@@ -113,6 +113,8 @@ export const transactions = pgTable("transactions", {
 
 export const insertTransactionSchema = createInsertSchema(transactions).omit({
   id: true,
+  transactionCode: true,
+  userId: true,
   createdAt: true,
   completedAt: true,
 });
