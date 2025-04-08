@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { z } from "zod";
@@ -6,30 +7,13 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { format } from "date-fns";
 import AppLayout from "@/components/layout/app-layout";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Calendar } from "@/components/ui/calendar";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Loader2, CalendarIcon } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -37,27 +21,16 @@ import { useAuth } from "@/hooks/use-auth";
 import { formatDateTime, getStatusColor, cn } from "@/lib/utils";
 
 const formSchema = z.object({
-    itemId: z.string().min(1, { message: "Item is required" }),
-    quantity: z.string().min(1, { message: "Quantity is required" }),
-    destinationWarehouseId: z.string().min(1, { message: "Destination warehouse is required" }),
-    cost: z.string().optional(),
-    requesterId: z.string().optional(),
-    checkInDate: z.date(),
-    transactionType: z.literal("check-in"),
-    status: z.literal("completed"),
-    sourceWarehouseId: z.null()
-}).transform(data => ({
-    ...data,
-    itemId: data.itemId,
-    quantity: data.quantity,
-    destinationWarehouseId: data.destinationWarehouseId,
-    cost: data.cost || null,
-    requesterId: data.requesterId || null,
-    checkInDate: data.checkInDate,
-    transactionType: "check-in" as const,
-    status: "completed" as const,
-    sourceWarehouseId: null
-}));
+  itemId: z.string().min(1, { message: "Item is required" }),
+  quantity: z.string().min(1, { message: "Quantity is required" }),
+  destinationWarehouseId: z.string().min(1, { message: "Destination warehouse is required" }),
+  cost: z.string().optional(),
+  requesterId: z.string().optional(),
+  checkInDate: z.date(),
+  transactionType: z.literal("check-in"),
+  status: z.literal("completed"),
+  sourceWarehouseId: z.null()
+});
 
 type FormValues = z.infer<typeof formSchema>;
 
@@ -91,43 +64,34 @@ export default function CheckInPage() {
       cost: "",
       requesterId: "",
       checkInDate: new Date(),
-      transactionType: "check-in" as const,
-      status: "completed" as const,
+      transactionType: "check-in",
+      status: "completed",
       sourceWarehouseId: null
     },
   });
 
   const checkInMutation = useMutation({
     mutationFn: async (data: FormValues) => {
-      if (!data.itemId || !data.quantity || !data.destinationWarehouseId) {
-        throw new Error("Please fill in all required fields");
-      }
-
       const payload = {
         itemId: parseInt(data.itemId),
         quantity: parseInt(data.quantity),
-        transactionType: "check-in",
+        transactionType: "check-in" as const,
         destinationWarehouseId: parseInt(data.destinationWarehouseId),
-        status: "completed",
+        status: "completed" as const,
         cost: data.cost ? parseFloat(data.cost) : null,
         requesterId: data.requesterId ? parseInt(data.requesterId) : null,
-        checkInDate: data.checkInDate ? new Date(data.checkInDate).toISOString() : new Date().toISOString(),
+        checkInDate: data.checkInDate,
         sourceWarehouseId: null
       };
 
-      try {
-        const res = await apiRequest("POST", "/api/transactions", payload);
-        if (!res.ok) {
-          const error = await res.json();
-          throw new Error(error.message || "Failed to create check-in transaction");
-        }
-        return res.json();
-      } catch (error: any) {
-        throw new Error(error.message || "Failed to create check-in transaction");
+      const response = await apiRequest("POST", "/api/transactions", payload);
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message);
       }
+      return response.json();
     },
     onSuccess: () => {
-      // Invalidate all relevant queries to update the UI
       queryClient.invalidateQueries({ queryKey: ["/api/transactions/type/check-in"] });
       queryClient.invalidateQueries({ queryKey: ["/api/reports/inventory-stock"] });
       queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
@@ -136,6 +100,7 @@ export default function CheckInPage() {
         title: "Check-in successful",
         description: "The items have been checked into inventory successfully.",
       });
+
       form.reset({
         itemId: "",
         quantity: "",
@@ -143,7 +108,11 @@ export default function CheckInPage() {
         cost: "",
         requesterId: "",
         checkInDate: new Date(),
+        transactionType: "check-in",
+        status: "completed",
+        sourceWarehouseId: null
       });
+
       setIsTransactionSuccess(true);
       setTimeout(() => setIsTransactionSuccess(false), 3000);
       refetchTransactions();
@@ -158,7 +127,14 @@ export default function CheckInPage() {
   });
 
   const handleSubmit = (values: FormValues) => {
-    console.log("Submitting form with values:", values);
+    if (!values.itemId || !values.quantity || !values.destinationWarehouseId) {
+      toast({
+        title: "Validation Error",
+        description: "Please fill in all required fields",
+        variant: "destructive",
+      });
+      return;
+    }
     checkInMutation.mutate(values);
   };
 
@@ -174,7 +150,6 @@ export default function CheckInPage() {
     );
   }
 
-  // Only managers and admins can check-in items
   if (!isManager) {
     return (
       <AppLayout>
@@ -205,16 +180,12 @@ export default function CheckInPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Form Card */}
         <Card className="lg:col-span-1">
           <CardHeader>
             <CardTitle>Check-In Form</CardTitle>
           </CardHeader>
           <CardContent>
-            <form onSubmit={(e) => {
-              e.preventDefault();
-              form.handleSubmit(handleSubmit)(e);
-            }} className="space-y-4">
+            <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="itemId">Select Item</Label>
                 <Select
@@ -283,9 +254,6 @@ export default function CheckInPage() {
                   placeholder="Enter cost"
                   {...form.register("cost")}
                 />
-                {form.formState.errors.cost && (
-                  <p className="text-sm text-red-500">{form.formState.errors.cost.message}</p>
-                )}
               </div>
 
               <div className="space-y-2">
@@ -301,16 +269,14 @@ export default function CheckInPage() {
                       )}
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
-                      {form.getValues("checkInDate") ? format(new Date(form.getValues("checkInDate")), "PPP") : <span>Pick a date</span>}
+                      {form.getValues("checkInDate") ? format(form.getValues("checkInDate"), "PPP") : <span>Pick a date</span>}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
                     <Calendar
                       mode="single"
                       selected={form.getValues("checkInDate")}
-                      onSelect={(date) => {
-                        form.setValue("checkInDate", date || undefined);
-                      }}
+                      onSelect={(date) => form.setValue("checkInDate", date || new Date())}
                       disabled={(date) => date > new Date()}
                       initialFocus
                     />
@@ -361,7 +327,6 @@ export default function CheckInPage() {
           </CardContent>
         </Card>
 
-        {/* Recent Check-Ins Table */}
         <Card className="lg:col-span-2">
           <CardHeader>
             <CardTitle>Recent Check-Ins</CardTitle>
@@ -390,7 +355,6 @@ export default function CheckInPage() {
                     </TableRow>
                   ) : (
                     checkInTransactions?.slice(0, 10).map((transaction: any) => {
-                      // Find associated item and warehouse
                       const item = items?.find((i: any) => i.id === transaction.itemId);
                       const warehouse = warehouses?.find((w: any) => w.id === transaction.destinationWarehouseId);
                       const requester = users?.find((u: any) => u.id === transaction.requesterId);
