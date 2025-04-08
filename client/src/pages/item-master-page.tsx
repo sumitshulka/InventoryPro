@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
@@ -37,6 +37,23 @@ import { Loader2, Search, Plus, Edit } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 
+// Item and Category types
+interface Item {
+  id: number;
+  name: string;
+  sku: string;
+  description: string | null;
+  minStockLevel: number;
+  categoryId: number | null;
+  unit: string;
+}
+
+interface Category {
+  id: number;
+  name: string;
+  description: string | null;
+}
+
 const formSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters" }),
   sku: z.string().min(1, { message: "SKU is required" }),
@@ -57,13 +74,23 @@ export default function ItemMasterPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
 
-  const { data: items, isLoading: itemsLoading } = useQuery({
-    queryKey: ["/api/items"],
+  const { data: items = [], isLoading: itemsLoading, refetch: refetchItems } = useQuery<Item[]>({
+    queryKey: ["/api/items"]
   });
 
-  const { data: categories, isLoading: categoriesLoading } = useQuery({
-    queryKey: ["/api/categories"],
+  // Log items when they change
+  useEffect(() => {
+    console.log("Items data updated:", items);
+  }, [items]);
+
+  const { data: categories = [], isLoading: categoriesLoading } = useQuery<Category[]>({
+    queryKey: ["/api/categories"]
   });
+
+  // Log categories when they change
+  useEffect(() => {
+    console.log("Categories data updated:", categories);
+  }, [categories]);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -99,8 +126,16 @@ export default function ItemMasterPage() {
         return res.json();
       }
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      console.log("Item saved successfully:", data);
+      // Force invalidate and refetch items
       queryClient.invalidateQueries({ queryKey: ["/api/items"] });
+      
+      // Manually refetch the items to ensure the UI is updated
+      setTimeout(() => {
+        refetchItems();
+      }, 500);
+      
       toast({
         title: isEditMode ? "Item updated" : "Item created",
         description: isEditMode
@@ -110,6 +145,7 @@ export default function ItemMasterPage() {
       resetForm();
     },
     onError: (error: Error) => {
+      console.error("Error saving item:", error);
       toast({
         title: "Error",
         description: error.message,
@@ -132,7 +168,7 @@ export default function ItemMasterPage() {
     setIsDialogOpen(false);
   };
 
-  const handleEditItem = (item: any) => {
+  const handleEditItem = (item: Item) => {
     form.reset({
       name: item.name,
       sku: item.sku,
@@ -151,7 +187,7 @@ export default function ItemMasterPage() {
   };
 
   const filteredItems = items
-    ? items.filter((item: any) => {
+    ? items.filter((item: Item) => {
         const matchesSearch = 
           item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
           item.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -167,7 +203,7 @@ export default function ItemMasterPage() {
 
   const getCategoryName = (categoryId: number | null) => {
     if (!categoryId || !categories) return "Uncategorized";
-    const category = categories.find((cat: any) => cat.id === categoryId);
+    const category = categories.find((cat: Category) => cat.id === categoryId);
     return category ? category.name : "Uncategorized";
   };
 
@@ -221,7 +257,7 @@ export default function ItemMasterPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Categories</SelectItem>
-                  {categories?.map((category: any) => (
+                  {categories.map((category: Category) => (
                     <SelectItem key={category.id} value={category.id.toString()}>
                       {category.name}
                     </SelectItem>
@@ -253,7 +289,7 @@ export default function ItemMasterPage() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredItems.map((item: any) => (
+                  filteredItems.map((item: Item) => (
                     <TableRow key={item.id}>
                       <TableCell className="font-medium">{item.sku}</TableCell>
                       <TableCell>{item.name}</TableCell>
@@ -341,7 +377,7 @@ export default function ItemMasterPage() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="0">Uncategorized</SelectItem>
-                      {categories?.map((category: any) => (
+                      {categories.map((category: Category) => (
                         <SelectItem key={category.id} value={category.id.toString()}>
                           {category.name}
                         </SelectItem>
