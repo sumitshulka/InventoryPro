@@ -67,7 +67,7 @@ export default function CheckInPage() {
     mutationFn: async (data: FormValues) => {
       const payload = {
         itemId: parseInt(data.itemId),
-        quantity: data.quantity,
+        quantity: parseInt(data.quantity),
         transactionType: "check-in",
         destinationWarehouseId: parseInt(data.destinationWarehouseId),
         status: "completed"
