@@ -68,7 +68,7 @@ export default function CheckInPage() {
       const payload = {
         itemId: parseInt(data.itemId),
         quantity: data.quantity,
-        type: "check-in",
+        transactionType: "check-in",
         destinationWarehouseId: parseInt(data.destinationWarehouseId),
         status: "completed"
       };
