@@ -40,20 +40,13 @@ const formSchema = z.object({
     itemId: z.string().min(1, { message: "Item is required" }),
     quantity: z.string().min(1, { message: "Quantity is required" }),
     destinationWarehouseId: z.string().min(1, { message: "Destination warehouse is required" }),
-    cost: z.string().optional(),
-    requesterId: z.string().optional(),
+    cost: z.string().optional().nullable(),
+    requesterId: z.string().optional().nullable(),
     checkInDate: z.date(),
     transactionType: z.literal("check-in"),
     status: z.literal("completed"),
     sourceWarehouseId: z.null()
-  }).transform(data => ({
-    ...data,
-    itemId: parseInt(data.itemId),
-    quantity: parseInt(data.quantity),
-    destinationWarehouseId: parseInt(data.destinationWarehouseId),
-    cost: data.cost ? parseFloat(data.cost) : null,
-    requesterId: data.requesterId ? parseInt(data.requesterId) : null
-  }));
+});
 
 type FormValues = z.infer<typeof formSchema>;
 
@@ -153,8 +146,17 @@ export default function CheckInPage() {
   });
 
   const handleSubmit = (values: FormValues) => {
-    console.log("Submitting form with values:", values);
-    checkInMutation.mutate(values);
+    const payload = {
+      ...values,
+      itemId: parseInt(values.itemId),
+      quantity: parseInt(values.quantity),
+      destinationWarehouseId: parseInt(values.destinationWarehouseId),
+      cost: values.cost ? parseFloat(values.cost) : null,
+      requesterId: values.requesterId ? parseInt(values.requesterId) : null,
+      checkInDate: values.checkInDate.toISOString()
+    };
+    console.log("Submitting form with payload:", payload);
+    checkInMutation.mutate(payload);
   };
 
   const isManager = user?.role === "admin" || user?.role === "manager";
