@@ -85,12 +85,13 @@ export default function CheckInPage() {
       const payload = {
         itemId: parseInt(data.itemId),
         quantity: parseInt(data.quantity.toString()),
-        transactionType: "check-in" as const,
+        transactionType: "check-in",
         destinationWarehouseId: parseInt(data.destinationWarehouseId),
-        status: "completed" as const,
-        cost: data.cost ? parseFloat(data.cost) : undefined,
-        requesterId: data.requesterId ? parseInt(data.requesterId) : undefined,
-        checkInDate: data.checkInDate || undefined
+        status: "completed",
+        cost: data.cost ? parseFloat(data.cost) : null,
+        requesterId: data.requesterId ? parseInt(data.requesterId) : null,
+        checkInDate: data.checkInDate ? data.checkInDate.toISOString() : null,
+        sourceWarehouseId: null
       };
       
       const res = await apiRequest("POST", "/api/transactions", payload);
