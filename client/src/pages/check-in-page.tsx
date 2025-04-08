@@ -72,14 +72,14 @@ export default function CheckInPage() {
   const checkInMutation = useMutation({
     mutationFn: async (values: FormValues) => {
       const payload = {
-        itemId: Number(values.itemId),
-        quantity: Number(values.quantity),
+        itemId: parseInt(values.itemId),
+        quantity: parseInt(values.quantity),
         transactionType: "check-in" as const,
-        destinationWarehouseId: Number(values.destinationWarehouseId),
+        destinationWarehouseId: parseInt(values.destinationWarehouseId),
         status: "completed" as const,
-        cost: values.cost ? Number(values.cost) : null,
-        requesterId: values.requesterId ? Number(values.requesterId) : null,
-        checkInDate: values.checkInDate.toISOString(),
+        cost: values.cost ? parseFloat(values.cost) : null,
+        requesterId: values.requesterId ? parseInt(values.requesterId) : null,
+        checkInDate: values.checkInDate,
         sourceWarehouseId: null
       };
 
