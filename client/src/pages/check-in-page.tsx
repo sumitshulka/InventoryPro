@@ -82,24 +82,32 @@ export default function CheckInPage() {
 
   const checkInMutation = useMutation({
     mutationFn: async (data: FormValues) => {
+      if (!data.itemId || !data.quantity || !data.destinationWarehouseId) {
+        throw new Error("Required fields are missing");
+      }
+
       const payload = {
         itemId: parseInt(data.itemId),
         quantity: parseInt(data.quantity),
         transactionType: "check-in",
         destinationWarehouseId: parseInt(data.destinationWarehouseId),
         status: "completed",
-        cost: data.cost ? parseFloat(data.cost) : null,
-        requesterId: data.requesterId ? parseInt(data.requesterId) : null,
-        checkInDate: data.checkInDate ? new Date(data.checkInDate).toISOString() : null,
+        cost: data.cost && data.cost !== "" ? parseFloat(data.cost) : null,
+        requesterId: data.requesterId && data.requesterId !== "" ? parseInt(data.requesterId) : null,
+        checkInDate: data.checkInDate ? data.checkInDate.toISOString() : new Date().toISOString(),
         sourceWarehouseId: null
       };
-      
-      const res = await apiRequest("POST", "/api/transactions", payload);
-      if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.message);
+
+      try {
+        const res = await apiRequest("POST", "/api/transactions", payload);
+        if (!res.ok) {
+          const error = await res.json();
+          throw new Error(error.message || "Failed to create check-in transaction");
+        }
+        return res.json();
+      } catch (error: any) {
+        throw new Error(error.message || "Failed to create check-in transaction");
       }
-      return res.json();
     },
     onSuccess: () => {
       // Invalidate all relevant queries to update the UI
@@ -272,14 +280,14 @@ export default function CheckInPage() {
                       )}
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
-                      {form.getValues("checkInDate") ? format(form.getValues("checkInDate"), "PPP") : <span>Pick a date</span>}
+                      {form.getValues("checkInDate") ? format(new Date(form.getValues("checkInDate")), "PPP") : <span>Pick a date</span>}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
                     <Calendar
                       mode="single" 
-                      selected={form.getValues("checkInDate")}
-                      onSelect={(date) => form.setValue("checkInDate", date)}
+                      selected={form.getValues("checkInDate") ? new Date(form.getValues("checkInDate")) : undefined}
+                      onSelect={(date) => form.setValue("checkInDate", date || new Date())}
                       disabled={(date) => date > new Date()}
                       initialFocus
                     />
