@@ -322,9 +322,10 @@ export default function CheckInPage() {
               </div>
 
               <Button
-                type="submit"
+                type="submit" 
                 className="w-full"
                 disabled={checkInMutation.isPending}
+                onClick={form.handleSubmit(handleSubmit)}
               >
                 {checkInMutation.isPending ? (
                   <>
