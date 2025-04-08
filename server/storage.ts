@@ -15,12 +15,24 @@ import {
   InsertRequest, 
   RequestItem, 
   InsertRequestItem,
-  TransactionType
+  TransactionType,
+  users,
+  categories,
+  warehouses,
+  items,
+  inventory,
+  transactions,
+  requests,
+  requestItems
 } from "@shared/schema";
 import session from "express-session";
+import connectPg from "connect-pg-simple";
 import createMemoryStore from "memorystore";
+import { db, pool } from "./db";
+import { eq, and, desc } from "drizzle-orm";
 
 const MemoryStore = createMemoryStore(session);
+const PostgresSessionStore = connectPg(session);
 
 export interface IStorage {
   // User operations
@@ -731,4 +743,368 @@ export class MemStorage implements IStorage {
 
 
 // Use the in-memory storage implementation for now
-export const storage = new MemStorage();
+export class DatabaseStorage implements IStorage {
+  sessionStore: session.SessionStore;
+
+  constructor() {
+    this.sessionStore = new PostgresSessionStore({ 
+      pool, 
+      createTableIfMissing: true 
+    });
+  }
+
+  // User operations
+  async getUser(id: number): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user || undefined;
+  }
+
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.username, username));
+    return user || undefined;
+  }
+
+  async createUser(user: InsertUser): Promise<User> {
+    const [newUser] = await db.insert(users).values(user).returning();
+    return newUser;
+  }
+
+  async getAllUsers(): Promise<User[]> {
+    return await db.select().from(users);
+  }
+
+  async updateUser(id: number, userData: Partial<InsertUser>): Promise<User | undefined> {
+    const [updatedUser] = await db.update(users)
+      .set(userData)
+      .where(eq(users.id, id))
+      .returning();
+    return updatedUser || undefined;
+  }
+
+  async deleteUser(id: number): Promise<boolean> {
+    const [deletedUser] = await db.delete(users)
+      .where(eq(users.id, id))
+      .returning();
+    return !!deletedUser;
+  }
+
+  // Category operations
+  async getCategory(id: number): Promise<Category | undefined> {
+    const [category] = await db.select().from(categories).where(eq(categories.id, id));
+    return category || undefined;
+  }
+
+  async getCategoryByName(name: string): Promise<Category | undefined> {
+    const [category] = await db.select().from(categories).where(eq(categories.name, name));
+    return category || undefined;
+  }
+
+  async createCategory(category: InsertCategory): Promise<Category> {
+    const [newCategory] = await db.insert(categories).values(category).returning();
+    return newCategory;
+  }
+
+  async getAllCategories(): Promise<Category[]> {
+    return await db.select().from(categories);
+  }
+
+  async updateCategory(id: number, categoryData: Partial<InsertCategory>): Promise<Category | undefined> {
+    const [updatedCategory] = await db.update(categories)
+      .set(categoryData)
+      .where(eq(categories.id, id))
+      .returning();
+    return updatedCategory || undefined;
+  }
+
+  async deleteCategory(id: number): Promise<boolean> {
+    const [deletedCategory] = await db.delete(categories)
+      .where(eq(categories.id, id))
+      .returning();
+    return !!deletedCategory;
+  }
+
+  // Warehouse operations
+  async getWarehouse(id: number): Promise<Warehouse | undefined> {
+    const [warehouse] = await db.select().from(warehouses).where(eq(warehouses.id, id));
+    return warehouse || undefined;
+  }
+
+  async getWarehouseByName(name: string): Promise<Warehouse | undefined> {
+    const [warehouse] = await db.select().from(warehouses).where(eq(warehouses.name, name));
+    return warehouse || undefined;
+  }
+
+  async createWarehouse(warehouse: InsertWarehouse): Promise<Warehouse> {
+    const [newWarehouse] = await db.insert(warehouses).values(warehouse).returning();
+    return newWarehouse;
+  }
+
+  async getAllWarehouses(): Promise<Warehouse[]> {
+    return await db.select().from(warehouses);
+  }
+
+  async updateWarehouse(id: number, warehouseData: Partial<InsertWarehouse>): Promise<Warehouse | undefined> {
+    const [updatedWarehouse] = await db.update(warehouses)
+      .set(warehouseData)
+      .where(eq(warehouses.id, id))
+      .returning();
+    return updatedWarehouse || undefined;
+  }
+
+  async deleteWarehouse(id: number): Promise<boolean> {
+    const [deletedWarehouse] = await db.delete(warehouses)
+      .where(eq(warehouses.id, id))
+      .returning();
+    return !!deletedWarehouse;
+  }
+
+  // Item operations
+  async getItem(id: number): Promise<Item | undefined> {
+    const [item] = await db.select().from(items).where(eq(items.id, id));
+    return item || undefined;
+  }
+
+  async getItemBySku(sku: string): Promise<Item | undefined> {
+    const [item] = await db.select().from(items).where(eq(items.sku, sku));
+    return item || undefined;
+  }
+
+  async createItem(item: InsertItem): Promise<Item> {
+    const [newItem] = await db.insert(items).values(item).returning();
+    return newItem;
+  }
+
+  async getAllItems(): Promise<Item[]> {
+    return await db.select().from(items);
+  }
+
+  async updateItem(id: number, itemData: Partial<InsertItem>): Promise<Item | undefined> {
+    const [updatedItem] = await db.update(items)
+      .set(itemData)
+      .where(eq(items.id, id))
+      .returning();
+    return updatedItem || undefined;
+  }
+
+  async deleteItem(id: number): Promise<boolean> {
+    const [deletedItem] = await db.delete(items)
+      .where(eq(items.id, id))
+      .returning();
+    return !!deletedItem;
+  }
+
+  // Inventory operations
+  async getInventory(id: number): Promise<Inventory | undefined> {
+    const [inventoryItem] = await db.select().from(inventory).where(eq(inventory.id, id));
+    return inventoryItem || undefined;
+  }
+
+  async getInventoryByItemAndWarehouse(itemId: number, warehouseId: number): Promise<Inventory | undefined> {
+    const [inventoryItem] = await db.select().from(inventory).where(
+      and(
+        eq(inventory.itemId, itemId),
+        eq(inventory.warehouseId, warehouseId)
+      )
+    );
+    return inventoryItem || undefined;
+  }
+
+  async createInventory(inventoryItem: InsertInventory): Promise<Inventory> {
+    const [newInventory] = await db.insert(inventory)
+      .values({ ...inventoryItem, lastUpdated: new Date() })
+      .returning();
+    return newInventory;
+  }
+
+  async getAllInventory(): Promise<Inventory[]> {
+    return await db.select().from(inventory);
+  }
+
+  async getInventoryByWarehouse(warehouseId: number): Promise<Inventory[]> {
+    return await db.select().from(inventory).where(eq(inventory.warehouseId, warehouseId));
+  }
+
+  async updateInventory(id: number, inventoryData: Partial<InsertInventory>): Promise<Inventory | undefined> {
+    const [updatedInventory] = await db.update(inventory)
+      .set({ ...inventoryData, lastUpdated: new Date() })
+      .where(eq(inventory.id, id))
+      .returning();
+    return updatedInventory || undefined;
+  }
+
+  async updateInventoryQuantity(itemId: number, warehouseId: number, quantity: number): Promise<Inventory | undefined> {
+    const inventoryItem = await this.getInventoryByItemAndWarehouse(itemId, warehouseId);
+    if (!inventoryItem) {
+      return undefined;
+    }
+    return await this.updateInventory(inventoryItem.id, { quantity });
+  }
+
+  async deleteInventory(id: number): Promise<boolean> {
+    const [deletedInventory] = await db.delete(inventory)
+      .where(eq(inventory.id, id))
+      .returning();
+    return !!deletedInventory;
+  }
+
+  // Transaction operations
+  async getTransaction(id: number): Promise<Transaction | undefined> {
+    const [transaction] = await db.select().from(transactions).where(eq(transactions.id, id));
+    return transaction || undefined;
+  }
+
+  async getTransactionByCode(code: string): Promise<Transaction | undefined> {
+    const [transaction] = await db.select().from(transactions).where(eq(transactions.transactionCode, code));
+    return transaction || undefined;
+  }
+
+  async createTransaction(transaction: InsertTransaction): Promise<Transaction> {
+    const insertData: any = {
+      ...transaction,
+      createdAt: new Date(),
+      completedAt: transaction.status === 'completed' ? new Date() : null
+    };
+    const [newTransaction] = await db.insert(transactions)
+      .values(insertData)
+      .returning();
+    return newTransaction;
+  }
+
+  async getAllTransactions(): Promise<Transaction[]> {
+    return await db.select().from(transactions).orderBy(desc(transactions.createdAt));
+  }
+
+  async getTransactionsByType(type: TransactionType): Promise<Transaction[]> {
+    return await db.select().from(transactions)
+      .where(eq(transactions.transactionType, type))
+      .orderBy(desc(transactions.createdAt));
+  }
+
+  async getTransactionsByWarehouse(warehouseId: number): Promise<Transaction[]> {
+    return await db.select().from(transactions)
+      .where(
+        and(
+          eq(transactions.sourceWarehouseId, warehouseId),
+          eq(transactions.destinationWarehouseId, warehouseId)
+        )
+      )
+      .orderBy(desc(transactions.createdAt));
+  }
+
+  async updateTransaction(id: number, transactionData: Partial<InsertTransaction>): Promise<Transaction | undefined> {
+    // Create the base updates
+    const updates: any = { ...transactionData };
+    
+    // If status is being updated to 'completed', set the completedAt timestamp
+    if (transactionData.status === 'completed') {
+      updates.completedAt = new Date();
+    }
+    
+    const [updatedTransaction] = await db.update(transactions)
+      .set(updates)
+      .where(eq(transactions.id, id))
+      .returning();
+    return updatedTransaction || undefined;
+  }
+
+  async deleteTransaction(id: number): Promise<boolean> {
+    const [deletedTransaction] = await db.delete(transactions)
+      .where(eq(transactions.id, id))
+      .returning();
+    return !!deletedTransaction;
+  }
+
+  // Request operations
+  async getRequest(id: number): Promise<Request | undefined> {
+    const [request] = await db.select().from(requests).where(eq(requests.id, id));
+    return request || undefined;
+  }
+
+  async getRequestByCode(code: string): Promise<Request | undefined> {
+    const [request] = await db.select().from(requests).where(eq(requests.requestCode, code));
+    return request || undefined;
+  }
+
+  async createRequest(request: InsertRequest): Promise<Request> {
+    const now = new Date();
+    // Generate a unique request code
+    const allRequests = await this.getAllRequests();
+    const requestCode = `REQ-${allRequests.length + 1000}`;
+    
+    // Use any to bypass TypeScript's strict checking
+    const insertData: any = {
+      ...request,
+      requestCode,
+      createdAt: now,
+      updatedAt: now
+    };
+    const [newRequest] = await db.insert(requests)
+      .values(insertData)
+      .returning();
+    return newRequest;
+  }
+
+  async getAllRequests(): Promise<Request[]> {
+    return await db.select().from(requests).orderBy(desc(requests.createdAt));
+  }
+
+  async getRequestsByStatus(status: string): Promise<Request[]> {
+    return await db.select().from(requests)
+      .where(eq(requests.status, status))
+      .orderBy(desc(requests.createdAt));
+  }
+
+  async getRequestsByUser(userId: number): Promise<Request[]> {
+    return await db.select().from(requests)
+      .where(eq(requests.userId, userId))
+      .orderBy(desc(requests.createdAt));
+  }
+
+  async updateRequest(id: number, requestData: Partial<InsertRequest>): Promise<Request | undefined> {
+    const [updatedRequest] = await db.update(requests)
+      .set({ ...requestData, updatedAt: new Date() })
+      .where(eq(requests.id, id))
+      .returning();
+    return updatedRequest || undefined;
+  }
+
+  async deleteRequest(id: number): Promise<boolean> {
+    const [deletedRequest] = await db.delete(requests)
+      .where(eq(requests.id, id))
+      .returning();
+    return !!deletedRequest;
+  }
+
+  // Request Item operations
+  async getRequestItem(id: number): Promise<RequestItem | undefined> {
+    const [requestItem] = await db.select().from(requestItems).where(eq(requestItems.id, id));
+    return requestItem || undefined;
+  }
+
+  async getRequestItemsByRequest(requestId: number): Promise<RequestItem[]> {
+    return await db.select().from(requestItems).where(eq(requestItems.requestId, requestId));
+  }
+
+  async createRequestItem(requestItem: InsertRequestItem): Promise<RequestItem> {
+    const [newRequestItem] = await db.insert(requestItems).values(requestItem).returning();
+    return newRequestItem;
+  }
+
+  async updateRequestItem(id: number, requestItemData: Partial<InsertRequestItem>): Promise<RequestItem | undefined> {
+    const [updatedRequestItem] = await db.update(requestItems)
+      .set(requestItemData)
+      .where(eq(requestItems.id, id))
+      .returning();
+    return updatedRequestItem || undefined;
+  }
+
+  async deleteRequestItem(id: number): Promise<boolean> {
+    const [deletedRequestItem] = await db.delete(requestItems)
+      .where(eq(requestItems.id, id))
+      .returning();
+    return !!deletedRequestItem;
+  }
+}
+
+// Use the database storage implementation
+export const storage = new DatabaseStorage();
