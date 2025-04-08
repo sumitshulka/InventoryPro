@@ -82,26 +82,16 @@ export default function CheckInPage() {
 
   const checkInMutation = useMutation({
     mutationFn: async (data: FormValues) => {
-      const payload: any = {
+      const payload = {
         itemId: parseInt(data.itemId),
-        quantity: parseInt(data.quantity),
-        transactionType: "check-in",
+        quantity: data.quantity,
+        transactionType: "check-in" as const,
         destinationWarehouseId: parseInt(data.destinationWarehouseId),
-        status: "completed"
+        status: "completed" as const,
+        cost: data.cost ? parseFloat(data.cost) : undefined,
+        requesterId: data.requesterId ? parseInt(data.requesterId) : undefined,
+        checkInDate: data.checkInDate || undefined
       };
-      
-      // Only add optional fields if they have values
-      if (data.cost) {
-        payload.cost = parseFloat(data.cost);
-      }
-      
-      if (data.requesterId) {
-        payload.requesterId = parseInt(data.requesterId);
-      }
-      
-      if (data.checkInDate) {
-        payload.checkInDate = data.checkInDate;
-      }
       
       const res = await apiRequest("POST", "/api/transactions", payload);
       return res.json();
