@@ -80,8 +80,9 @@ export default function CheckInPage() {
       cost: "",
       requesterId: "",
       checkInDate: new Date(),
-      transactionType: "check-in",
-      status: "completed"
+      transactionType: "check-in" as const,
+      status: "completed" as const,
+      sourceWarehouseId: null
     },
   });
 
@@ -208,7 +209,10 @@ export default function CheckInPage() {
             <CardTitle>Check-In Form</CardTitle>
           </CardHeader>
           <CardContent>
-            <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              form.handleSubmit(handleSubmit)(e);
+            }} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="itemId">Select Item</Label>
                 <Select
