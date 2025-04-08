@@ -84,17 +84,21 @@ export default function CheckInPage() {
     mutationFn: async (data: FormValues) => {
       const payload = {
         itemId: parseInt(data.itemId),
-        quantity: parseInt(data.quantity.toString()),
+        quantity: parseInt(data.quantity),
         transactionType: "check-in",
         destinationWarehouseId: parseInt(data.destinationWarehouseId),
         status: "completed",
         cost: data.cost ? parseFloat(data.cost) : null,
         requesterId: data.requesterId ? parseInt(data.requesterId) : null,
-        checkInDate: data.checkInDate ? data.checkInDate.toISOString() : null,
+        checkInDate: data.checkInDate ? new Date(data.checkInDate).toISOString() : null,
         sourceWarehouseId: null
       };
       
       const res = await apiRequest("POST", "/api/transactions", payload);
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message);
+      }
       return res.json();
     },
     onSuccess: () => {
@@ -268,14 +272,14 @@ export default function CheckInPage() {
                       )}
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
-                      {form.getValues("checkInDate") ? format(new Date(form.getValues("checkInDate")), "PPP") : <span>Pick a date</span>}
+                      {form.getValues("checkInDate") ? format(form.getValues("checkInDate"), "PPP") : <span>Pick a date</span>}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
                     <Calendar
-                      mode="single"
-                      selected={form.getValues("checkInDate") ? new Date(form.getValues("checkInDate")) : undefined}
-                      onSelect={(date) => form.setValue("checkInDate", date || new Date())}
+                      mode="single" 
+                      selected={form.getValues("checkInDate")}
+                      onSelect={(date) => form.setValue("checkInDate", date)}
                       disabled={(date) => date > new Date()}
                       initialFocus
                     />
