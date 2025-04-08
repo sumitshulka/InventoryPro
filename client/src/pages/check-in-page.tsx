@@ -71,7 +71,6 @@ export default function CheckInPage() {
 
   const checkInMutation = useMutation({
     mutationFn: async (values: FormValues) => {
-      // Convert form values to correct types before submission
       const payload = {
         itemId: Number(values.itemId),
         quantity: Number(values.quantity),
@@ -80,7 +79,8 @@ export default function CheckInPage() {
         status: "completed" as const,
         cost: values.cost ? Number(values.cost) : null,
         requesterId: values.requesterId ? Number(values.requesterId) : null,
-        checkInDate: values.checkInDate,
+        checkInDate: new Date(values.checkInDate),
+        createdAt: new Date(),
         sourceWarehouseId: null
       };
 
