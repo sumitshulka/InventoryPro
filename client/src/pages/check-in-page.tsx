@@ -83,10 +83,6 @@ export default function CheckInPage() {
   const checkInMutation = useMutation({
     mutationFn: async (data: FormValues) => {
       if (!data.itemId || !data.quantity || !data.destinationWarehouseId) {
-        throw new Error("Required fields are missing");
-      }
-
-      if (!data.itemId || !data.quantity || !data.destinationWarehouseId) {
         throw new Error("Please fill in all required fields");
       }
 
@@ -98,7 +94,7 @@ export default function CheckInPage() {
         status: "completed" as const,
         cost: data.cost && data.cost !== "" ? parseFloat(data.cost) : undefined,
         requesterId: data.requesterId && data.requesterId !== "" ? parseInt(data.requesterId) : undefined,
-        checkInDate: data.checkInDate ? new Date(data.checkInDate).toISOString() : undefined,
+        checkInDate: data.checkInDate instanceof Date ? data.checkInDate.toISOString() : new Date().toISOString(),
         sourceWarehouseId: undefined
       };
 
