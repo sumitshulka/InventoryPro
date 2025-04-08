@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { z } from "zod";
@@ -75,7 +74,7 @@ export default function CheckInPage() {
         cost: values.cost ? parseFloat(values.cost) : null,
         requesterId: values.requesterId ? parseInt(values.requesterId) : null,
         sourceWarehouseId: null,
-        checkInDate: new Date(values.checkInDate),
+        checkInDate: values.checkInDate ? new Date(values.checkInDate) : undefined,
       };
 
       const response = await apiRequest("POST", "/api/transactions", payload);

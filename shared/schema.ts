@@ -114,13 +114,20 @@ export const transactions = pgTable("transactions", {
   completedAt: timestamp("completed_at"),
 });
 
-export const insertTransactionSchema = createInsertSchema(transactions).omit({
-  id: true,
-  transactionCode: true,
-  userId: true,
-  createdAt: true,
-  completedAt: true,
-});
+export const insertTransactionSchema = createInsertSchema(transactions)
+  .omit({
+    id: true,
+    transactionCode: true,
+    userId: true,
+    createdAt: true,
+    completedAt: true,
+  })
+  .extend({
+    checkInDate: z.preprocess((arg) => {
+      if (typeof arg === 'string' || arg instanceof Date) return new Date(arg);
+      return arg;
+    }, z.date().optional())
+  });
 
 // Inventory requests
 export const requests = pgTable("requests", {
