@@ -83,7 +83,7 @@ export default function UserManagementPage() {
       email: "",
       password: "",
       role: "user",
-      warehouseId: "",
+      warehouseId: "null",
     },
   });
 
@@ -91,7 +91,7 @@ export default function UserManagementPage() {
     mutationFn: async (data: UserFormValues) => {
       const payload = {
         ...data,
-        warehouseId: data.warehouseId ? parseInt(data.warehouseId) : undefined,
+        warehouseId: data.warehouseId === "null" ? null : data.warehouseId ? parseInt(data.warehouseId) : null,
       };
       
       if (isEditMode && editUserId) {
@@ -151,7 +151,7 @@ export default function UserManagementPage() {
       email: "",
       password: "",
       role: "user",
-      warehouseId: "",
+      warehouseId: "null",
     });
     setIsEditMode(false);
     setEditUserId(null);
@@ -165,7 +165,7 @@ export default function UserManagementPage() {
       email: user.email,
       password: "", // don't show the password
       role: user.role,
-      warehouseId: user.warehouseId ? user.warehouseId.toString() : "",
+      warehouseId: user.warehouseId ? user.warehouseId.toString() : "null",
     });
     setIsEditMode(true);
     setEditUserId(user.id);
@@ -406,7 +406,7 @@ export default function UserManagementPage() {
                     <SelectValue placeholder="Select a warehouse (optional)" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">None</SelectItem>
+                    <SelectItem value="null">None</SelectItem>
                     {warehouses?.filter((w: any) => w.isActive).map((warehouse: any) => (
                       <SelectItem key={warehouse.id} value={warehouse.id.toString()}>
                         {warehouse.name}
