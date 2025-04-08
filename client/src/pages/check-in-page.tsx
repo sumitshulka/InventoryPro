@@ -37,15 +37,16 @@ import { useAuth } from "@/hooks/use-auth";
 import { formatDateTime, getStatusColor, cn } from "@/lib/utils";
 
 const formSchema = z.object({
-  itemId: z.string().min(1, { message: "Item is required" }),
-  quantity: z.string().min(1, { message: "Quantity is required" }),
-  destinationWarehouseId: z.string().min(1, { message: "Destination warehouse is required" }),
-  cost: z.string().optional(),
-  requesterId: z.string().optional(),
-  checkInDate: z.date().default(() => new Date()),
-  transactionType: z.literal("check-in"),
-  status: z.literal("completed")
-});
+    itemId: z.string().min(1, { message: "Item is required" }),
+    quantity: z.string().min(1, { message: "Quantity is required" }),
+    destinationWarehouseId: z.string().min(1, { message: "Destination warehouse is required" }),
+    cost: z.string().optional(),
+    requesterId: z.string().optional(),
+    checkInDate: z.date(),
+    transactionType: z.literal("check-in"),
+    status: z.literal("completed"),
+    sourceWarehouseId: z.null()
+  });
 
 type FormValues = z.infer<typeof formSchema>;
 
@@ -145,7 +146,16 @@ export default function CheckInPage() {
   });
 
   const handleSubmit = (values: FormValues) => {
-    checkInMutation.mutate(values);
+    const payload = {
+      ...values,
+      itemId: parseInt(values.itemId),
+      quantity: parseInt(values.quantity),
+      destinationWarehouseId: parseInt(values.destinationWarehouseId),
+      cost: values.cost ? parseFloat(values.cost) : null,
+      requesterId: values.requesterId ? parseInt(values.requesterId) : null,
+      sourceWarehouseId: null
+    };
+    checkInMutation.mutate(payload);
   };
 
   const isManager = user?.role === "admin" || user?.role === "manager";
