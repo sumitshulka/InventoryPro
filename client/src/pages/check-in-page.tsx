@@ -134,20 +134,7 @@ export default function CheckInPage() {
       });
       return;
     }
-
-    const payload = {
-      itemId: parseInt(values.itemId),
-      quantity: parseInt(values.quantity),
-      destinationWarehouseId: parseInt(values.destinationWarehouseId),
-      cost: values.cost ? parseFloat(values.cost) : null,
-      requesterId: values.requesterId ? parseInt(values.requesterId) : null,
-      checkInDate: values.checkInDate,
-      transactionType: "check-in" as const,
-      status: "completed" as const,
-      sourceWarehouseId: null
-    };
-
-    checkInMutation.mutate(payload);
+    checkInMutation.mutate(values);
   };
 
   const isManager = user?.role === "admin" || user?.role === "manager";
