@@ -42,10 +42,9 @@ const formSchema = z.object({
   destinationWarehouseId: z.string().min(1, { message: "Destination warehouse is required" }),
   cost: z.string().optional(),
   requesterId: z.string().optional(),
-  checkInDate: z.date().optional(),
+  checkInDate: z.date().default(() => new Date()),
   transactionType: z.literal("check-in"),
-  status: z.literal("completed"),
-  sourceWarehouseId: z.null()
+  status: z.literal("completed")
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -198,10 +197,7 @@ export default function CheckInPage() {
             <CardTitle>Check-In Form</CardTitle>
           </CardHeader>
           <CardContent>
-            <form onSubmit={(e) => {
-              e.preventDefault();
-              form.handleSubmit(handleSubmit)(e);
-            }} className="space-y-4">
+            <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="itemId">Select Item</Label>
                 <Select
@@ -325,9 +321,9 @@ export default function CheckInPage() {
               </div>
 
               <Button
-                type="submit" 
+                type="submit"
                 className="w-full"
-                disabled={checkInMutation.isPending}
+                disabled={checkInMutation.isPending || !form.formState.isValid}
               >
                 {checkInMutation.isPending ? (
                   <>
