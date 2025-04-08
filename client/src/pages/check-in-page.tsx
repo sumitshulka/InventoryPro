@@ -75,7 +75,7 @@ export default function CheckInPage() {
         cost: values.cost ? parseFloat(values.cost) : null,
         requesterId: values.requesterId ? parseInt(values.requesterId) : null,
         sourceWarehouseId: null,
-        checkInDate: values.checkInDate,
+        checkInDate: new Date(values.checkInDate),
       };
 
       const response = await apiRequest("POST", "/api/transactions", payload);
