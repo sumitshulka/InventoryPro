@@ -40,7 +40,7 @@ import { useAuth } from "@/hooks/use-auth";
 const formSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters" }),
   description: z.string().optional(),
-  managerId: z.string().optional().transform(val => val === "" || val === "none" ? null : parseInt(val)),
+  managerId: z.string().optional().transform(val => val === "" || val === "none" ? null : parseInt(val || "0")),
   isActive: z.boolean().default(true),
 });
 

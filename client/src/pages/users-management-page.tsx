@@ -42,9 +42,9 @@ const formSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters" }),
   email: z.string().email({ message: "Invalid email address" }),
   role: z.enum(["admin", "manager", "employee"], { message: "Role is required" }),
-  managerId: z.string().optional().transform(val => val === "" || val === "none" ? null : parseInt(val)),
-  warehouseId: z.string().optional().transform(val => val === "" || val === "none" ? null : parseInt(val)),
-  departmentId: z.string().optional().transform(val => val === "" || val === "none" ? null : parseInt(val)),
+  managerId: z.string().optional().transform(val => val === "" || val === "none" ? null : parseInt(val || "0")),
+  warehouseId: z.string().optional().transform(val => val === "" || val === "none" ? null : parseInt(val || "0")),
+  departmentId: z.string().optional().transform(val => val === "" || val === "none" ? null : parseInt(val || "0")),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -66,6 +66,10 @@ export default function UsersManagementPage() {
     queryKey: ["/api/warehouses"],
   });
 
+  const { data: departments } = useQuery({
+    queryKey: ["/api/departments"],
+  });
+
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -76,6 +80,7 @@ export default function UsersManagementPage() {
       role: "employee",
       managerId: "none",
       warehouseId: "none",
+      departmentId: "none",
     },
   });
 
