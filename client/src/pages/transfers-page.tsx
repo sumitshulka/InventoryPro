@@ -92,12 +92,21 @@ export default function TransfersPage() {
       const res = await apiRequest("POST", "/api/transactions", payload);
       return res.json();
     },
-    onSuccess: () => {
-      // Invalidate all relevant queries to refresh data immediately
-      queryClient.invalidateQueries({ queryKey: ["/api/transactions/type/transfer"] });
+    onSuccess: async (newTransfer) => {
+      // Immediately update cache with new transfer
+      queryClient.setQueryData(["/api/transactions/type/transfer"], (oldData: any) => {
+        if (!oldData || !Array.isArray(oldData)) return [newTransfer];
+        return [newTransfer, ...oldData];
+      });
+      
+      // Force immediate refetch to ensure data consistency
+      await queryClient.refetchQueries({ 
+        queryKey: ["/api/transactions/type/transfer"],
+        type: 'active'
+      });
+      
       queryClient.invalidateQueries({ queryKey: ["/api/reports/inventory-stock"] });
       queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
       
       toast({
         title: "Transfer initiated",
@@ -121,12 +130,25 @@ export default function TransfersPage() {
       });
       return res.json();
     },
-    onSuccess: () => {
-      // Invalidate all relevant queries to refresh data immediately
-      queryClient.invalidateQueries({ queryKey: ["/api/transactions/type/transfer"] });
+    onSuccess: async (updatedTransfer, transferId) => {
+      // Immediately update the transfer status in cache
+      queryClient.setQueryData(["/api/transactions/type/transfer"], (oldData: any) => {
+        if (!oldData || !Array.isArray(oldData)) return oldData;
+        return oldData.map((transfer: any) => 
+          transfer.id === transferId 
+            ? { ...transfer, status: "completed" }
+            : transfer
+        );
+      });
+      
+      // Force immediate refetch to ensure data consistency
+      await queryClient.refetchQueries({ 
+        queryKey: ["/api/transactions/type/transfer"],
+        type: 'active'
+      });
+      
       queryClient.invalidateQueries({ queryKey: ["/api/reports/inventory-stock"] });
       queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
       
       toast({
         title: "Transfer completed",
