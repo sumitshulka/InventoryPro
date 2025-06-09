@@ -731,6 +731,8 @@ export class MemStorage implements IStorage {
     return this.transactions.delete(id);
   }
 
+
+
   // Request operations
   async getRequest(id: number): Promise<Request | undefined> {
     return this.requests.get(id);

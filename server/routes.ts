@@ -1227,6 +1227,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Categories routes
+  app.get("/api/categories", async (req, res) => {
+    try {
+      const categories = await storage.getAllCategories();
+      res.json(categories);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/categories", async (req, res) => {
+    try {
+      const category = await storage.createCategory(req.body);
+      res.status(201).json(category);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.put("/api/categories/:id", async (req, res) => {
+    try {
+      const categoryId = parseInt(req.params.id);
+      const updatedCategory = await storage.updateCategory(categoryId, req.body);
+      if (!updatedCategory) {
+        return res.status(404).json({ message: "Category not found" });
+      }
+      res.json(updatedCategory);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/categories/:id", async (req, res) => {
+    try {
+      const categoryId = parseInt(req.params.id);
+      const deleted = await storage.deleteCategory(categoryId);
+      if (!deleted) {
+        return res.status(404).json({ message: "Category not found" });
+      }
+      res.json({ message: "Category deleted successfully" });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
   // Request Approval routes
   app.get("/api/request-approvals/:requestId", async (req, res) => {
     try {

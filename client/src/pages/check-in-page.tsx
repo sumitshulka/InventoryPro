@@ -13,27 +13,40 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Loader2, CalendarIcon } from "lucide-react";
+import { Loader2, CalendarIcon, Plus, Trash2, Package } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { formatDateTime, getStatusColor, cn } from "@/lib/utils";
 
-const formSchema = z.object({
+const itemSchema = z.object({
   itemId: z.string().min(1, { message: "Item is required" }),
   quantity: z.string().min(1, { message: "Quantity is required" }),
-  destinationWarehouseId: z.string().min(1, { message: "Destination warehouse is required" }),
   cost: z.string().optional(),
-  requesterId: z.string().optional(),
-  checkInDate: z.date(),
 });
 
-type FormValues = z.infer<typeof formSchema>;
+const multiCheckInSchema = z.object({
+  destinationWarehouseId: z.string().min(1, { message: "Destination warehouse is required" }),
+  purchaseOrderNumber: z.string().optional(),
+  deliveryChallanNumber: z.string().optional(),
+  supplierName: z.string().optional(),
+  notes: z.string().optional(),
+  checkInDate: z.date(),
+  items: z.array(itemSchema).min(1, { message: "At least one item is required" }),
+});
+
+type ItemFormValues = z.infer<typeof itemSchema>;
+type MultiCheckInFormValues = z.infer<typeof multiCheckInSchema>;
 
 export default function CheckInPage() {
   const { toast } = useToast();
   const { user } = useAuth();
   const [isTransactionSuccess, setIsTransactionSuccess] = useState(false);
+  const [itemsToCheckIn, setItemsToCheckIn] = useState<ItemFormValues[]>([
+    { itemId: "", quantity: "", cost: "" }
+  ]);
 
   const { data: items, isLoading: itemsLoading } = useQuery({
     queryKey: ["/api/items"],
