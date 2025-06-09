@@ -663,9 +663,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   sourceWarehouseId: warehouse.id,
                   destinationWarehouseId: request.warehouseId,
                   requestId: request.id,
-                  userId: req.user!.id,
-                  status: "in-transit",
-                  transactionCode: trxCode
+                  requesterId: req.user!.id,
+                  status: "in-transit"
                 });
                 
                 // Update source warehouse inventory
@@ -694,9 +693,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
               transactionType: "issue",
               sourceWarehouseId: request.warehouseId,
               requestId: request.id,
-              userId: req.user!.id,
-              status: "completed",
-              transactionCode: issueCode
+              requesterId: req.user!.id,
+              status: "completed"
             });
             
             // Update inventory
