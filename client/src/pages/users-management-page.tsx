@@ -44,6 +44,7 @@ const formSchema = z.object({
   role: z.enum(["admin", "manager", "employee"], { message: "Role is required" }),
   managerId: z.string().optional().transform(val => val === "" || val === "none" ? null : parseInt(val)),
   warehouseId: z.string().optional().transform(val => val === "" || val === "none" ? null : parseInt(val)),
+  departmentId: z.string().optional().transform(val => val === "" || val === "none" ? null : parseInt(val)),
 });
 
 type FormValues = z.infer<typeof formSchema>;

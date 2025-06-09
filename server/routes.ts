@@ -11,6 +11,8 @@ import {
   insertTransactionSchema, 
   insertRequestSchema, 
   insertRequestItemSchema,
+  insertDepartmentSchema,
+  departments,
   organizationSettings
 } from "@shared/schema";
 import { db } from "./db";
@@ -1188,6 +1190,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .returning();
         res.json(updated[0]);
       }
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // ==== Departments Routes ====
+  // Get all departments
+  app.get("/api/departments", async (req, res) => {
+    try {
+      const departments = await db.select().from(departments);
+      res.json(departments);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Create department (admin only)
+  app.post("/api/departments", checkRole("admin"), async (req, res) => {
+    try {
+      const departmentData = insertDepartmentSchema.parse(req.body);
+      const newDepartment = await db.insert(departments).values(departmentData).returning();
+      res.status(201).json(newDepartment[0]);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Update department (admin only)
+  app.put("/api/departments/:id", checkRole("admin"), async (req, res) => {
+    try {
+      const departmentId = parseInt(req.params.id);
+      const departmentData = insertDepartmentSchema.partial().parse(req.body);
+      const updatedDepartment = await db.update(departments)
+        .set(departmentData)
+        .where(eq(departments.id, departmentId))
+        .returning();
+      
+      if (updatedDepartment.length === 0) {
+        return res.status(404).json({ message: "Department not found" });
+      }
+      res.json(updatedDepartment[0]);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Delete department (admin only)
+  app.delete("/api/departments/:id", checkRole("admin"), async (req, res) => {
+    try {
+      const departmentId = parseInt(req.params.id);
+      const deletedDepartment = await db.delete(departments)
+        .where(eq(departments.id, departmentId))
+        .returning();
+      
+      if (deletedDepartment.length === 0) {
+        return res.status(404).json({ message: "Department not found" });
+      }
+      res.status(204).send();
     } catch (error: any) {
       res.status(400).json({ message: error.message });
     }
