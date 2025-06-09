@@ -51,6 +51,10 @@ export default function CheckInPage() {
     queryKey: ["/api/users"],
   });
 
+  const { data: organizationSettings } = useQuery({
+    queryKey: ["/api/organization-settings"],
+  });
+
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -84,8 +88,15 @@ export default function CheckInPage() {
       }
       return response.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/transactions/type/check-in"] });
+    onSuccess: (newTransaction) => {
+      // Immediately update cache with new transaction
+      queryClient.setQueryData(["/api/transactions/type/check-in"], (oldData: any) => {
+        if (!oldData || !Array.isArray(oldData)) return [newTransaction];
+        return [newTransaction, ...oldData];
+      });
+
+      // Force refetch without waiting
+      queryClient.refetchQueries({ queryKey: ["/api/transactions/type/check-in"] });
       queryClient.invalidateQueries({ queryKey: ["/api/reports/inventory-stock"] });
       queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
 
@@ -105,7 +116,6 @@ export default function CheckInPage() {
 
       setIsTransactionSuccess(true);
       setTimeout(() => setIsTransactionSuccess(false), 3000);
-      refetchTransactions();
     },
     onError: (error: Error) => {
       toast({

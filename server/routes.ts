@@ -1147,6 +1147,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Organization settings routes
+  app.get("/api/organization-settings", async (req, res) => {
+    try {
+      // Return default settings for now
+      const settings = {
+        id: 1,
+        organizationName: "My Organization",
+        currency: "USD",
+        currencySymbol: "$",
+        timezone: "UTC"
+      };
+      res.json(settings);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.put("/api/organization-settings", async (req, res) => {
+    try {
+      // For now, just return the updated settings
+      const settings = {
+        id: 1,
+        ...req.body,
+        updatedAt: new Date()
+      };
+      res.json(settings);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
   // Request Approval routes
   app.get("/api/request-approvals/:requestId", async (req, res) => {
     try {

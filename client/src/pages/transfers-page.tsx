@@ -92,19 +92,15 @@ export default function TransfersPage() {
       const res = await apiRequest("POST", "/api/transactions", payload);
       return res.json();
     },
-    onSuccess: async (newTransfer) => {
+    onSuccess: (newTransfer) => {
       // Immediately update cache with new transfer
       queryClient.setQueryData(["/api/transactions/type/transfer"], (oldData: any) => {
         if (!oldData || !Array.isArray(oldData)) return [newTransfer];
         return [newTransfer, ...oldData];
       });
       
-      // Force immediate refetch to ensure data consistency
-      await queryClient.refetchQueries({ 
-        queryKey: ["/api/transactions/type/transfer"],
-        type: 'active'
-      });
-      
+      // Force refetch without waiting
+      queryClient.refetchQueries({ queryKey: ["/api/transactions/type/transfer"] });
       queryClient.invalidateQueries({ queryKey: ["/api/reports/inventory-stock"] });
       queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
       
@@ -130,7 +126,7 @@ export default function TransfersPage() {
       });
       return res.json();
     },
-    onSuccess: async (updatedTransfer, transferId) => {
+    onSuccess: (updatedTransfer, transferId) => {
       // Immediately update the transfer status in cache
       queryClient.setQueryData(["/api/transactions/type/transfer"], (oldData: any) => {
         if (!oldData || !Array.isArray(oldData)) return oldData;
@@ -141,12 +137,8 @@ export default function TransfersPage() {
         );
       });
       
-      // Force immediate refetch to ensure data consistency
-      await queryClient.refetchQueries({ 
-        queryKey: ["/api/transactions/type/transfer"],
-        type: 'active'
-      });
-      
+      // Force refetch without waiting
+      queryClient.refetchQueries({ queryKey: ["/api/transactions/type/transfer"] });
       queryClient.invalidateQueries({ queryKey: ["/api/reports/inventory-stock"] });
       queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
       

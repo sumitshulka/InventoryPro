@@ -189,6 +189,23 @@ export const insertApprovalSettingsSchema = createInsertSchema(approvalSettings)
   createdAt: true,
 });
 
+// Organization settings
+export const organizationSettings = pgTable("organization_settings", {
+  id: serial("id").primaryKey(),
+  organizationName: text("organization_name").notNull().default("My Organization"),
+  currency: text("currency").notNull().default("USD"),
+  currencySymbol: text("currency_symbol").notNull().default("$"),
+  timezone: text("timezone").notNull().default("UTC"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at"),
+});
+
+export const insertOrganizationSettingsSchema = createInsertSchema(organizationSettings).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 // Request approvals
 export const requestApprovals = pgTable("request_approvals", {
   id: serial("id").primaryKey(),
