@@ -16,64 +16,16 @@ export default function Sidebar({ user, isOpen, onClose }: SidebarProps) {
     return location === path;
   };
 
-  // Array of navigation items grouped by category
-  const navigationItems = [
-    {
-      category: "MAIN",
-      items: [
-        { name: "Dashboard", path: "/", icon: "dashboard" },
-        { name: "Inventory", path: "/inventory", icon: "inventory_2" },
-        { name: "Items", path: "/items", icon: "category" },
-        { name: "Warehouses", path: "/warehouses", icon: "store" },
-      ],
-    },
-    {
-      category: "OPERATIONS",
-      items: [
-        { name: "CheckIn", path: "/check-in", icon: "login" },
-        { name: "Requests", path: "/requests", icon: "assignment" },
-        { name: "Transfers", path: "/transfers", icon: "swap_horiz" },
-      ],
-    },
-    {
-      category: "REPORTS",
-      items: [
-        { name: "Stock", path: "/stock-report", icon: "bar_chart" },
-        { name: "Movement", path: "/movement-report", icon: "timeline" },
-      ],
-    },
-  ];
-
-  // Only show User Management for admins
-  if (user.role === "admin") {
-    navigationItems.push({
-      category: "SYSTEM",
-      items: [
-        { name: "Users", path: "/users", icon: "people" },
-      ],
-    });
-  }
-
-  // Show Approval Management for managers and admins
-  if (user.role === "manager" || user.role === "admin") {
-    // Find or create the OPERATIONS category
-    let operationsCategory = navigationItems.find(cat => cat.category === "OPERATIONS");
-    if (operationsCategory) {
-      operationsCategory.items.push({ name: "Approvals", path: "/approvals", icon: "approval" });
-    } else {
-      navigationItems.push({
-        category: "OPERATIONS",
-        items: [
-          { name: "Approvals", path: "/approvals", icon: "approval" },
-        ],
-      });
+  const handleNavClick = () => {
+    // Close sidebar on mobile after navigation
+    if (window.innerWidth < 768) {
+      onClose();
     }
-  }
+  };
 
   return (
     <>
       <aside 
-        id="sidebar"
         className={cn(
           "bg-white shrink-0 shadow-md overflow-y-auto transition-all duration-300 z-30",
           isOpen ? "w-64 block" : "w-0 hidden md:block md:w-64",
@@ -105,29 +57,202 @@ export default function Sidebar({ user, isOpen, onClose }: SidebarProps) {
         
         {/* Navigation */}
         <nav className="p-2">
-          {navigationItems.map((group, groupIndex) => (
-            <div key={groupIndex} className="mb-4">
-              <p className="text-xs font-medium text-gray-500 px-3 py-2">{group.category}</p>
+          {/* MAIN Section */}
+          <div className="mb-4">
+            <p className="text-xs font-medium text-gray-500 px-3 py-2">MAIN</p>
+            <ul>
+              <li>
+                <Link 
+                  href="/"
+                  onClick={handleNavClick}
+                  className={cn(
+                    "flex items-center px-3 py-2 rounded-md",
+                    isActive("/") 
+                      ? "bg-primary/10 border-l-4 border-primary text-primary" 
+                      : "text-gray-700 hover:text-primary hover:bg-primary/5"
+                  )}
+                >
+                  <span className="material-icons mr-3">dashboard</span>
+                  <span className="whitespace-nowrap">Dashboard</span>
+                </Link>
+              </li>
+              <li>
+                <Link 
+                  href="/inventory"
+                  onClick={handleNavClick}
+                  className={cn(
+                    "flex items-center px-3 py-2 rounded-md",
+                    isActive("/inventory") 
+                      ? "bg-primary/10 border-l-4 border-primary text-primary" 
+                      : "text-gray-700 hover:text-primary hover:bg-primary/5"
+                  )}
+                >
+                  <span className="material-icons mr-3">inventory_2</span>
+                  <span className="whitespace-nowrap">Inventory</span>
+                </Link>
+              </li>
+              <li>
+                <Link 
+                  href="/items"
+                  onClick={handleNavClick}
+                  className={cn(
+                    "flex items-center px-3 py-2 rounded-md",
+                    isActive("/items") 
+                      ? "bg-primary/10 border-l-4 border-primary text-primary" 
+                      : "text-gray-700 hover:text-primary hover:bg-primary/5"
+                  )}
+                >
+                  <span className="material-icons mr-3">category</span>
+                  <span className="whitespace-nowrap">Items</span>
+                </Link>
+              </li>
+              <li>
+                <Link 
+                  href="/warehouses"
+                  onClick={handleNavClick}
+                  className={cn(
+                    "flex items-center px-3 py-2 rounded-md",
+                    isActive("/warehouses") 
+                      ? "bg-primary/10 border-l-4 border-primary text-primary" 
+                      : "text-gray-700 hover:text-primary hover:bg-primary/5"
+                  )}
+                >
+                  <span className="material-icons mr-3">store</span>
+                  <span className="whitespace-nowrap">Warehouses</span>
+                </Link>
+              </li>
+            </ul>
+          </div>
+
+          {/* OPERATIONS Section */}
+          <div className="mb-4">
+            <p className="text-xs font-medium text-gray-500 px-3 py-2">OPERATIONS</p>
+            <ul>
+              <li>
+                <Link 
+                  href="/check-in"
+                  onClick={handleNavClick}
+                  className={cn(
+                    "flex items-center px-3 py-2 rounded-md",
+                    isActive("/check-in") 
+                      ? "bg-primary/10 border-l-4 border-primary text-primary" 
+                      : "text-gray-700 hover:text-primary hover:bg-primary/5"
+                  )}
+                >
+                  <span className="material-icons mr-3">login</span>
+                  <span className="whitespace-nowrap">CheckIn</span>
+                </Link>
+              </li>
+              <li>
+                <Link 
+                  href="/requests"
+                  onClick={handleNavClick}
+                  className={cn(
+                    "flex items-center px-3 py-2 rounded-md",
+                    isActive("/requests") 
+                      ? "bg-primary/10 border-l-4 border-primary text-primary" 
+                      : "text-gray-700 hover:text-primary hover:bg-primary/5"
+                  )}
+                >
+                  <span className="material-icons mr-3">assignment</span>
+                  <span className="whitespace-nowrap">Requests</span>
+                </Link>
+              </li>
+              <li>
+                <Link 
+                  href="/transfers"
+                  onClick={handleNavClick}
+                  className={cn(
+                    "flex items-center px-3 py-2 rounded-md",
+                    isActive("/transfers") 
+                      ? "bg-primary/10 border-l-4 border-primary text-primary" 
+                      : "text-gray-700 hover:text-primary hover:bg-primary/5"
+                  )}
+                >
+                  <span className="material-icons mr-3">swap_horiz</span>
+                  <span className="whitespace-nowrap">Transfers</span>
+                </Link>
+              </li>
+              {(user.role === "manager" || user.role === "admin") && (
+                <li>
+                  <Link 
+                    href="/approvals"
+                    onClick={handleNavClick}
+                    className={cn(
+                      "flex items-center px-3 py-2 rounded-md",
+                      isActive("/approvals") 
+                        ? "bg-primary/10 border-l-4 border-primary text-primary" 
+                        : "text-gray-700 hover:text-primary hover:bg-primary/5"
+                    )}
+                  >
+                    <span className="material-icons mr-3">approval</span>
+                    <span className="whitespace-nowrap">Approvals</span>
+                  </Link>
+                </li>
+              )}
+            </ul>
+          </div>
+
+          {/* REPORTS Section */}
+          <div className="mb-4">
+            <p className="text-xs font-medium text-gray-500 px-3 py-2">REPORTS</p>
+            <ul>
+              <li>
+                <Link 
+                  href="/stock-report"
+                  onClick={handleNavClick}
+                  className={cn(
+                    "flex items-center px-3 py-2 rounded-md",
+                    isActive("/stock-report") 
+                      ? "bg-primary/10 border-l-4 border-primary text-primary" 
+                      : "text-gray-700 hover:text-primary hover:bg-primary/5"
+                  )}
+                >
+                  <span className="material-icons mr-3">bar_chart</span>
+                  <span className="whitespace-nowrap">Stock</span>
+                </Link>
+              </li>
+              <li>
+                <Link 
+                  href="/movement-report"
+                  onClick={handleNavClick}
+                  className={cn(
+                    "flex items-center px-3 py-2 rounded-md",
+                    isActive("/movement-report") 
+                      ? "bg-primary/10 border-l-4 border-primary text-primary" 
+                      : "text-gray-700 hover:text-primary hover:bg-primary/5"
+                  )}
+                >
+                  <span className="material-icons mr-3">timeline</span>
+                  <span className="whitespace-nowrap">Movement</span>
+                </Link>
+              </li>
+            </ul>
+          </div>
+
+          {/* SYSTEM Section - Only for admins */}
+          {user.role === "admin" && (
+            <div className="mb-4">
+              <p className="text-xs font-medium text-gray-500 px-3 py-2">SYSTEM</p>
               <ul>
-                {group.items.map((item, itemIndex) => (
-                  <li key={itemIndex}>
-                    <Link 
-                      href={item.path}
-                      className={cn(
-                        "sidebar-nav-item flex items-center px-3 py-2 rounded-md",
-                        isActive(item.path) 
-                          ? "active bg-primary/10 border-l-4 border-primary text-primary" 
-                          : "text-gray-700 hover:text-primary hover:bg-primary/5"
-                      )}
-                    >
-                      <span className="material-icons mr-3">{item.icon}</span>
-                      <span className="whitespace-nowrap">{item.name}</span>
-                    </Link>
-                  </li>
-                ))}
+                <li>
+                  <Link 
+                    href="/users"
+                    onClick={handleNavClick}
+                    className={cn(
+                      "flex items-center px-3 py-2 rounded-md",
+                      isActive("/users") 
+                        ? "bg-primary/10 border-l-4 border-primary text-primary" 
+                        : "text-gray-700 hover:text-primary hover:bg-primary/5"
+                    )}
+                  >
+                    <span className="material-icons mr-3">people</span>
+                    <span className="whitespace-nowrap">Users</span>
+                  </Link>
+                </li>
               </ul>
             </div>
-          ))}
+          )}
         </nav>
       </aside>
     </>
