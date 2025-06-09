@@ -339,6 +339,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       console.log("Transaction request body:", JSON.stringify(req.body, null, 2));
       
+      // Additional validation before schema parsing
+      if (req.body.quantity !== undefined && req.body.quantity <= 0) {
+        console.log("Rejecting negative/zero quantity:", req.body.quantity);
+        return res.status(400).json({ 
+          message: "Quantity must be greater than 0",
+          issues: [{ path: ["quantity"], message: "Quantity must be greater than 0" }]
+        });
+      }
+      
       // Use safeParse and handle any validation errors manually
       const parseResult = insertTransactionSchema.safeParse(req.body);
       

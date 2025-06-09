@@ -123,10 +123,18 @@ export const insertTransactionSchema = createInsertSchema(transactions)
     completedAt: true,
   })
   .extend({
+    cost: z.preprocess((arg) => {
+      if (typeof arg === 'number') return arg.toString();
+      return arg;
+    }, z.string().optional()),
     checkInDate: z.preprocess((arg) => {
       if (typeof arg === 'string' || arg instanceof Date) return new Date(arg);
       return arg;
     }, z.date().optional())
+  })
+  .refine((data) => data.quantity > 0, {
+    message: "Quantity must be greater than 0",
+    path: ["quantity"]
   });
 
 // Inventory requests
