@@ -1349,7 +1349,114 @@ export class DatabaseStorage implements IStorage {
       .returning();
     return !!deletedRequestItem;
   }
+
+  // Approval Settings operations
+  async getApprovalSettings(id: number): Promise<ApprovalSettings | undefined> {
+    const [settings] = await db.select().from(approvalSettings).where(eq(approvalSettings.id, id));
+    return settings || undefined;
+  }
+
+  async getApprovalSettingsByType(type: string): Promise<ApprovalSettings[]> {
+    return await db.select().from(approvalSettings).where(eq(approvalSettings.type, type));
+  }
+
+  async createApprovalSettings(settings: InsertApprovalSettings): Promise<ApprovalSettings> {
+    const [newSettings] = await db.insert(approvalSettings).values(settings).returning();
+    return newSettings;
+  }
+
+  async getAllApprovalSettings(): Promise<ApprovalSettings[]> {
+    return await db.select().from(approvalSettings);
+  }
+
+  async updateApprovalSettings(id: number, settingsData: Partial<InsertApprovalSettings>): Promise<ApprovalSettings | undefined> {
+    const [updatedSettings] = await db.update(approvalSettings)
+      .set(settingsData)
+      .where(eq(approvalSettings.id, id))
+      .returning();
+    return updatedSettings || undefined;
+  }
+
+  async deleteApprovalSettings(id: number): Promise<boolean> {
+    const [deletedSettings] = await db.delete(approvalSettings)
+      .where(eq(approvalSettings.id, id))
+      .returning();
+    return !!deletedSettings;
+  }
+
+  // Request Approval operations
+  async getRequestApproval(id: number): Promise<RequestApproval | undefined> {
+    const [approval] = await db.select().from(requestApprovals).where(eq(requestApprovals.id, id));
+    return approval || undefined;
+  }
+
+  async getRequestApprovalsByRequest(requestId: number): Promise<RequestApproval[]> {
+    return await db.select().from(requestApprovals).where(eq(requestApprovals.requestId, requestId));
+  }
+
+  async getRequestApprovalsByApprover(approverId: number): Promise<RequestApproval[]> {
+    return await db.select().from(requestApprovals).where(eq(requestApprovals.approverId, approverId));
+  }
+
+  async createRequestApproval(approval: InsertRequestApproval): Promise<RequestApproval> {
+    const [newApproval] = await db.insert(requestApprovals).values({
+      ...approval,
+      createdAt: new Date()
+    }).returning();
+    return newApproval;
+  }
+
+  async updateRequestApproval(id: number, approvalData: Partial<InsertRequestApproval>): Promise<RequestApproval | undefined> {
+    const [updatedApproval] = await db.update(requestApprovals)
+      .set(approvalData)
+      .where(eq(requestApprovals.id, id))
+      .returning();
+    return updatedApproval || undefined;
+  }
+
+  async deleteRequestApproval(id: number): Promise<boolean> {
+    const [deletedApproval] = await db.delete(requestApprovals)
+      .where(eq(requestApprovals.id, id))
+      .returning();
+    return !!deletedApproval;
+  }
+
+  // User hierarchy operations
+  async getUserManager(userId: number): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.id, userId));
+    if (!user || !user.managerId) return undefined;
+    
+    const [manager] = await db.select().from(users).where(eq(users.id, user.managerId));
+    return manager || undefined;
+  }
+
+  async getUserHierarchy(userId: number): Promise<User[]> {
+    const hierarchy: User[] = [];
+    let currentUserId = userId;
+    
+    while (currentUserId) {
+      const [user] = await db.select().from(users).where(eq(users.id, currentUserId));
+      if (!user) break;
+      
+      hierarchy.push(user);
+      currentUserId = user.managerId || 0;
+    }
+    
+    return hierarchy;
+  }
+
+  async canApproveRequest(userId: number, requestId: number): Promise<boolean> {
+    // Get all approvals for this request
+    const approvals = await this.getRequestApprovalsByRequest(requestId);
+    
+    // Check if user is an approver for any pending approval
+    const userApproval = approvals.find(approval => 
+      approval.approverId === userId && approval.status === 'pending'
+    );
+    
+    return !!userApproval;
+  }
 }
 
-// Use the memory storage implementation for now
-export const storage = new MemStorage();
+// Use the database storage implementation
+export const storage = new DatabaseStorage();
