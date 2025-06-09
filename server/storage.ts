@@ -1357,7 +1357,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getApprovalSettingsByType(type: string): Promise<ApprovalSettings[]> {
-    return await db.select().from(approvalSettings).where(eq(approvalSettings.type, type));
+    return await db.select().from(approvalSettings).where(eq(approvalSettings.requestType, type));
   }
 
   async createApprovalSettings(settings: InsertApprovalSettings): Promise<ApprovalSettings> {
@@ -1428,6 +1428,10 @@ export class DatabaseStorage implements IStorage {
     
     const [manager] = await db.select().from(users).where(eq(users.id, user.managerId));
     return manager || undefined;
+  }
+
+  async getUsersByManager(managerId: number): Promise<User[]> {
+    return await db.select().from(users).where(eq(users.managerId, managerId));
   }
 
   async getUserHierarchy(userId: number): Promise<User[]> {

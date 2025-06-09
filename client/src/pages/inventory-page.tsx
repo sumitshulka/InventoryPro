@@ -42,7 +42,7 @@ import { downloadCSV } from "@/lib/utils";
 const formSchema = z.object({
   itemId: z.string().min(1, { message: "Item is required" }),
   warehouseId: z.string().min(1, { message: "Warehouse is required" }),
-  quantity: z.string().min(1, { message: "Quantity is required" }).transform(val => parseInt(val)),
+  quantity: z.string().min(1, { message: "Quantity is required" }),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -80,7 +80,7 @@ export default function InventoryPage() {
     defaultValues: {
       itemId: "",
       warehouseId: "",
-      quantity: "",
+      quantity: "0",
     },
   });
 
@@ -89,7 +89,7 @@ export default function InventoryPage() {
       const res = await apiRequest("POST", "/api/inventory", {
         itemId: parseInt(data.itemId),
         warehouseId: parseInt(data.warehouseId),
-        quantity: data.quantity,
+        quantity: parseInt(data.quantity),
       });
       return res.json();
     },
