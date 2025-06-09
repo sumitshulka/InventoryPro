@@ -526,7 +526,12 @@ export class MemStorage implements IStorage {
 
   async createWarehouse(warehouse: InsertWarehouse): Promise<Warehouse> {
     const id = this.warehouseIdCounter++;
-    const newWarehouse: Warehouse = { ...warehouse, id };
+    const newWarehouse: Warehouse = { 
+      ...warehouse, 
+      id,
+      manager: warehouse.manager || null,
+      isActive: warehouse.isActive !== undefined ? warehouse.isActive : true
+    };
     this.warehouses.set(id, newWarehouse);
     return newWarehouse;
   }
@@ -561,7 +566,14 @@ export class MemStorage implements IStorage {
 
   async createItem(item: InsertItem): Promise<Item> {
     const id = this.itemIdCounter++;
-    const newItem: Item = { ...item, id };
+    const newItem: Item = { 
+      ...item, 
+      id,
+      description: item.description || null,
+      minStockLevel: item.minStockLevel || 0,
+      categoryId: item.categoryId || null,
+      unit: item.unit || 'units'
+    };
     this.items.set(id, newItem);
     return newItem;
   }
@@ -597,7 +609,12 @@ export class MemStorage implements IStorage {
   async createInventory(inventory: InsertInventory): Promise<Inventory> {
     const id = this.inventoryIdCounter++;
     const lastUpdated = new Date();
-    const newInventory: Inventory = { ...inventory, id, lastUpdated };
+    const newInventory: Inventory = { 
+      ...inventory, 
+      id, 
+      lastUpdated,
+      quantity: inventory.quantity || 0
+    };
     this.inventory.set(id, newInventory);
     return newInventory;
   }
@@ -661,8 +678,16 @@ export class MemStorage implements IStorage {
   async createTransaction(transaction: InsertTransaction): Promise<Transaction> {
     const id = this.transactionIdCounter++;
     const createdAt = new Date();
-    const completedAt = transaction.status === "completed" ? new Date() : undefined;
-    const newTransaction: Transaction = { ...transaction, id, createdAt, completedAt };
+    const completedAt = transaction.status === "completed" ? new Date() : null;
+    const newTransaction: Transaction = { 
+      ...transaction, 
+      id, 
+      createdAt, 
+      completedAt,
+      transactionCode: `TXN-${id}`,
+      userId: transaction.requesterId || 1, // Default to admin if no requesterId
+      status: transaction.status || 'pending'
+    };
     this.transactions.set(id, newTransaction);
     return newTransaction;
   }
@@ -717,7 +742,18 @@ export class MemStorage implements IStorage {
     const id = this.requestIdCounter++;
     const requestCode = `REQ-${id + 150}`; // Starting with REQ-151 for better UI display
     const createdAt = new Date();
-    const newRequest: Request = { ...request, id, requestCode, createdAt, updatedAt: createdAt };
+    const newRequest: Request = { 
+      ...request, 
+      id, 
+      requestCode, 
+      createdAt, 
+      updatedAt: createdAt,
+      status: request.status || 'pending',
+      priority: request.priority || 'normal',
+      justification: request.justification || null,
+      notes: request.notes || null,
+      submittedAt: request.submittedAt || createdAt
+    };
     this.requests.set(id, newRequest);
     return newRequest;
   }
@@ -808,7 +844,8 @@ export class MemStorage implements IStorage {
       requestType: settings.requestType || 'issue',
       minApprovalLevel: settings.minApprovalLevel || 'manager',
       requiresSecondApproval: settings.requiresSecondApproval || false,
-      isActive: settings.isActive !== undefined ? settings.isActive : true
+      isActive: settings.isActive !== undefined ? settings.isActive : true,
+      maxAmount: settings.maxAmount || null
     };
     this.approvalSettingsMap.set(id, newSettings);
     return newSettings;
