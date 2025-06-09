@@ -877,6 +877,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Export transactions to CSV
+  app.get("/api/export/transactions", async (req, res) => {
+    try {
+      const transactions = await storage.getAllTransactions();
+      const allItems = await storage.getAllItems();
+      const allWarehouses = await storage.getAllWarehouses();
+      const allUsers = await storage.getAllUsers();
+      
+      const itemMap = new Map();
+      allItems.forEach(item => itemMap.set(item.id, item));
+      
+      const warehouseMap = new Map();
+      allWarehouses.forEach(warehouse => warehouseMap.set(warehouse.id, warehouse));
+      
+      const userMap = new Map();
+      allUsers.forEach(user => userMap.set(user.id, user));
+      
+      // CSV headers
+      let csv = 'Transaction Code,Type,Item Name,SKU,Quantity,Unit,Source Warehouse,Destination Warehouse,Cost,Date,Status,User\n';
+      
+      // Add transaction data
+      transactions.forEach(transaction => {
+        const item = itemMap.get(transaction.itemId);
+        const sourceWarehouse = transaction.sourceWarehouseId ? warehouseMap.get(transaction.sourceWarehouseId) : null;
+        const destinationWarehouse = transaction.destinationWarehouseId ? warehouseMap.get(transaction.destinationWarehouseId) : null;
+        const user = userMap.get(transaction.userId);
+        
+        csv += `"${transaction.transactionCode}",`;
+        csv += `"${transaction.transactionType}",`;
+        csv += `"${item?.name || `Item #${transaction.itemId}`}",`;
+        csv += `"${item?.sku || 'N/A'}",`;
+        csv += `${transaction.quantity},`;
+        csv += `"${item?.unit || 'units'}",`;
+        csv += `"${sourceWarehouse?.name || 'N/A'}",`;
+        csv += `"${destinationWarehouse?.name || 'N/A'}",`;
+        csv += `"${transaction.cost || 'N/A'}",`;
+        csv += `"${transaction.createdAt.toISOString()}",`;
+        csv += `"${transaction.status}",`;
+        csv += `"${user?.name || 'Unknown'}"`;
+        csv += '\n';
+      });
+      
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', 'attachment; filename="inventory-movements.csv"');
+      res.send(csv);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
   // Get warehouse statistics
   app.get("/api/warehouses/stats", async (req, res) => {
     try {

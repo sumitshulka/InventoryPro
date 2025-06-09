@@ -400,11 +400,12 @@ export default function MovementReportPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Transaction Code</TableHead>
-                  <TableHead>Type</TableHead>
+                  <TableHead>Movement</TableHead>
                   <TableHead>Item</TableHead>
                   <TableHead>Quantity</TableHead>
                   <TableHead>Source</TableHead>
                   <TableHead>Destination</TableHead>
+                  <TableHead>Cost</TableHead>
                   <TableHead>Date</TableHead>
                   <TableHead>Status</TableHead>
                 </TableRow>
@@ -412,7 +413,7 @@ export default function MovementReportPage() {
               <TableBody>
                 {filteredTransactions.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8 text-gray-500">
+                    <TableCell colSpan={9} className="text-center py-8 text-gray-500">
                       No transactions found matching the filters
                     </TableCell>
                   </TableRow>
@@ -421,13 +422,34 @@ export default function MovementReportPage() {
                     <TableRow key={transaction.id}>
                       <TableCell className="font-medium">{transaction.transactionCode}</TableCell>
                       <TableCell>
-                        <span className={`px-2 py-1 text-xs rounded-full ${getTransactionTypeColor(transaction.transactionType)}`}>
-                          {transaction.transactionType === "check-in" ? "Check-in" : 
-                           transaction.transactionType === "issue" ? "Issue" : "Transfer"}
-                        </span>
+                        <div className="flex items-center space-x-2">
+                          {transaction.transactionType === "check-in" && (
+                            <ArrowUpCircle className="h-4 w-4 text-green-600" />
+                          )}
+                          {transaction.transactionType === "issue" && (
+                            <ArrowDownCircle className="h-4 w-4 text-red-600" />
+                          )}
+                          {transaction.transactionType === "transfer" && (
+                            <ArrowRightLeft className="h-4 w-4 text-blue-600" />
+                          )}
+                          <span className={`px-2 py-1 text-xs rounded-full ${getTransactionTypeColor(transaction.transactionType)}`}>
+                            {transaction.transactionType === "check-in" ? "Check-in" : 
+                             transaction.transactionType === "issue" ? "Issue" : "Transfer"}
+                          </span>
+                        </div>
                       </TableCell>
-                      <TableCell>{transaction.item?.name || `Item #${transaction.itemId}`}</TableCell>
-                      <TableCell>{transaction.quantity}</TableCell>
+                      <TableCell>
+                        <div>
+                          <div className="font-medium">{transaction.item?.name || `Item #${transaction.itemId}`}</div>
+                          <div className="text-sm text-gray-500">{transaction.item?.sku}</div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center space-x-1">
+                          <span className="font-medium">{transaction.quantity}</span>
+                          <span className="text-sm text-gray-500">{transaction.item?.unit || "units"}</span>
+                        </div>
+                      </TableCell>
                       <TableCell>
                         {transaction.sourceWarehouse?.name || 
                           (transaction.sourceWarehouseId ? `Warehouse #${transaction.sourceWarehouseId}` : "—")}
@@ -436,7 +458,25 @@ export default function MovementReportPage() {
                         {transaction.destinationWarehouse?.name || 
                           (transaction.destinationWarehouseId ? `Warehouse #${transaction.destinationWarehouseId}` : "—")}
                       </TableCell>
-                      <TableCell>{formatDateTime(transaction.createdAt)}</TableCell>
+                      <TableCell>
+                        {transaction.cost ? (
+                          <span className="font-medium text-green-600">
+                            ${parseFloat(transaction.cost).toFixed(2)}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <div>
+                          <div className="text-sm">{formatDateTime(transaction.createdAt)}</div>
+                          {transaction.checkInDate && transaction.checkInDate !== transaction.createdAt && (
+                            <div className="text-xs text-gray-500">
+                              Check-in: {formatDateTime(transaction.checkInDate)}
+                            </div>
+                          )}
+                        </div>
+                      </TableCell>
                       <TableCell>
                         <span className={`px-2 py-1 text-xs rounded-full ${getStatusColor(transaction.status)}`}>
                           {transaction.status === "in-transit" ? "In Transit" : 
