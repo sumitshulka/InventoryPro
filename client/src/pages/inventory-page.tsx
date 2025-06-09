@@ -382,12 +382,12 @@ export default function InventoryPage() {
       </Dialog>
 
       <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
-        <SheetContent className="w-full sm:w-[600px]">
+        <SheetContent className="w-full sm:w-[800px] sm:max-w-[90vw]">
           <SheetHeader>
             <SheetTitle>Movement History - {selectedSku}</SheetTitle>
           </SheetHeader>
           
-          <div className="mt-6">
+          <div className="mt-6 h-full max-h-[80vh] overflow-y-auto">
             <Table>
               <TableHeader>
                 <TableRow>
