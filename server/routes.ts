@@ -337,11 +337,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create transaction (check-in, issue, transfer) (manager+)
   app.post("/api/transactions", checkRole("manager"), async (req, res) => {
     try {
+      console.log("Transaction request body:", JSON.stringify(req.body, null, 2));
+      
       // Use safeParse and handle any validation errors manually
       const parseResult = insertTransactionSchema.safeParse(req.body);
       
       if (!parseResult.success) {
-        return res.status(400).json({ message: parseResult.error.message });
+        console.log("Validation error:", JSON.stringify(parseResult.error.issues, null, 2));
+        return res.status(400).json({ 
+          message: parseResult.error.message,
+          issues: parseResult.error.issues
+        });
       }
       
       const transactionData = parseResult.data;
