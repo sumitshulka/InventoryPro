@@ -91,24 +91,35 @@ export default function CheckInPage() {
 
   const checkInMutation = useMutation({
     mutationFn: async (values: MultiCheckInFormValues) => {
-      const payload = {
-        itemId: parseInt(values.itemId),
-        quantity: parseInt(values.quantity),
-        destinationWarehouseId: parseInt(values.destinationWarehouseId),
-        transactionType: "check-in" as const,
-        status: "completed" as const,
-        cost: values.cost ? parseFloat(values.cost) : null,
-        requesterId: values.requesterId ? parseInt(values.requesterId) : null,
-        sourceWarehouseId: null,
-        checkInDate: values.checkInDate ? new Date(values.checkInDate) : undefined,
-      };
+      // Process each item in the multi-item check-in
+      const results = [];
+      
+      for (const item of values.items) {
+        const payload = {
+          itemId: parseInt(item.itemId),
+          quantity: parseInt(item.quantity),
+          destinationWarehouseId: parseInt(values.destinationWarehouseId),
+          transactionType: "check-in" as const,
+          status: "completed" as const,
+          cost: item.cost ? parseFloat(item.cost) : null,
+          requesterId: null, // Multi-item check-ins don't have individual requesters
+          sourceWarehouseId: null,
+          checkInDate: values.checkInDate ? new Date(values.checkInDate) : undefined,
+          purchaseOrderNumber: values.purchaseOrderNumber || null,
+          deliveryChallanNumber: values.deliveryChallanNumber || null,
+          supplierName: values.supplierName || null,
+          notes: values.notes || null,
+        };
 
-      const response = await apiRequest("POST", "/api/transactions", payload);
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message);
+        const response = await apiRequest("POST", "/api/transactions", payload);
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.message);
+        }
+        results.push(await response.json());
       }
-      return response.json();
+      
+      return results;
     },
     onSuccess: (newTransaction) => {
       // Immediately update cache with new transaction
