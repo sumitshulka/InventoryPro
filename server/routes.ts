@@ -1134,6 +1134,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.delete("/api/approval-settings/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const deleted = await storage.deleteApprovalSettings(id);
+      if (!deleted) {
+        return res.status(404).json({ message: "Approval settings not found" });
+      }
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
   // Request Approval routes
   app.get("/api/request-approvals/:requestId", async (req, res) => {
     try {

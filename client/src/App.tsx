@@ -14,6 +14,7 @@ import StockReportPage from "@/pages/stock-report-page";
 import MovementReportPage from "@/pages/movement-report-page";
 import UserManagementPage from "@/pages/user-management-page";
 import ApprovalManagementPage from "@/pages/approval-management-page";
+import SettingsPage from "@/pages/settings-page";
 import { ProtectedRoute } from "./lib/protected-route";
 
 function Router() {
@@ -44,6 +45,7 @@ function Router() {
       <ProtectedRoute path="/movement-report" component={MovementReportPage} />
       <ProtectedRoute path="/users" component={UserManagementPage} />
       <ProtectedRoute path="/approvals" component={ApprovalManagementPage} />
+      <ProtectedRoute path="/settings" component={SettingsPage} />
       <Route component={NotFound} />
     </Switch>
   );

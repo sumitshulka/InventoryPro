@@ -89,8 +89,7 @@ export default function Header({ user, onMenuClick }: HeaderProps) {
                   className="cursor-pointer"
                   onClick={() => {
                     setIsUserMenuOpen(false);
-                    // Placeholder for settings page
-                    // navigate('/settings');
+                    navigate('/settings');
                   }}
                 >
                   <span className="material-icons text-gray-500 mr-2 text-sm">settings</span>
