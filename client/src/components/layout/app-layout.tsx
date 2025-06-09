@@ -16,6 +16,10 @@ export default function AppLayout({ children }: AppLayoutProps) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [location, setLocation] = useLocation();
 
+  console.log("AppLayout render - isMobile:", isMobile);
+  console.log("AppLayout render - isSidebarOpen:", isSidebarOpen);
+  console.log("AppLayout render - location:", location);
+
   // If user is not authenticated, redirect to login
   useEffect(() => {
     if (!user) {
@@ -23,11 +27,11 @@ export default function AppLayout({ children }: AppLayoutProps) {
     }
   }, [user, setLocation]);
 
-  // Close sidebar on mobile when clicking away
+  // Close sidebar on mobile when clicking away - ONLY on mobile
   useEffect(() => {
     function handleOutsideClick(event: MouseEvent) {
+      // Only apply this logic on mobile devices
       if (isMobile && isSidebarOpen) {
-        // Check if click was outside the sidebar
         const sidebar = document.getElementById("sidebar");
         const target = event.target as Node;
         
@@ -37,10 +41,13 @@ export default function AppLayout({ children }: AppLayoutProps) {
       }
     }
 
-    document.addEventListener("mousedown", handleOutsideClick);
-    return () => {
-      document.removeEventListener("mousedown", handleOutsideClick);
-    };
+    // Only add event listener on mobile
+    if (isMobile) {
+      document.addEventListener("mousedown", handleOutsideClick);
+      return () => {
+        document.removeEventListener("mousedown", handleOutsideClick);
+      };
+    }
   }, [isMobile, isSidebarOpen]);
 
   // Remove the problematic route change effect completely

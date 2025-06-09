@@ -12,11 +12,17 @@ type SidebarProps = {
 export default function Sidebar({ user, isOpen, onClose }: SidebarProps) {
   const [location] = useLocation();
   
+  console.log("Sidebar render - user:", user);
+  console.log("Sidebar render - user.role:", user?.role);
+  console.log("Sidebar render - isOpen:", isOpen);
+  console.log("Sidebar render - location:", location);
+  
   const isActive = (path: string) => {
     return location === path;
   };
 
   const handleNavClick = () => {
+    console.log("Navigation clicked");
     // Close sidebar on mobile after navigation
     if (window.innerWidth < 768) {
       onClose();
@@ -26,6 +32,7 @@ export default function Sidebar({ user, isOpen, onClose }: SidebarProps) {
   return (
     <>
       <aside 
+        id="sidebar"
         className={cn(
           "bg-white shrink-0 shadow-md overflow-y-auto transition-all duration-300 z-30",
           isOpen ? "w-64 block" : "w-0 hidden md:block md:w-64",
