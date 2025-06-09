@@ -240,7 +240,7 @@ export default function CheckInPage() {
                     <SelectValue placeholder="Select a warehouse" />
                   </SelectTrigger>
                   <SelectContent>
-                    {warehouses?.filter((w: any) => w.isActive).map((warehouse: any) => (
+                    {(warehouses as any[])?.filter((w: any) => w.isActive).map((warehouse: any) => (
                       <SelectItem key={warehouse.id} value={warehouse.id.toString()}>
                         {warehouse.name}
                       </SelectItem>
@@ -310,7 +310,7 @@ export default function CheckInPage() {
                     <SelectValue placeholder="Select a requester" />
                   </SelectTrigger>
                   <SelectContent>
-                    {users?.map((u: any) => (
+                    {(users as any[])?.map((u: any) => (
                       <SelectItem key={u.id} value={u.id.toString()}>
                         {u.name}
                       </SelectItem>
@@ -363,16 +363,16 @@ export default function CheckInPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {checkInTransactions?.length === 0 ? (
+                  {(checkInTransactions as any[])?.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={8} className="text-center py-8 text-gray-500">
                         No check-in transactions found
                       </TableCell>
                     </TableRow>
                   ) : (
-                    checkInTransactions?.slice(0, 10).map((transaction: any) => {
-                      const item = items?.find((i: any) => i.id === transaction.itemId);
-                      const warehouse = warehouses?.find((w: any) => w.id === transaction.destinationWarehouseId);
+                    (checkInTransactions as any[])?.slice(0, 10).map((transaction: any) => {
+                      const item = (items as any[])?.find((i: any) => i.id === transaction.itemId);
+                      const warehouse = (warehouses as any[])?.find((w: any) => w.id === transaction.destinationWarehouseId);
 
                       return (
                         <TableRow key={transaction.id}>
