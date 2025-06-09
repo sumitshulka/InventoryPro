@@ -40,7 +40,7 @@ import { useAuth } from "@/hooks/use-auth";
 const formSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters" }),
   location: z.string().min(2, { message: "Location is required" }),
-  managerId: z.string().optional().transform(val => val === "" || val === "none" ? null : parseInt(val)),
+  managerId: z.string().optional().transform(val => val === "" || val === "none" || !val ? null : parseInt(val)),
   capacity: z.number().min(1, { message: "Capacity is required" }),
   isActive: z.boolean().default(true),
 });
@@ -68,7 +68,7 @@ export default function WarehousesPage() {
       name: "",
       location: "",
       managerId: "none",
-      capacity: "1000",
+      capacity: 1000,
       isActive: true,
     },
   });
@@ -114,8 +114,8 @@ export default function WarehousesPage() {
     form.reset({
       name: "",
       location: "",
-      manager: "",
-      capacity: "1000",
+      managerId: "none",
+      capacity: 1000,
       isActive: true,
     });
     setIsEditMode(false);
@@ -127,8 +127,8 @@ export default function WarehousesPage() {
     form.reset({
       name: warehouse.name,
       location: warehouse.location,
-      manager: warehouse.manager || "",
-      capacity: warehouse.capacity.toString(),
+      managerId: warehouse.managerId?.toString() || "none",
+      capacity: warehouse.capacity,
       isActive: warehouse.isActive,
     });
     setIsEditMode(true);
@@ -249,7 +249,12 @@ export default function WarehousesPage() {
                     <TableRow key={warehouse.id}>
                       <TableCell className="font-medium">{warehouse.name}</TableCell>
                       <TableCell>{warehouse.location}</TableCell>
-                      <TableCell>{warehouse.manager || "—"}</TableCell>
+                      <TableCell>
+                        {warehouse.managerId ? 
+                          (users as any[])?.find((u: any) => u.id === warehouse.managerId)?.name || "Unknown Manager" 
+                          : "—"
+                        }
+                      </TableCell>
                       <TableCell>{warehouse.capacity}</TableCell>
                       <TableCell>
                         <span className={`${warehouse.isActive ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"} text-xs px-2 py-1 rounded-full`}>
@@ -314,12 +319,28 @@ export default function WarehousesPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="manager">Manager</Label>
-                <Input
-                  id="manager"
-                  placeholder="Enter warehouse manager's name"
-                  {...form.register("manager")}
-                />
+                <Label htmlFor="managerId">Manager</Label>
+                <Select
+                  value={form.watch("managerId") || "none"}
+                  onValueChange={(value) => form.setValue("managerId", value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a manager" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No Manager</SelectItem>
+                    {(users as any[])?.filter((u: any) => 
+                      u.role === 'admin' || u.role === 'manager'
+                    ).map((manager: any) => (
+                      <SelectItem key={manager.id} value={manager.id.toString()}>
+                        {manager.name} ({manager.role})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {form.formState.errors.managerId && (
+                  <p className="text-sm text-red-500">{form.formState.errors.managerId.message}</p>
+                )}
               </div>
 
               <div className="space-y-2">

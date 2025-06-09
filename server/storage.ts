@@ -239,7 +239,7 @@ export class MemStorage implements IStorage {
     const northWarehouse = await this.createWarehouse({
       name: "North Branch",
       location: "123 Main St, New York, NY",
-      manager: "Michael Scott",
+      managerId: null,
       capacity: 1000,
       isActive: true
     });
@@ -247,7 +247,7 @@ export class MemStorage implements IStorage {
     const southWarehouse = await this.createWarehouse({
       name: "South Branch",
       location: "456 Oak Ave, Miami, FL",
-      manager: "Jim Halpert",
+      managerId: null,
       capacity: 800,
       isActive: true
     });
@@ -255,7 +255,7 @@ export class MemStorage implements IStorage {
     const eastWarehouse = await this.createWarehouse({
       name: "East Branch",
       location: "789 Pine St, Boston, MA",
-      manager: "Dwight Schrute",
+      managerId: null,
       capacity: 600,
       isActive: true
     });
@@ -263,7 +263,7 @@ export class MemStorage implements IStorage {
     const westWarehouse = await this.createWarehouse({
       name: "West Branch",
       location: "101 Cedar Blvd, San Francisco, CA",
-      manager: "Pam Beesly",
+      managerId: null,
       capacity: 750,
       isActive: true
     });
@@ -527,7 +527,7 @@ export class MemStorage implements IStorage {
     const newWarehouse: Warehouse = { 
       ...warehouse, 
       id,
-      manager: warehouse.manager || null,
+      managerId: warehouse.managerId || null,
       isActive: warehouse.isActive !== undefined ? warehouse.isActive : true
     };
     this.warehouses.set(id, newWarehouse);
