@@ -13,6 +13,8 @@ import TransfersPage from "@/pages/transfers-page";
 import StockReportPage from "@/pages/stock-report-page";
 import MovementReportPage from "@/pages/movement-report-page";
 import UserManagementPage from "@/pages/user-management-page";
+import UsersManagementPage from "@/pages/users-management-page";
+import CategoriesPage from "@/pages/categories-page";
 import ApprovalManagementPage from "@/pages/approval-management-page";
 import SettingsPage from "@/pages/settings-page";
 import { ProtectedRoute } from "./lib/protected-route";
@@ -44,6 +46,8 @@ function Router() {
       <ProtectedRoute path="/stock-report" component={StockReportPage} />
       <ProtectedRoute path="/movement-report" component={MovementReportPage} />
       <ProtectedRoute path="/users" component={UserManagementPage} />
+      <ProtectedRoute path="/users-management" component={UsersManagementPage} />
+      <ProtectedRoute path="/categories" component={CategoriesPage} />
       <ProtectedRoute path="/approvals" component={ApprovalManagementPage} />
       <ProtectedRoute path="/settings" component={SettingsPage} />
       <Route component={NotFound} />

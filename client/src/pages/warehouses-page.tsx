@@ -321,7 +321,7 @@ export default function WarehousesPage() {
               <div className="space-y-2">
                 <Label htmlFor="managerId">Manager</Label>
                 <Select
-                  value={form.watch("managerId") || "none"}
+                  value={form.watch("managerId")?.toString() || "none"}
                   onValueChange={(value) => form.setValue("managerId", value)}
                 >
                   <SelectTrigger>

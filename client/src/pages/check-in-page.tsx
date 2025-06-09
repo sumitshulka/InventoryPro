@@ -76,20 +76,21 @@ export default function CheckInPage() {
     queryKey: ["/api/organization-settings"],
   });
 
-  const form = useForm<FormValues>({
-    resolver: zodResolver(formSchema),
+  const form = useForm<MultiCheckInFormValues>({
+    resolver: zodResolver(multiCheckInSchema),
     defaultValues: {
-      itemId: "",
-      quantity: "",
       destinationWarehouseId: "",
-      cost: "",
-      requesterId: "",
+      purchaseOrderNumber: "",
+      deliveryChallanNumber: "",
+      supplierName: "",
+      notes: "",
       checkInDate: new Date(),
+      items: [{ itemId: "", quantity: "", cost: "" }],
     },
   });
 
   const checkInMutation = useMutation({
-    mutationFn: async (values: FormValues) => {
+    mutationFn: async (values: MultiCheckInFormValues) => {
       const payload = {
         itemId: parseInt(values.itemId),
         quantity: parseInt(values.quantity),

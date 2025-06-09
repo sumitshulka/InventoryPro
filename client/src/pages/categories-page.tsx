@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Table,
   TableBody,
@@ -24,9 +25,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Textarea } from "@/components/ui/textarea";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Loader2, Plus, Edit, Trash2 } from "lucide-react";
+import { Loader2, Plus, Edit, Trash2, Tags } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 
@@ -60,11 +60,16 @@ export default function CategoriesPage() {
 
   const createCategoryMutation = useMutation({
     mutationFn: async (data: FormValues) => {
+      const payload = {
+        name: data.name,
+        description: data.description || null,
+      };
+
       if (isEditMode && editCategoryId) {
-        const res = await apiRequest("PUT", `/api/categories/${editCategoryId}`, data);
+        const res = await apiRequest("PUT", `/api/categories/${editCategoryId}`, payload);
         return res.json();
       } else {
-        const res = await apiRequest("POST", "/api/categories", data);
+        const res = await apiRequest("POST", "/api/categories", payload);
         return res.json();
       }
     },
@@ -90,6 +95,10 @@ export default function CategoriesPage() {
   const deleteCategoryMutation = useMutation({
     mutationFn: async (id: number) => {
       const res = await apiRequest("DELETE", `/api/categories/${id}`);
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message);
+      }
       return res.json();
     },
     onSuccess: () => {
@@ -118,14 +127,20 @@ export default function CategoriesPage() {
     setIsDialogOpen(false);
   };
 
-  const handleEditCategory = (category: any) => {
+  const handleEditCategory = (categoryData: any) => {
     form.reset({
-      name: category.name,
-      description: category.description || "",
+      name: categoryData.name,
+      description: categoryData.description || "",
     });
     setIsEditMode(true);
-    setEditCategoryId(category.id);
+    setEditCategoryId(categoryData.id);
     setIsDialogOpen(true);
+  };
+
+  const handleDeleteCategory = (id: number) => {
+    if (confirm("Are you sure you want to delete this category?")) {
+      deleteCategoryMutation.mutate(id);
+    }
   };
 
   const handleSubmit = (values: FormValues) => {
@@ -147,8 +162,8 @@ export default function CategoriesPage() {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Categories</h1>
-            <p className="text-muted-foreground">Manage item categories for organization</p>
+            <h1 className="text-3xl font-bold tracking-tight">Categories Management</h1>
+            <p className="text-muted-foreground">Manage item categories and classifications</p>
           </div>
           {isAdmin && (
             <Button onClick={() => setIsDialogOpen(true)}>
@@ -160,7 +175,10 @@ export default function CategoriesPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>All Categories</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              <Tags className="h-5 w-5" />
+              All Categories
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="rounded-md border">
@@ -169,7 +187,7 @@ export default function CategoriesPage() {
                   <TableRow>
                     <TableHead>Name</TableHead>
                     <TableHead>Description</TableHead>
-                    {isAdmin && <TableHead className="w-[100px]">Actions</TableHead>}
+                    {isAdmin && <TableHead className="w-[120px]">Actions</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -186,7 +204,7 @@ export default function CategoriesPage() {
                         <TableCell>{category.description || "—"}</TableCell>
                         {isAdmin && (
                           <TableCell>
-                            <div className="flex space-x-2">
+                            <div className="flex gap-2">
                               <Button
                                 variant="ghost"
                                 size="sm"
@@ -197,7 +215,8 @@ export default function CategoriesPage() {
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => deleteCategoryMutation.mutate(category.id)}
+                                onClick={() => handleDeleteCategory(category.id)}
+                                disabled={deleteCategoryMutation.isPending}
                               >
                                 <Trash2 className="h-4 w-4" />
                               </Button>
@@ -222,14 +241,14 @@ export default function CategoriesPage() {
               <DialogDescription>
                 {isEditMode 
                   ? "Update the category details below."
-                  : "Create a new category for organizing inventory items."
+                  : "Create a new category for organizing items."
                 }
               </DialogDescription>
             </DialogHeader>
 
             <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="name">Name</Label>
+                <Label htmlFor="name">Category Name</Label>
                 <Input
                   id="name"
                   placeholder="Enter category name"
@@ -241,12 +260,15 @@ export default function CategoriesPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="description">Description</Label>
+                <Label htmlFor="description">Description (Optional)</Label>
                 <Textarea
                   id="description"
-                  placeholder="Enter category description (optional)"
+                  placeholder="Enter category description"
                   {...form.register("description")}
                 />
+                {form.formState.errors.description && (
+                  <p className="text-sm text-red-500">{form.formState.errors.description.message}</p>
+                )}
               </div>
 
               <DialogFooter>
