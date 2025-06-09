@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -82,12 +82,24 @@ export default function SettingsPage() {
   const orgForm = useForm<OrganizationSettingsFormValues>({
     resolver: zodResolver(organizationSettingsSchema),
     defaultValues: {
-      organizationName: organizationSettings?.organizationName || "My Organization",
-      currency: organizationSettings?.currency || "USD",
-      currencySymbol: organizationSettings?.currencySymbol || "$",
-      timezone: organizationSettings?.timezone || "UTC",
+      organizationName: "My Organization",
+      currency: "USD",
+      currencySymbol: "$",
+      timezone: "UTC",
     },
   });
+
+  // Update form when organization settings load
+  useEffect(() => {
+    if (organizationSettings) {
+      orgForm.reset({
+        organizationName: (organizationSettings as any).organizationName || "My Organization",
+        currency: (organizationSettings as any).currency || "USD",
+        currencySymbol: (organizationSettings as any).currencySymbol || "$",
+        timezone: (organizationSettings as any).timezone || "UTC",
+      });
+    }
+  }, [organizationSettings, orgForm]);
 
   const createMutation = useMutation({
     mutationFn: async (data: ApprovalSettingsFormValues) => {

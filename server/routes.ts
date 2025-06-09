@@ -10,8 +10,11 @@ import {
   insertInventorySchema, 
   insertTransactionSchema, 
   insertRequestSchema, 
-  insertRequestItemSchema 
+  insertRequestItemSchema,
+  organizationSettings
 } from "@shared/schema";
+import { db } from "./db";
+import { eq } from "drizzle-orm";
 
 // Utility function to check required role
 const checkRole = (requiredRole: string) => {
@@ -1150,15 +1153,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Organization settings routes
   app.get("/api/organization-settings", async (req, res) => {
     try {
-      // Return default settings for now
-      const settings = {
-        id: 1,
-        organizationName: "My Organization",
-        currency: "USD",
-        currencySymbol: "$",
-        timezone: "UTC"
-      };
-      res.json(settings);
+      const settings = await db.select().from(organizationSettings).limit(1);
+      if (settings.length === 0) {
+        // Create default settings if none exist
+        const defaultSettings = await db.insert(organizationSettings).values({
+          organizationName: "My Organization",
+          currency: "USD",
+          currencySymbol: "$",
+          timezone: "UTC"
+        }).returning();
+        res.json(defaultSettings[0]);
+      } else {
+        res.json(settings[0]);
+      }
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -1166,13 +1173,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.put("/api/organization-settings", async (req, res) => {
     try {
-      // For now, just return the updated settings
-      const settings = {
-        id: 1,
-        ...req.body,
-        updatedAt: new Date()
-      };
-      res.json(settings);
+      const existing = await db.select().from(organizationSettings).limit(1);
+      if (existing.length === 0) {
+        // Create new settings
+        const newSettings = await db.insert(organizationSettings).values({
+          ...req.body,
+        }).returning();
+        res.json(newSettings[0]);
+      } else {
+        // Update existing settings
+        const updated = await db.update(organizationSettings)
+          .set({ ...req.body, updatedAt: new Date() })
+          .where(eq(organizationSettings.id, existing[0].id))
+          .returning();
+        res.json(updated[0]);
+      }
     } catch (error: any) {
       res.status(400).json({ message: error.message });
     }
