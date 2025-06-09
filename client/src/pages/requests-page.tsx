@@ -528,34 +528,53 @@ export default function RequestsPage() {
             </div>
 
             <DialogFooter>
-              {isManager && selectedRequest.status === "pending" && (
+              {isManager && (
                 <div className="flex space-x-2 mr-auto">
-                  <Button
-                    variant="outline"
-                    className="border-green-500 text-green-600 hover:bg-green-50"
-                    onClick={() => handleUpdateStatus(selectedRequest.id, "approved")}
-                    disabled={updateRequestStatusMutation.isPending}
-                  >
-                    {updateRequestStatusMutation.isPending ? (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    ) : (
-                      <CheckCircle className="mr-2 h-4 w-4" />
-                    )}
-                    Approve
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="border-red-500 text-red-600 hover:bg-red-50"
-                    onClick={() => handleUpdateStatus(selectedRequest.id, "rejected")}
-                    disabled={updateRequestStatusMutation.isPending}
-                  >
-                    {updateRequestStatusMutation.isPending ? (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    ) : (
-                      <X className="mr-2 h-4 w-4" />
-                    )}
-                    Reject
-                  </Button>
+                  {selectedRequest.status === "pending" && (
+                    <>
+                      <Button
+                        variant="outline"
+                        className="border-green-500 text-green-600 hover:bg-green-50"
+                        onClick={() => handleUpdateStatus(selectedRequest.id, "approved")}
+                        disabled={updateRequestStatusMutation.isPending}
+                      >
+                        {updateRequestStatusMutation.isPending ? (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                          <CheckCircle className="mr-2 h-4 w-4" />
+                        )}
+                        Approve
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="border-red-500 text-red-600 hover:bg-red-50"
+                        onClick={() => handleUpdateStatus(selectedRequest.id, "rejected")}
+                        disabled={updateRequestStatusMutation.isPending}
+                      >
+                        {updateRequestStatusMutation.isPending ? (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                          <X className="mr-2 h-4 w-4" />
+                        )}
+                        Reject
+                      </Button>
+                    </>
+                  )}
+                  {selectedRequest.status === "approved" && (
+                    <Button
+                      variant="outline"
+                      className="border-blue-500 text-blue-600 hover:bg-blue-50"
+                      onClick={() => handleUpdateStatus(selectedRequest.id, "completed")}
+                      disabled={updateRequestStatusMutation.isPending}
+                    >
+                      {updateRequestStatusMutation.isPending ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <CheckCircle className="mr-2 h-4 w-4" />
+                      )}
+                      Complete Request
+                    </Button>
+                  )}
                 </div>
               )}
               <Button
