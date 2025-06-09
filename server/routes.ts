@@ -1193,6 +1193,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // User manager assignment routes
+  app.put("/api/users/:id/manager", async (req, res) => {
+    try {
+      const userId = parseInt(req.params.id);
+      const { managerId } = req.body;
+      
+      const updatedUser = await storage.updateUser(userId, { managerId });
+      if (!updatedUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      res.json(updatedUser);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Warehouse manager assignment routes
+  app.put("/api/warehouses/:id/manager", async (req, res) => {
+    try {
+      const warehouseId = parseInt(req.params.id);
+      const { managerId } = req.body;
+      
+      const updatedWarehouse = await storage.updateWarehouse(warehouseId, { managerId });
+      if (!updatedWarehouse) {
+        return res.status(404).json({ message: "Warehouse not found" });
+      }
+      
+      res.json(updatedWarehouse);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
   // Request Approval routes
   app.get("/api/request-approvals/:requestId", async (req, res) => {
     try {

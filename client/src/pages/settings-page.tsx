@@ -70,6 +70,14 @@ export default function SettingsPage() {
     queryKey: ["/api/organization-settings"],
   });
 
+  const { data: users } = useQuery({
+    queryKey: ["/api/users"],
+  });
+
+  const { data: warehouses } = useQuery({
+    queryKey: ["/api/warehouses"],
+  });
+
   const form = useForm<ApprovalSettingsFormValues>({
     resolver: zodResolver(approvalSettingsSchema),
     defaultValues: {
@@ -248,6 +256,7 @@ export default function SettingsPage() {
           <TabsList>
             <TabsTrigger value="approval-hierarchy">Approval Hierarchy</TabsTrigger>
             <TabsTrigger value="organization">Organization</TabsTrigger>
+            <TabsTrigger value="user-management">User Management</TabsTrigger>
             <TabsTrigger value="system-config">System Configuration</TabsTrigger>
           </TabsList>
 
@@ -374,7 +383,7 @@ export default function SettingsPage() {
                       </div>
 
                       <div className="space-y-2">
-                        <Label htmlFor="timezone">Timezone</Label>
+                        <Label htmlFor="timezone">Default Timezone</Label>
                         <Select
                           onValueChange={(value) => orgForm.setValue("timezone", value)}
                           defaultValue={orgForm.getValues("timezone")}
@@ -382,15 +391,34 @@ export default function SettingsPage() {
                           <SelectTrigger>
                             <SelectValue placeholder="Select timezone" />
                           </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="UTC">UTC</SelectItem>
-                            <SelectItem value="America/New_York">Eastern Time</SelectItem>
-                            <SelectItem value="America/Chicago">Central Time</SelectItem>
-                            <SelectItem value="America/Denver">Mountain Time</SelectItem>
-                            <SelectItem value="America/Los_Angeles">Pacific Time</SelectItem>
-                            <SelectItem value="Europe/London">London</SelectItem>
-                            <SelectItem value="Europe/Paris">Paris</SelectItem>
-                            <SelectItem value="Asia/Tokyo">Tokyo</SelectItem>
+                          <SelectContent className="max-h-60 overflow-y-auto">
+                            <SelectItem value="UTC">UTC (GMT+0:00) - Coordinated Universal Time</SelectItem>
+                            <SelectItem value="America/New_York">EST (GMT-5:00) - Eastern Time</SelectItem>
+                            <SelectItem value="America/Chicago">CST (GMT-6:00) - Central Time</SelectItem>
+                            <SelectItem value="America/Denver">MST (GMT-7:00) - Mountain Time</SelectItem>
+                            <SelectItem value="America/Los_Angeles">PST (GMT-8:00) - Pacific Time</SelectItem>
+                            <SelectItem value="Europe/London">GMT (GMT+0:00) - London</SelectItem>
+                            <SelectItem value="Europe/Paris">CET (GMT+1:00) - Paris</SelectItem>
+                            <SelectItem value="Europe/Berlin">CET (GMT+1:00) - Berlin</SelectItem>
+                            <SelectItem value="Europe/Rome">CET (GMT+1:00) - Rome</SelectItem>
+                            <SelectItem value="Europe/Madrid">CET (GMT+1:00) - Madrid</SelectItem>
+                            <SelectItem value="Europe/Amsterdam">CET (GMT+1:00) - Amsterdam</SelectItem>
+                            <SelectItem value="Europe/Moscow">MSK (GMT+3:00) - Moscow</SelectItem>
+                            <SelectItem value="Asia/Tokyo">JST (GMT+9:00) - Tokyo</SelectItem>
+                            <SelectItem value="Asia/Shanghai">CST (GMT+8:00) - Shanghai</SelectItem>
+                            <SelectItem value="Asia/Hong_Kong">HKT (GMT+8:00) - Hong Kong</SelectItem>
+                            <SelectItem value="Asia/Singapore">SGT (GMT+8:00) - Singapore</SelectItem>
+                            <SelectItem value="Asia/Mumbai">IST (GMT+5:30) - Mumbai</SelectItem>
+                            <SelectItem value="Asia/Dubai">GST (GMT+4:00) - Dubai</SelectItem>
+                            <SelectItem value="Australia/Sydney">AEDT (GMT+11:00) - Sydney</SelectItem>
+                            <SelectItem value="Australia/Melbourne">AEDT (GMT+11:00) - Melbourne</SelectItem>
+                            <SelectItem value="Pacific/Auckland">NZDT (GMT+13:00) - Auckland</SelectItem>
+                            <SelectItem value="America/Toronto">EST (GMT-5:00) - Toronto</SelectItem>
+                            <SelectItem value="America/Vancouver">PST (GMT-8:00) - Vancouver</SelectItem>
+                            <SelectItem value="America/Sao_Paulo">BRT (GMT-3:00) - São Paulo</SelectItem>
+                            <SelectItem value="America/Mexico_City">CST (GMT-6:00) - Mexico City</SelectItem>
+                            <SelectItem value="Africa/Cairo">EET (GMT+2:00) - Cairo</SelectItem>
+                            <SelectItem value="Africa/Johannesburg">SAST (GMT+2:00) - Johannesburg</SelectItem>
                           </SelectContent>
                         </Select>
                         {orgForm.formState.errors.timezone && (
@@ -458,6 +486,78 @@ export default function SettingsPage() {
                       </div>
                     </div>
 
+                    <div className="space-y-6">
+                      <div className="space-y-4">
+                        <Label className="text-base font-semibold">Default Unit Types</Label>
+                        <p className="text-sm text-muted-foreground">
+                          Define the available unit types for items in your inventory
+                        </p>
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                          {["pcs", "boxes", "reams", "kg", "liters", "meters", "tons", "gallons", "cases", "pallets"].map((unit) => (
+                            <div key={unit} className="flex items-center space-x-2">
+                              <input
+                                type="checkbox"
+                                id={`unit-${unit}`}
+                                checked={orgForm.watch("defaultUnits").includes(unit)}
+                                onChange={(e) => {
+                                  const currentUnits = orgForm.getValues("defaultUnits");
+                                  if (e.target.checked) {
+                                    orgForm.setValue("defaultUnits", [...currentUnits, unit]);
+                                  } else {
+                                    orgForm.setValue("defaultUnits", currentUnits.filter(u => u !== unit));
+                                  }
+                                }}
+                                className="rounded border-gray-300"
+                              />
+                              <Label htmlFor={`unit-${unit}`} className="text-sm capitalize">
+                                {unit}
+                              </Label>
+                            </div>
+                          ))}
+                        </div>
+                        {orgForm.formState.errors.defaultUnits && (
+                          <p className="text-sm text-red-500">
+                            {orgForm.formState.errors.defaultUnits.message}
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="space-y-4">
+                        <Label className="text-base font-semibold">Default Item Categories</Label>
+                        <p className="text-sm text-muted-foreground">
+                          Define the available categories for organizing your inventory items
+                        </p>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          {["Electronics", "Office Supplies", "Furniture", "Raw Materials", "Finished Goods", "Tools & Equipment", "Safety Equipment", "Consumables"].map((category) => (
+                            <div key={category} className="flex items-center space-x-2">
+                              <input
+                                type="checkbox"
+                                id={`category-${category}`}
+                                checked={orgForm.watch("allowedCategories").includes(category)}
+                                onChange={(e) => {
+                                  const currentCategories = orgForm.getValues("allowedCategories");
+                                  if (e.target.checked) {
+                                    orgForm.setValue("allowedCategories", [...currentCategories, category]);
+                                  } else {
+                                    orgForm.setValue("allowedCategories", currentCategories.filter(c => c !== category));
+                                  }
+                                }}
+                                className="rounded border-gray-300"
+                              />
+                              <Label htmlFor={`category-${category}`} className="text-sm">
+                                {category}
+                              </Label>
+                            </div>
+                          ))}
+                        </div>
+                        {orgForm.formState.errors.allowedCategories && (
+                          <p className="text-sm text-red-500">
+                            {orgForm.formState.errors.allowedCategories.message}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
                     <div className="flex justify-end">
                       <Button
                         type="submit"
@@ -477,6 +577,104 @@ export default function SettingsPage() {
                 )}
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="user-management" className="space-y-4">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Manager Hierarchy</CardTitle>
+                  <p className="text-sm text-muted-foreground">
+                    Configure reporting relationships for approval workflows
+                  </p>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {(users as any[])?.filter((u: any) => u.role !== 'admin').map((user: any) => (
+                      <div key={user.id} className="flex items-center justify-between p-3 border rounded-lg">
+                        <div className="flex-1">
+                          <p className="font-medium">{user.name}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {user.role} • {user.email}
+                          </p>
+                        </div>
+                        <div className="ml-4">
+                          <Select
+                            value={user.managerId?.toString() || "none"}
+                            onValueChange={(value) => {
+                              // Update user's manager
+                              const managerId = value === "none" ? null : parseInt(value);
+                              // This would trigger an API call to update the user
+                            }}
+                          >
+                            <SelectTrigger className="w-40">
+                              <SelectValue placeholder="Select manager" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="none">No Manager</SelectItem>
+                              {(users as any[])?.filter((u: any) => 
+                                (u.role === 'admin' || u.role === 'manager') && u.id !== user.id
+                              ).map((manager: any) => (
+                                <SelectItem key={manager.id} value={manager.id.toString()}>
+                                  {manager.name} ({manager.role})
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Warehouse Managers</CardTitle>
+                  <p className="text-sm text-muted-foreground">
+                    Assign managers to warehouses for operational oversight
+                  </p>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {(warehouses as any[])?.map((warehouse: any) => (
+                      <div key={warehouse.id} className="flex items-center justify-between p-3 border rounded-lg">
+                        <div className="flex-1">
+                          <p className="font-medium">{warehouse.name}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {warehouse.location}
+                          </p>
+                        </div>
+                        <div className="ml-4">
+                          <Select
+                            value={warehouse.managerId?.toString() || "none"}
+                            onValueChange={(value) => {
+                              // Update warehouse manager
+                              const managerId = value === "none" ? null : parseInt(value);
+                              // This would trigger an API call to update the warehouse
+                            }}
+                          >
+                            <SelectTrigger className="w-40">
+                              <SelectValue placeholder="Select manager" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="none">No Manager</SelectItem>
+                              {(users as any[])?.filter((u: any) => 
+                                u.role === 'admin' || u.role === 'manager'
+                              ).map((manager: any) => (
+                                <SelectItem key={manager.id} value={manager.id.toString()}>
+                                  {manager.name} ({manager.role})
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
 
           <TabsContent value="system-config" className="space-y-4">
