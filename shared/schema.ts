@@ -2,6 +2,22 @@ import { pgTable, text, serial, integer, boolean, timestamp, unique, numeric } f
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
+// Departments table
+export const departments = pgTable("departments", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull().unique(),
+  description: text("description"),
+  managerId: integer("manager_id"),
+  isActive: boolean("is_active").notNull().default(true),
+});
+
+export const insertDepartmentSchema = createInsertSchema(departments).pick({
+  name: true,
+  description: true,
+  managerId: true,
+  isActive: true,
+});
+
 // Users table
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
@@ -12,6 +28,7 @@ export const users = pgTable("users", {
   role: text("role").notNull().default("user"),
   managerId: integer("manager_id"),
   warehouseId: integer("warehouse_id"),
+  departmentId: integer("department_id"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -23,6 +40,7 @@ export const insertUserSchema = createInsertSchema(users).pick({
   role: true,
   managerId: true,
   warehouseId: true,
+  departmentId: true,
 });
 
 // Categories for items

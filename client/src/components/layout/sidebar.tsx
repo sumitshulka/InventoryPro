@@ -239,17 +239,62 @@ export default function Sidebar({ user, isOpen, onClose }: SidebarProps) {
               <ul>
                 <li>
                   <Link 
-                    href="/users"
+                    href="/users-management"
                     onClick={handleNavClick}
                     className={cn(
                       "flex items-center px-3 py-2 rounded-md",
-                      isActive("/users") 
+                      isActive("/users-management") 
                         ? "bg-primary/10 border-l-4 border-primary text-primary" 
                         : "text-gray-700 hover:text-primary hover:bg-primary/5"
                     )}
                   >
                     <span className="material-icons mr-3">people</span>
                     <span className="whitespace-nowrap">Users</span>
+                  </Link>
+                </li>
+                <li>
+                  <Link 
+                    href="/categories"
+                    onClick={handleNavClick}
+                    className={cn(
+                      "flex items-center px-3 py-2 rounded-md",
+                      isActive("/categories") 
+                        ? "bg-primary/10 border-l-4 border-primary text-primary" 
+                        : "text-gray-700 hover:text-primary hover:bg-primary/5"
+                    )}
+                  >
+                    <span className="material-icons mr-3">label</span>
+                    <span className="whitespace-nowrap">Categories</span>
+                  </Link>
+                </li>
+                <li>
+                  <Link 
+                    href="/departments"
+                    onClick={handleNavClick}
+                    className={cn(
+                      "flex items-center px-3 py-2 rounded-md",
+                      isActive("/departments") 
+                        ? "bg-primary/10 border-l-4 border-primary text-primary" 
+                        : "text-gray-700 hover:text-primary hover:bg-primary/5"
+                    )}
+                  >
+                    <span className="material-icons mr-3">corporate_fare</span>
+                    <span className="whitespace-nowrap">Departments</span>
+                  </Link>
+                </li>
+                <li>
+                  <Link 
+                    href="/settings"
+                    onClick={handleNavClick}
+                    className={cn(
+                      "flex items-center px-3 py-2 rounded-md",
+                      isActive("/settings") 
+                        ? "bg-primary/10 border-l-4 border-primary text-primary" 
+                        : "text-gray-700 hover:text-primary hover:bg-primary/5"
+                    )}
+                  >
+                    <span className="material-icons mr-3">settings</span>
+                    <span className="whitespace-nowrap">Settings</span>
                   </Link>
                 </li>
               </ul>
