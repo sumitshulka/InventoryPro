@@ -213,14 +213,15 @@ export class MemStorage implements IStorage {
       warehouseId: 1
     });
     
-    // Create regular user
+    // Create regular user with manager relationship
     await this.createUser({
       username: "user",
       password: "user", // Will be hashed in auth.ts
       name: "Regular User",
       email: "user@example.com",
       role: "user",
-      warehouseId: 2
+      warehouseId: 2,
+      managerId: 2 // Reports to manager user
     });
     
     // Create categories

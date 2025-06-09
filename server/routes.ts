@@ -601,6 +601,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
       }
+
+      // Create approval records based on user hierarchy and approval settings
+      try {
+        // For regular users, get their manager for approval
+        if (req.user!.role === "user") {
+          const manager = await storage.getUserManager(req.user!.id);
+          if (manager) {
+            await storage.createRequestApproval({
+              requestId: request.id,
+              approverId: manager.id,
+              approvalLevel: "manager",
+              status: "pending"
+            });
+          } else {
+            // If no manager, require admin approval
+            const admins = await storage.getAllUsers();
+            const adminUser = admins.find(u => u.role === "admin");
+            if (adminUser) {
+              await storage.createRequestApproval({
+                requestId: request.id,
+                approverId: adminUser.id,
+                approvalLevel: "admin",
+                status: "pending"
+              });
+            }
+          }
+        } else if (req.user!.role === "manager") {
+          // Managers need admin approval for high priority requests
+          if (request.priority === "high") {
+            const admins = await storage.getAllUsers();
+            const adminUser = admins.find(u => u.role === "admin");
+            if (adminUser) {
+              await storage.createRequestApproval({
+                requestId: request.id,
+                approverId: adminUser.id,
+                approvalLevel: "admin",
+                status: "pending"
+              });
+            }
+          }
+        }
+        // Admins can auto-approve their own requests
+      } catch (error) {
+        console.error("Error creating approval records:", error);
+      }
       
       res.status(201).json(request);
     } catch (error: any) {
