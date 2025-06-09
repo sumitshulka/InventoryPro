@@ -145,6 +145,8 @@ export class MemStorage implements IStorage {
   private transactions: Map<number, Transaction>;
   private requests: Map<number, Request>;
   private requestItems: Map<number, RequestItem>;
+  private approvalSettingsMap: Map<number, ApprovalSettings>;
+  private requestApprovalsMap: Map<number, RequestApproval>;
   
   private userIdCounter: number;
   private categoryIdCounter: number;
@@ -154,8 +156,10 @@ export class MemStorage implements IStorage {
   private transactionIdCounter: number;
   private requestIdCounter: number;
   private requestItemIdCounter: number;
+  private approvalSettingsIdCounter: number;
+  private requestApprovalIdCounter: number;
   
-  sessionStore: session.SessionStore;
+  sessionStore: session.Store;
 
   constructor() {
     this.users = new Map();
@@ -166,6 +170,8 @@ export class MemStorage implements IStorage {
     this.transactions = new Map();
     this.requests = new Map();
     this.requestItems = new Map();
+    this.approvalSettingsMap = new Map();
+    this.requestApprovalsMap = new Map();
     
     this.userIdCounter = 1;
     this.categoryIdCounter = 1;
@@ -175,6 +181,8 @@ export class MemStorage implements IStorage {
     this.transactionIdCounter = 1;
     this.requestIdCounter = 1;
     this.requestItemIdCounter = 1;
+    this.approvalSettingsIdCounter = 1;
+    this.requestApprovalIdCounter = 1;
     
     this.sessionStore = new MemoryStore({
       checkPeriod: 86400000,
@@ -437,7 +445,14 @@ export class MemStorage implements IStorage {
   async createUser(user: InsertUser): Promise<User> {
     const id = this.userIdCounter++;
     const createdAt = new Date();
-    const newUser: User = { ...user, id, createdAt };
+    const newUser: User = { 
+      ...user, 
+      id, 
+      createdAt,
+      role: user.role || 'user',
+      managerId: user.managerId || null,
+      warehouseId: user.warehouseId || null
+    };
     this.users.set(id, newUser);
     return newUser;
   }
@@ -472,7 +487,11 @@ export class MemStorage implements IStorage {
 
   async createCategory(category: InsertCategory): Promise<Category> {
     const id = this.categoryIdCounter++;
-    const newCategory: Category = { ...category, id };
+    const newCategory: Category = { 
+      ...category, 
+      id,
+      description: category.description || null
+    };
     this.categories.set(id, newCategory);
     return newCategory;
   }
@@ -767,12 +786,167 @@ export class MemStorage implements IStorage {
   async deleteRequestItem(id: number): Promise<boolean> {
     return this.requestItems.delete(id);
   }
+
+  // Approval Settings operations
+  async getApprovalSettings(id: number): Promise<ApprovalSettings | undefined> {
+    return this.approvalSettingsMap.get(id);
+  }
+
+  async getApprovalSettingsByType(requestType: string): Promise<ApprovalSettings[]> {
+    return Array.from(this.approvalSettingsMap.values()).filter(
+      (settings) => settings.requestType === requestType && settings.isActive
+    );
+  }
+
+  async createApprovalSettings(settings: InsertApprovalSettings): Promise<ApprovalSettings> {
+    const id = this.approvalSettingsIdCounter++;
+    const createdAt = new Date();
+    const newSettings: ApprovalSettings = { 
+      ...settings, 
+      id, 
+      createdAt,
+      requestType: settings.requestType || 'issue',
+      minApprovalLevel: settings.minApprovalLevel || 'manager',
+      requiresSecondApproval: settings.requiresSecondApproval || false,
+      isActive: settings.isActive !== undefined ? settings.isActive : true
+    };
+    this.approvalSettingsMap.set(id, newSettings);
+    return newSettings;
+  }
+
+  async getAllApprovalSettings(): Promise<ApprovalSettings[]> {
+    return Array.from(this.approvalSettingsMap.values());
+  }
+
+  async updateApprovalSettings(id: number, settingsData: Partial<InsertApprovalSettings>): Promise<ApprovalSettings | undefined> {
+    const settings = await this.getApprovalSettings(id);
+    if (!settings) return undefined;
+
+    const updatedSettings = { ...settings, ...settingsData };
+    this.approvalSettingsMap.set(id, updatedSettings);
+    return updatedSettings;
+  }
+
+  async deleteApprovalSettings(id: number): Promise<boolean> {
+    return this.approvalSettingsMap.delete(id);
+  }
+
+  // Request Approval operations
+  async getRequestApproval(id: number): Promise<RequestApproval | undefined> {
+    return this.requestApprovalsMap.get(id);
+  }
+
+  async getRequestApprovalsByRequest(requestId: number): Promise<RequestApproval[]> {
+    return Array.from(this.requestApprovalsMap.values()).filter(
+      (approval) => approval.requestId === requestId
+    );
+  }
+
+  async getRequestApprovalsByApprover(approverId: number): Promise<RequestApproval[]> {
+    return Array.from(this.requestApprovalsMap.values()).filter(
+      (approval) => approval.approverId === approverId
+    );
+  }
+
+  async createRequestApproval(approval: InsertRequestApproval): Promise<RequestApproval> {
+    const id = this.requestApprovalIdCounter++;
+    const createdAt = new Date();
+    const newApproval: RequestApproval = { 
+      ...approval, 
+      id, 
+      createdAt,
+      status: approval.status || 'pending'
+    };
+    this.requestApprovalsMap.set(id, newApproval);
+    return newApproval;
+  }
+
+  async updateRequestApproval(id: number, approvalData: Partial<InsertRequestApproval>): Promise<RequestApproval | undefined> {
+    const approval = await this.getRequestApproval(id);
+    if (!approval) return undefined;
+
+    const updatedApproval = { 
+      ...approval, 
+      ...approvalData,
+      approvedAt: approvalData.status === 'approved' ? new Date() : approval.approvedAt
+    };
+    this.requestApprovalsMap.set(id, updatedApproval);
+    return updatedApproval;
+  }
+
+  async deleteRequestApproval(id: number): Promise<boolean> {
+    return this.requestApprovalsMap.delete(id);
+  }
+
+  // Hierarchy and Approval Workflow helpers
+  async getUserManager(userId: number): Promise<User | undefined> {
+    const user = await this.getUser(userId);
+    if (!user || !user.managerId) return undefined;
+    return this.getUser(user.managerId);
+  }
+
+  async getUsersByManager(managerId: number): Promise<User[]> {
+    return Array.from(this.users.values()).filter(
+      (user) => user.managerId === managerId
+    );
+  }
+
+  async getUserHierarchy(userId: number): Promise<User[]> {
+    const hierarchy: User[] = [];
+    let currentUser = await this.getUser(userId);
+    
+    while (currentUser) {
+      hierarchy.push(currentUser);
+      if (!currentUser.managerId) break;
+      currentUser = await this.getUser(currentUser.managerId);
+    }
+    
+    return hierarchy;
+  }
+
+  async canApproveRequest(approverId: number, requestId: number): Promise<boolean> {
+    const request = await this.getRequest(requestId);
+    const approver = await this.getUser(approverId);
+    
+    if (!request || !approver) return false;
+    
+    // Admins can approve any request
+    if (approver.role === 'admin') return true;
+    
+    const requester = await this.getUser(request.userId);
+    if (!requester) return false;
+    
+    // Managers can approve requests from their direct reports
+    if (approver.role === 'manager' && requester.managerId === approverId) {
+      return true;
+    }
+    
+    // Check approval settings for the request type
+    const approvalSettings = await this.getApprovalSettingsByType('issue');
+    if (approvalSettings.length === 0) {
+      // Default approval logic: manager or above
+      return approver.role === 'manager' || approver.role === 'admin';
+    }
+    
+    // Apply approval settings logic
+    for (const setting of approvalSettings) {
+      if (setting.minApprovalLevel === 'manager' && 
+          (approver.role === 'manager' || approver.role === 'admin')) {
+        return true;
+      }
+      if (setting.minApprovalLevel === 'admin' && approver.role === 'admin') {
+        return true;
+      }
+    }
+    
+    return false;
+  }
 }
 
 
 // Use the in-memory storage implementation for now
 export class DatabaseStorage implements IStorage {
-  sessionStore: session.SessionStore;
+  sessionStore: session.Store;
 
   constructor() {
     this.sessionStore = new PostgresSessionStore({ 
