@@ -45,7 +45,15 @@ const approvalSettingsSchema = z.object({
   isActive: z.boolean(),
 });
 
+const organizationSettingsSchema = z.object({
+  organizationName: z.string().min(1, "Organization name is required"),
+  currency: z.string().min(1, "Currency is required"),
+  currencySymbol: z.string().min(1, "Currency symbol is required"),
+  timezone: z.string().min(1, "Timezone is required"),
+});
+
 type ApprovalSettingsFormValues = z.infer<typeof approvalSettingsSchema>;
+type OrganizationSettingsFormValues = z.infer<typeof organizationSettingsSchema>;
 
 export default function SettingsPage() {
   const { toast } = useToast();
@@ -56,6 +64,10 @@ export default function SettingsPage() {
     queryKey: ["/api/approval-settings"],
   });
 
+  const { data: organizationSettings, isLoading: orgSettingsLoading } = useQuery({
+    queryKey: ["/api/organization-settings"],
+  });
+
   const form = useForm<ApprovalSettingsFormValues>({
     resolver: zodResolver(approvalSettingsSchema),
     defaultValues: {
@@ -64,6 +76,16 @@ export default function SettingsPage() {
       maxAmount: "",
       requiresSecondApproval: false,
       isActive: true,
+    },
+  });
+
+  const orgForm = useForm<OrganizationSettingsFormValues>({
+    resolver: zodResolver(organizationSettingsSchema),
+    defaultValues: {
+      organizationName: organizationSettings?.organizationName || "My Organization",
+      currency: organizationSettings?.currency || "USD",
+      currencySymbol: organizationSettings?.currencySymbol || "$",
+      timezone: organizationSettings?.timezone || "UTC",
     },
   });
 
@@ -143,12 +165,37 @@ export default function SettingsPage() {
     },
   });
 
+  const updateOrgSettingsMutation = useMutation({
+    mutationFn: async (data: OrganizationSettingsFormValues) => {
+      const res = await apiRequest("PUT", "/api/organization-settings", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/organization-settings"] });
+      toast({
+        title: "Organization settings updated",
+        description: "The organization settings have been updated successfully.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to update organization settings",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const onSubmit = (data: ApprovalSettingsFormValues) => {
     if (editingSettings) {
       updateMutation.mutate(data);
     } else {
       createMutation.mutate(data);
     }
+  };
+
+  const onOrgSubmit = (data: OrganizationSettingsFormValues) => {
+    updateOrgSettingsMutation.mutate(data);
   };
 
   const handleEdit = (settings: any) => {
@@ -182,6 +229,7 @@ export default function SettingsPage() {
         <Tabs defaultValue="approval-hierarchy" className="space-y-4">
           <TabsList>
             <TabsTrigger value="approval-hierarchy">Approval Hierarchy</TabsTrigger>
+            <TabsTrigger value="organization">Organization</TabsTrigger>
             <TabsTrigger value="system-config">System Configuration</TabsTrigger>
           </TabsList>
 
@@ -272,6 +320,142 @@ export default function SettingsPage() {
                       )}
                     </TableBody>
                   </Table>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="organization" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Organization Settings</CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Configure organization-wide settings including default currency
+                </p>
+              </CardHeader>
+              <CardContent>
+                {orgSettingsLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-6 w-6 animate-spin" />
+                  </div>
+                ) : (
+                  <form onSubmit={orgForm.handleSubmit(onOrgSubmit)} className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                        <Label htmlFor="organizationName">Organization Name</Label>
+                        <Input
+                          id="organizationName"
+                          placeholder="Enter organization name"
+                          {...orgForm.register("organizationName")}
+                        />
+                        {orgForm.formState.errors.organizationName && (
+                          <p className="text-sm text-red-500">
+                            {orgForm.formState.errors.organizationName.message}
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="timezone">Timezone</Label>
+                        <Select
+                          onValueChange={(value) => orgForm.setValue("timezone", value)}
+                          defaultValue={orgForm.getValues("timezone")}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select timezone" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="UTC">UTC</SelectItem>
+                            <SelectItem value="America/New_York">Eastern Time</SelectItem>
+                            <SelectItem value="America/Chicago">Central Time</SelectItem>
+                            <SelectItem value="America/Denver">Mountain Time</SelectItem>
+                            <SelectItem value="America/Los_Angeles">Pacific Time</SelectItem>
+                            <SelectItem value="Europe/London">London</SelectItem>
+                            <SelectItem value="Europe/Paris">Paris</SelectItem>
+                            <SelectItem value="Asia/Tokyo">Tokyo</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        {orgForm.formState.errors.timezone && (
+                          <p className="text-sm text-red-500">
+                            {orgForm.formState.errors.timezone.message}
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="currency">Default Currency</Label>
+                        <Select
+                          onValueChange={(value) => {
+                            orgForm.setValue("currency", value);
+                            // Set currency symbol based on currency
+                            const symbols: Record<string, string> = {
+                              USD: "$",
+                              EUR: "€",
+                              GBP: "£",
+                              JPY: "¥",
+                              CAD: "C$",
+                              AUD: "A$",
+                              CHF: "CHF",
+                              CNY: "¥",
+                              INR: "₹"
+                            };
+                            orgForm.setValue("currencySymbol", symbols[value] || "$");
+                          }}
+                          defaultValue={orgForm.getValues("currency")}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select currency" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="USD">USD - US Dollar</SelectItem>
+                            <SelectItem value="EUR">EUR - Euro</SelectItem>
+                            <SelectItem value="GBP">GBP - British Pound</SelectItem>
+                            <SelectItem value="JPY">JPY - Japanese Yen</SelectItem>
+                            <SelectItem value="CAD">CAD - Canadian Dollar</SelectItem>
+                            <SelectItem value="AUD">AUD - Australian Dollar</SelectItem>
+                            <SelectItem value="CHF">CHF - Swiss Franc</SelectItem>
+                            <SelectItem value="CNY">CNY - Chinese Yuan</SelectItem>
+                            <SelectItem value="INR">INR - Indian Rupee</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        {orgForm.formState.errors.currency && (
+                          <p className="text-sm text-red-500">
+                            {orgForm.formState.errors.currency.message}
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="currencySymbol">Currency Symbol</Label>
+                        <Input
+                          id="currencySymbol"
+                          placeholder="Enter currency symbol"
+                          {...orgForm.register("currencySymbol")}
+                        />
+                        {orgForm.formState.errors.currencySymbol && (
+                          <p className="text-sm text-red-500">
+                            {orgForm.formState.errors.currencySymbol.message}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end">
+                      <Button
+                        type="submit"
+                        disabled={updateOrgSettingsMutation.isPending}
+                      >
+                        {updateOrgSettingsMutation.isPending ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Saving...
+                          </>
+                        ) : (
+                          "Save Organization Settings"
+                        )}
+                      </Button>
+                    </div>
+                  </form>
                 )}
               </CardContent>
             </Card>
