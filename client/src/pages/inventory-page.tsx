@@ -54,6 +54,7 @@ export default function InventoryPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [warehouseFilter, setWarehouseFilter] = useState("all");
   const [selectedSku, setSelectedSku] = useState<string | null>(null);
+  const [selectedItemId, setSelectedItemId] = useState<number | null>(null);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
 
   const { data: inventory, isLoading: inventoryLoading } = useQuery({
@@ -66,6 +67,12 @@ export default function InventoryPage() {
 
   const { data: warehouses, isLoading: warehousesLoading } = useQuery({
     queryKey: ["/api/warehouses"],
+  });
+
+  // Fetch movement history for selected item
+  const { data: movementHistory, isLoading: movementLoading } = useQuery({
+    queryKey: ["/api/reports/inventory-movement"],
+    enabled: isSheetOpen,
   });
 
   const form = useForm<FormValues>({
@@ -132,7 +139,7 @@ export default function InventoryPage() {
     updateInventoryMutation.mutate(values);
   };
 
-  const filteredInventory = inventory
+  const filteredInventory = inventory && Array.isArray(inventory)
     ? inventory.filter((item: any) => {
         const matchesSearch = 
           item.item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -210,11 +217,11 @@ export default function InventoryPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Warehouses</SelectItem>
-                  {warehouses?.map((warehouse: any) => (
+                  {warehouses && Array.isArray(warehouses) ? warehouses.map((warehouse: any) => (
                     <SelectItem key={warehouse.id} value={warehouse.id.toString()}>
                       {warehouse.name}
                     </SelectItem>
-                  ))}
+                  )) : null}
                 </SelectContent>
               </Select>
             </div>
@@ -248,6 +255,7 @@ export default function InventoryPage() {
                       className="cursor-pointer hover:bg-gray-50"
                       onClick={() => {
                         setSelectedSku(inv.item.sku);
+                        setSelectedItemId(inv.item.id);
                         setIsSheetOpen(true);
                       }}
                     >
@@ -298,11 +306,11 @@ export default function InventoryPage() {
                     <SelectValue placeholder="Select an item" />
                   </SelectTrigger>
                   <SelectContent>
-                    {items?.map((item: any) => (
+                    {items && Array.isArray(items) ? items.map((item: any) => (
                       <SelectItem key={item.id} value={item.id.toString()}>
                         {item.name} ({item.sku})
                       </SelectItem>
-                    ))}
+                    )) : null}
                   </SelectContent>
                 </Select>
                 {form.formState.errors.itemId && (
@@ -390,52 +398,47 @@ export default function InventoryPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {inventory?.filter((item: any) => item.item.sku === selectedSku)
-                  .flatMap((item: any) => {
-                    const movements = [];
-                    // Add check-in transactions
-                    if (item.checkInTransactions) {
-                      movements.push(...item.checkInTransactions.map((t: any) => ({
-                        ...t,
-                        type: 'check-in',
-                        quantity: t.quantity,
-                        warehouse: t.destinationWarehouse
-                      })));
-                    }
-                    // Add issue transactions
-                    if (item.issueTransactions) {
-                      movements.push(...item.issueTransactions.map((t: any) => ({
-                        ...t,
-                        type: 'issue',
-                        quantity: -t.quantity,
-                        warehouse: t.sourceWarehouse
-                      })));
-                    }
-                    // Add transfer transactions
-                    if (item.transferTransactions) {
-                      movements.push(...item.transferTransactions.map((t: any) => ({
-                        ...t,
-                        type: 'transfer',
-                        quantity: t.sourceWarehouseId === item.warehouseId ? -t.quantity : t.quantity,
-                        warehouse: t.sourceWarehouseId === item.warehouseId ? t.destinationWarehouse : t.sourceWarehouse
-                      })));
-                    }
-                    return movements.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-                  })
-                  .map((movement: any) => (
-                    <TableRow key={movement.id}>
-                      <TableCell>{formatDateTime(movement.createdAt)}</TableCell>
-                      <TableCell>
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${getTransactionTypeColor(movement.type)}`}>
-                          {movement.type}
-                        </span>
-                      </TableCell>
-                      <TableCell className={movement.quantity < 0 ? 'text-red-600' : 'text-green-600'}>
-                        {movement.quantity > 0 ? '+' : ''}{movement.quantity}
-                      </TableCell>
-                      <TableCell>{movement.warehouse?.name || 'Unknown'}</TableCell>
-                    </TableRow>
-                  ))}
+                {movementLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={4} className="text-center py-8">
+                      <Loader2 className="h-6 w-6 animate-spin mx-auto" />
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  movementHistory && Array.isArray(movementHistory) 
+                    ? movementHistory
+                        .filter((transaction: any) => transaction.itemId === selectedItemId)
+                        .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+                        .map((transaction: any) => (
+                          <TableRow key={transaction.id}>
+                            <TableCell>{formatDateTime(transaction.createdAt)}</TableCell>
+                            <TableCell>
+                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${getTransactionTypeColor(transaction.transactionType)}`}>
+                                {transaction.transactionType === "check-in" ? "Check-in" : 
+                                 transaction.transactionType === "issue" ? "Issue" : "Transfer"}
+                              </span>
+                            </TableCell>
+                            <TableCell className={
+                              transaction.transactionType === "issue" ? 'text-red-600' : 'text-green-600'
+                            }>
+                              {transaction.transactionType === "issue" ? '-' : '+'}
+                              {transaction.quantity}
+                            </TableCell>
+                            <TableCell>
+                              {transaction.transactionType === "check-in" 
+                                ? transaction.destinationWarehouse?.name 
+                                : transaction.sourceWarehouse?.name || 'Unknown'}
+                            </TableCell>
+                          </TableRow>
+                        ))
+                    : (
+                      <TableRow>
+                        <TableCell colSpan={4} className="text-center py-8 text-gray-500">
+                          No movement history found for this item
+                        </TableCell>
+                      </TableRow>
+                    )
+                )}
               </TableBody>
             </Table>
           </div>
