@@ -30,9 +30,8 @@ export default function Sidebar({ user, isOpen, onClose }: SidebarProps) {
       <aside 
         id="sidebar"
         className={cn(
-          "bg-white shrink-0 shadow-md overflow-y-auto transition-all duration-300 z-30",
-          isOpen ? "w-64 block" : "w-0 hidden md:block md:w-64",
-          "md:static"
+          "bg-white shrink-0 shadow-md overflow-y-auto transition-all duration-300 z-30 md:static",
+          "w-64 block"
         )}
       >
         <div className="flex items-center justify-between p-4 border-b">

@@ -74,7 +74,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
       {/* Sidebar */}
       <Sidebar 
         user={user} 
-        isOpen={isMobile ? isSidebarOpen : true} 
+        isOpen={true} 
         onClose={() => {
           if (isMobile) {
             setIsSidebarOpen(false);
