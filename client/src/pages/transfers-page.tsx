@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
@@ -92,21 +93,17 @@ export default function TransfersPage() {
       return res.json();
     },
     onSuccess: () => {
-      // Invalidate all relevant queries
+      // Invalidate all relevant queries to refresh data immediately
       queryClient.invalidateQueries({ queryKey: ["/api/transactions/type/transfer"] });
       queryClient.invalidateQueries({ queryKey: ["/api/reports/inventory-stock"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
       queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
       
       toast({
         title: "Transfer initiated",
         description: "The inventory transfer has been initiated successfully.",
       });
-      form.reset({
-        itemId: "",
-        quantity: "",
-        sourceWarehouseId: "",
-        destinationWarehouseId: "",
-      });
+      form.reset();
     },
     onError: (error: Error) => {
       toast({
@@ -118,14 +115,17 @@ export default function TransfersPage() {
   });
 
   const completeTransferMutation = useMutation({
-    mutationFn: async (id: number) => {
-      const res = await apiRequest("PUT", `/api/transactions/${id}/status`, { status: "completed" });
+    mutationFn: async (transferId: number) => {
+      const res = await apiRequest("PUT", `/api/transactions/${transferId}/status`, {
+        status: "completed"
+      });
       return res.json();
     },
     onSuccess: () => {
-      // Invalidate all relevant queries
+      // Invalidate all relevant queries to refresh data immediately
       queryClient.invalidateQueries({ queryKey: ["/api/transactions/type/transfer"] });
       queryClient.invalidateQueries({ queryKey: ["/api/reports/inventory-stock"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
       queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
       
       toast({
@@ -135,281 +135,250 @@ export default function TransfersPage() {
     },
     onError: (error: Error) => {
       toast({
-        title: "Error",
+        title: "Failed to complete transfer",
         description: error.message,
         variant: "destructive",
       });
     },
   });
 
-  const handleSubmit = (values: FormValues) => {
-    // Check if source warehouse has enough inventory
-    if (inventory) {
-      const sourceInventory = inventory.find((inv: any) => 
-        inv.itemId === parseInt(values.itemId) && 
-        inv.warehouseId === parseInt(values.sourceWarehouseId)
-      );
-      
-      if (!sourceInventory || sourceInventory.quantity < parseInt(values.quantity)) {
-        toast({
-          title: "Insufficient inventory",
-          description: "The source warehouse does not have enough items to transfer.",
-          variant: "destructive",
-        });
-        return;
-      }
-    }
-    
-    transferMutation.mutate(values);
+  const onSubmit = (data: FormValues) => {
+    transferMutation.mutate(data);
   };
 
-  const handleCompleteTransfer = (id: number) => {
-    completeTransferMutation.mutate(id);
+  const handleCompleteTransfer = (transferId: number) => {
+    completeTransferMutation.mutate(transferId);
   };
 
-  // Filter transfers based on active tab
-  const filteredTransfers = transfers
-    ? transfers.filter((transfer: any) => {
-        if (activeTab === "all") return true;
-        return transfer.status === activeTab;
-      })
-    : [];
+  const getItemName = (itemId: number) => {
+    const item = items && Array.isArray(items) ? items.find((item: any) => item.id === itemId) : null;
+    return item ? `${item.name} (${item.sku})` : "Unknown Item";
+  };
 
-  const isManager = user?.role === "admin" || user?.role === "manager";
-  
-  // Only managers and admins can initiate transfers
-  if (!isManager) {
-    return (
-      <AppLayout>
-        <div className="flex items-center justify-center h-[calc(100vh-200px)]">
-          <Card className="w-full max-w-md">
-            <CardContent className="p-6">
-              <div className="text-center">
-                <span className="material-icons text-error text-4xl">error</span>
-                <h2 className="text-xl font-semibold mt-4">Access Denied</h2>
-                <p className="text-gray-600 mt-2">
-                  You don't have permission to access this page. Only managers and administrators can manage inventory transfers.
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </AppLayout>
-    );
-  }
+  const getWarehouseName = (warehouseId: number) => {
+    const warehouse = warehouses && Array.isArray(warehouses) ? warehouses.find((w: any) => w.id === warehouseId) : null;
+    return warehouse ? warehouse.name : "Unknown Warehouse";
+  };
 
-  if (transfersLoading || itemsLoading || warehousesLoading || inventoryLoading) {
-    return (
-      <AppLayout>
-        <div className="flex items-center justify-center h-[calc(100vh-200px)]">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        </div>
-      </AppLayout>
+  const getAvailableStock = (itemId: string, warehouseId: string) => {
+    if (!inventory || !Array.isArray(inventory)) return 0;
+    const stock = inventory.find((inv: any) => 
+      inv.itemId === parseInt(itemId) && inv.warehouseId === parseInt(warehouseId)
     );
-  }
+    return stock ? stock.quantity : 0;
+  };
+
+  const filteredTransfers = transfers && Array.isArray(transfers) ? transfers.filter((transfer: any) => {
+    if (activeTab === "all") return true;
+    if (activeTab === "in-transit") return transfer.status === "in-transit";
+    if (activeTab === "completed") return transfer.status === "completed";
+    return true;
+  }) : [];
 
   return (
     <AppLayout>
-      <div className="flex items-center justify-between mb-6">
+      <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-medium text-gray-800">Warehouse Transfers</h1>
-          <p className="text-gray-600">Move inventory between warehouses</p>
+          <h1 className="text-3xl font-bold">Inventory Transfers</h1>
+          <p className="text-muted-foreground">
+            Transfer inventory between warehouses and track shipments
+          </p>
         </div>
-      </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-        {/* Transfer Form */}
-        <Card className="lg:col-span-1">
-          <CardHeader>
-            <CardTitle>Create Transfer</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="itemId">Select Item</Label>
-                <Select
-                  onValueChange={(value) => form.setValue("itemId", value)}
-                  defaultValue={form.getValues("itemId")}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select an item" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {items?.map((item: any) => (
-                      <SelectItem key={item.id} value={item.id.toString()}>
-                        {item.name} ({item.sku})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {form.formState.errors.itemId && (
-                  <p className="text-sm text-red-500">{form.formState.errors.itemId.message}</p>
-                )}
-              </div>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+          <TabsList>
+            <TabsTrigger value="all">All Transfers</TabsTrigger>
+            <TabsTrigger value="in-transit">In Transit</TabsTrigger>
+            <TabsTrigger value="completed">Completed</TabsTrigger>
+          </TabsList>
 
-              <div className="space-y-2">
-                <Label htmlFor="quantity">Quantity</Label>
-                <Input
-                  id="quantity"
-                  type="number"
-                  min="1"
-                  placeholder="Enter quantity"
-                  {...form.register("quantity")}
-                />
-                {form.formState.errors.quantity && (
-                  <p className="text-sm text-red-500">{form.formState.errors.quantity.message}</p>
-                )}
-              </div>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Create Transfer Form */}
+            <Card className="lg:col-span-1">
+              <CardHeader>
+                <CardTitle>Create Transfer</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="itemId">Item</Label>
+                    <Select
+                      value={form.watch("itemId")}
+                      onValueChange={(value) => form.setValue("itemId", value)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select item" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {items && Array.isArray(items) && items.map((item: any) => (
+                          <SelectItem key={item.id} value={item.id.toString()}>
+                            {item.name} ({item.sku})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {form.formState.errors.itemId && (
+                      <p className="text-sm text-red-500">{form.formState.errors.itemId.message}</p>
+                    )}
+                  </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="sourceWarehouseId">Source Warehouse</Label>
-                <Select
-                  onValueChange={(value) => form.setValue("sourceWarehouseId", value)}
-                  defaultValue={form.getValues("sourceWarehouseId")}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select source warehouse" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {warehouses?.filter((w: any) => w.isActive).map((warehouse: any) => (
-                      <SelectItem key={warehouse.id} value={warehouse.id.toString()}>
-                        {warehouse.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {form.formState.errors.sourceWarehouseId && (
-                  <p className="text-sm text-red-500">{form.formState.errors.sourceWarehouseId.message}</p>
-                )}
-              </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="sourceWarehouseId">From Warehouse</Label>
+                    <Select
+                      value={form.watch("sourceWarehouseId")}
+                      onValueChange={(value) => form.setValue("sourceWarehouseId", value)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select source warehouse" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {warehouses && Array.isArray(warehouses) && warehouses.map((warehouse: any) => (
+                          <SelectItem key={warehouse.id} value={warehouse.id.toString()}>
+                            {warehouse.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {form.formState.errors.sourceWarehouseId && (
+                      <p className="text-sm text-red-500">{form.formState.errors.sourceWarehouseId.message}</p>
+                    )}
+                  </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="destinationWarehouseId">Destination Warehouse</Label>
-                <Select
-                  onValueChange={(value) => form.setValue("destinationWarehouseId", value)}
-                  defaultValue={form.getValues("destinationWarehouseId")}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select destination warehouse" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {warehouses?.filter((w: any) => w.isActive).map((warehouse: any) => (
-                      <SelectItem key={warehouse.id} value={warehouse.id.toString()}>
-                        {warehouse.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {form.formState.errors.destinationWarehouseId && (
-                  <p className="text-sm text-red-500">{form.formState.errors.destinationWarehouseId.message}</p>
-                )}
-              </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="destinationWarehouseId">To Warehouse</Label>
+                    <Select
+                      value={form.watch("destinationWarehouseId")}
+                      onValueChange={(value) => form.setValue("destinationWarehouseId", value)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select destination warehouse" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {warehouses && Array.isArray(warehouses) && warehouses.map((warehouse: any) => (
+                          <SelectItem key={warehouse.id} value={warehouse.id.toString()}>
+                            {warehouse.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {form.formState.errors.destinationWarehouseId && (
+                      <p className="text-sm text-red-500">{form.formState.errors.destinationWarehouseId.message}</p>
+                    )}
+                  </div>
 
-              <Button
-                type="submit"
-                className="w-full"
-                disabled={transferMutation.isPending}
-              >
-                {transferMutation.isPending ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Processing...
-                  </>
+                  <div className="space-y-2">
+                    <Label htmlFor="quantity">Quantity</Label>
+                    <Input
+                      id="quantity"
+                      type="number"
+                      min="1"
+                      placeholder="Enter quantity"
+                      {...form.register("quantity")}
+                    />
+                    {form.formState.errors.quantity && (
+                      <p className="text-sm text-red-500">{form.formState.errors.quantity.message}</p>
+                    )}
+                    {form.watch("itemId") && form.watch("sourceWarehouseId") && (
+                      <p className="text-sm text-gray-500">
+                        Available: {getAvailableStock(form.watch("itemId"), form.watch("sourceWarehouseId"))} units
+                      </p>
+                    )}
+                  </div>
+
+                  <Button
+                    type="submit"
+                    className="w-full"
+                    disabled={transferMutation.isPending}
+                  >
+                    {transferMutation.isPending ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Creating Transfer...
+                      </>
+                    ) : (
+                      "Create Transfer"
+                    )}
+                  </Button>
+                </form>
+              </CardContent>
+            </Card>
+
+            {/* Transfer List */}
+            <Card className="lg:col-span-2">
+              <CardHeader>
+                <CardTitle>Transfer Transactions</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {transfersLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-6 w-6 animate-spin" />
+                  </div>
                 ) : (
-                  "Initiate Transfer"
-                )}
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
-
-        {/* Transfers Table */}
-        <Card className="lg:col-span-2">
-          <CardHeader className="pb-2">
-            <CardTitle>Transfer Transactions</CardTitle>
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-4">
-              <TabsList>
-                <TabsTrigger value="all">All</TabsTrigger>
-                <TabsTrigger value="in-transit">In Transit</TabsTrigger>
-                <TabsTrigger value="completed">Completed</TabsTrigger>
-              </TabsList>
-            </Tabs>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Transaction ID</TableHead>
-                    <TableHead>Item</TableHead>
-                    <TableHead>Quantity</TableHead>
-                    <TableHead>Source → Destination</TableHead>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredTransfers.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={7} className="text-center py-8 text-gray-500">
-                        No transfers found
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    filteredTransfers.map((transfer: any) => {
-                      // Find associated item and warehouses
-                      const item = items?.find((i: any) => i.id === transfer.itemId);
-                      const sourceWarehouse = warehouses?.find((w: any) => w.id === transfer.sourceWarehouseId);
-                      const destWarehouse = warehouses?.find((w: any) => w.id === transfer.destinationWarehouseId);
-                      
-                      return (
-                        <TableRow key={transfer.id}>
-                          <TableCell className="font-medium">{transfer.transactionCode}</TableCell>
-                          <TableCell>{item ? item.name : `Item #${transfer.itemId}`}</TableCell>
-                          <TableCell>{transfer.quantity}</TableCell>
-                          <TableCell>
-                            {sourceWarehouse ? sourceWarehouse.name : `Warehouse #${transfer.sourceWarehouseId}`} → {destWarehouse ? destWarehouse.name : `Warehouse #${transfer.destinationWarehouseId}`}
-                          </TableCell>
-                          <TableCell>{formatDateTime(transfer.createdAt)}</TableCell>
-                          <TableCell>
-                            <span className={`px-2 py-1 text-xs rounded-full ${getStatusColor(transfer.status)}`}>
-                              {transfer.status === "in-transit" ? "In Transit" : transfer.status.charAt(0).toUpperCase() + transfer.status.slice(1)}
-                            </span>
-                          </TableCell>
-                          <TableCell>
-                            {transfer.status === "in-transit" && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="text-green-600"
-                                onClick={() => handleCompleteTransfer(transfer.id)}
-                                disabled={completeTransferMutation.isPending}
-                              >
-                                {completeTransferMutation.isPending ? (
-                                  <Loader2 className="h-4 w-4 animate-spin" />
-                                ) : (
-                                  <>
-                                    <CheckCircle className="mr-2 h-4 w-4" />
-                                    Complete
-                                  </>
-                                )}
-                              </Button>
-                            )}
-                          </TableCell>
+                  <div className="rounded-md border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Transaction Code</TableHead>
+                          <TableHead>Item</TableHead>
+                          <TableHead>From</TableHead>
+                          <TableHead>To</TableHead>
+                          <TableHead>Quantity</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Date</TableHead>
+                          <TableHead>Actions</TableHead>
                         </TableRow>
-                      );
-                    })
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
-        </Card>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredTransfers.length > 0 ? (
+                          filteredTransfers.map((transfer: any) => (
+                            <TableRow key={transfer.id}>
+                              <TableCell className="font-medium">
+                                {transfer.transactionCode}
+                              </TableCell>
+                              <TableCell>{getItemName(transfer.itemId)}</TableCell>
+                              <TableCell>{getWarehouseName(transfer.sourceWarehouseId)}</TableCell>
+                              <TableCell>{getWarehouseName(transfer.destinationWarehouseId)}</TableCell>
+                              <TableCell>{transfer.quantity}</TableCell>
+                              <TableCell>
+                                <span className={`px-2 py-1 text-xs rounded-full ${getStatusColor(transfer.status)}`}>
+                                  {transfer.status.charAt(0).toUpperCase() + transfer.status.slice(1)}
+                                </span>
+                              </TableCell>
+                              <TableCell>{formatDateTime(transfer.createdAt)}</TableCell>
+                              <TableCell>
+                                {transfer.status === "in-transit" && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleCompleteTransfer(transfer.id)}
+                                    disabled={completeTransferMutation.isPending}
+                                  >
+                                    {completeTransferMutation.isPending ? (
+                                      <Loader2 className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                      <CheckCircle className="h-4 w-4" />
+                                    )}
+                                  </Button>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        ) : (
+                          <TableRow>
+                            <TableCell colSpan={8} className="text-center py-8 text-gray-500">
+                              No transfers found
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </Tabs>
       </div>
     </AppLayout>
   );
 }
-
-// Add missing import
-import { useState } from "react";
