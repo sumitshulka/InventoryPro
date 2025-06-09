@@ -15,6 +15,10 @@ import {
   InsertRequest, 
   RequestItem, 
   InsertRequestItem,
+  ApprovalSettings,
+  InsertApprovalSettings,
+  RequestApproval,
+  InsertRequestApproval,
   TransactionType,
   users,
   categories,
@@ -23,7 +27,9 @@ import {
   inventory,
   transactions,
   requests,
-  requestItems
+  requestItems,
+  approvalSettings,
+  requestApprovals
 } from "@shared/schema";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
@@ -104,8 +110,30 @@ export interface IStorage {
   updateRequestItem(id: number, requestItemData: Partial<InsertRequestItem>): Promise<RequestItem | undefined>;
   deleteRequestItem(id: number): Promise<boolean>;
 
+  // Approval Settings operations
+  getApprovalSettings(id: number): Promise<ApprovalSettings | undefined>;
+  getApprovalSettingsByType(requestType: string): Promise<ApprovalSettings[]>;
+  createApprovalSettings(settings: InsertApprovalSettings): Promise<ApprovalSettings>;
+  getAllApprovalSettings(): Promise<ApprovalSettings[]>;
+  updateApprovalSettings(id: number, settingsData: Partial<InsertApprovalSettings>): Promise<ApprovalSettings | undefined>;
+  deleteApprovalSettings(id: number): Promise<boolean>;
+
+  // Request Approval operations
+  getRequestApproval(id: number): Promise<RequestApproval | undefined>;
+  getRequestApprovalsByRequest(requestId: number): Promise<RequestApproval[]>;
+  getRequestApprovalsByApprover(approverId: number): Promise<RequestApproval[]>;
+  createRequestApproval(approval: InsertRequestApproval): Promise<RequestApproval>;
+  updateRequestApproval(id: number, approvalData: Partial<InsertRequestApproval>): Promise<RequestApproval | undefined>;
+  deleteRequestApproval(id: number): Promise<boolean>;
+
+  // Hierarchy and Approval Workflow helpers
+  getUserManager(userId: number): Promise<User | undefined>;
+  getUsersByManager(managerId: number): Promise<User[]>;
+  getUserHierarchy(userId: number): Promise<User[]>;
+  canApproveRequest(approverId: number, requestId: number): Promise<boolean>;
+
   // Session store
-  sessionStore: session.SessionStore;
+  sessionStore: session.Store;
 }
 
 export class MemStorage implements IStorage {
