@@ -10,6 +10,7 @@ export const users = pgTable("users", {
   name: text("name").notNull(),
   email: text("email").notNull(),
   role: text("role").notNull().default("user"),
+  managerId: integer("manager_id"),
   warehouseId: integer("warehouse_id"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
@@ -20,6 +21,7 @@ export const insertUserSchema = createInsertSchema(users).pick({
   name: true,
   email: true,
   role: true,
+  managerId: true,
   warehouseId: true,
 });
 
@@ -144,7 +146,10 @@ export const requests = pgTable("requests", {
   userId: integer("user_id").notNull(),
   warehouseId: integer("warehouse_id").notNull(),
   status: text("status").notNull().default("pending"),
+  priority: text("priority").notNull().default("normal"),
+  justification: text("justification"),
   notes: text("notes"),
+  submittedAt: timestamp("submitted_at").defaultNow().notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at"),
 });
@@ -166,6 +171,39 @@ export const requestItems = pgTable("request_items", {
 
 export const insertRequestItemSchema = createInsertSchema(requestItems).omit({
   id: true,
+});
+
+// Approval workflow settings
+export const approvalSettings = pgTable("approval_settings", {
+  id: serial("id").primaryKey(),
+  requestType: text("request_type").notNull().default("issue"),
+  minApprovalLevel: text("min_approval_level").notNull().default("manager"),
+  maxAmount: numeric("max_amount"),
+  requiresSecondApproval: boolean("requires_second_approval").notNull().default(false),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertApprovalSettingsSchema = createInsertSchema(approvalSettings).omit({
+  id: true,
+  createdAt: true,
+});
+
+// Request approvals
+export const requestApprovals = pgTable("request_approvals", {
+  id: serial("id").primaryKey(),
+  requestId: integer("request_id").notNull(),
+  approverId: integer("approver_id").notNull(),
+  approvalLevel: text("approval_level").notNull(),
+  status: text("status").notNull().default("pending"),
+  comments: text("comments"),
+  approvedAt: timestamp("approved_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertRequestApprovalSchema = createInsertSchema(requestApprovals).omit({
+  id: true,
+  createdAt: true,
 });
 
 // Export types
@@ -192,3 +230,9 @@ export type InsertRequest = z.infer<typeof insertRequestSchema>;
 
 export type RequestItem = typeof requestItems.$inferSelect;
 export type InsertRequestItem = z.infer<typeof insertRequestItemSchema>;
+
+export type ApprovalSettings = typeof approvalSettings.$inferSelect;
+export type InsertApprovalSettings = z.infer<typeof insertApprovalSettingsSchema>;
+
+export type RequestApproval = typeof requestApprovals.$inferSelect;
+export type InsertRequestApproval = z.infer<typeof insertRequestApprovalSchema>;
