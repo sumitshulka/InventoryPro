@@ -14,7 +14,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
   const { user } = useAuth();
   const isMobile = useMobile();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [_, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
 
   // If user is not authenticated, redirect to login
   useEffect(() => {
@@ -48,7 +48,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
     if (isMobile) {
       setIsSidebarOpen(false);
     }
-  }, [location.pathname, isMobile]);
+  }, [location, isMobile]);
 
   // Prevent scrolling when sidebar is open on mobile
   useEffect(() => {
