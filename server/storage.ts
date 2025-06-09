@@ -361,33 +361,30 @@ export class MemStorage implements IStorage {
     
     // Create some transactions
     await this.createTransaction({
-      transactionCode: "TRX-872",
       itemId: laptop.id,
       quantity: 15,
       transactionType: "check-in",
       destinationWarehouseId: northWarehouse.id,
-      userId: 2,
+      requesterId: 2,
       status: "completed"
     });
     
     await this.createTransaction({
-      transactionCode: "TRX-871",
       itemId: monitor.id,
       quantity: 8,
       transactionType: "transfer",
       sourceWarehouseId: eastWarehouse.id,
       destinationWarehouseId: westWarehouse.id,
-      userId: 2,
+      requesterId: 2,
       status: "in-transit"
     });
     
     await this.createTransaction({
-      transactionCode: "TRX-870",
       itemId: keyboard.id,
       quantity: 12,
       transactionType: "issue",
       sourceWarehouseId: southWarehouse.id,
-      userId: 3,
+      requesterId: 3,
       status: "completed"
     });
     
@@ -686,7 +683,13 @@ export class MemStorage implements IStorage {
       completedAt,
       transactionCode: `TXN-${id}`,
       userId: transaction.requesterId || 1, // Default to admin if no requesterId
-      status: transaction.status || 'pending'
+      status: transaction.status || 'pending',
+      sourceWarehouseId: transaction.sourceWarehouseId || null,
+      destinationWarehouseId: transaction.destinationWarehouseId || null,
+      requestId: transaction.requestId || null,
+      requesterId: transaction.requesterId || null,
+      cost: transaction.cost || null,
+      checkInDate: transaction.checkInDate || null
     };
     this.transactions.set(id, newTransaction);
     return newTransaction;
@@ -892,7 +895,9 @@ export class MemStorage implements IStorage {
       ...approval, 
       id, 
       createdAt,
-      status: approval.status || 'pending'
+      status: approval.status || 'pending',
+      comments: approval.comments || null,
+      approvedAt: approval.approvedAt || null
     };
     this.requestApprovalsMap.set(id, newApproval);
     return newApproval;
@@ -1345,5 +1350,5 @@ export class DatabaseStorage implements IStorage {
   }
 }
 
-// Use the database storage implementation
-export const storage = new DatabaseStorage();
+// Use the memory storage implementation for now
+export const storage = new MemStorage();

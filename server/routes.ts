@@ -1059,6 +1059,176 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Approval Settings routes
+  app.get("/api/approval-settings", async (req, res) => {
+    try {
+      const settings = await storage.getAllApprovalSettings();
+      res.json(settings);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/approval-settings", async (req, res) => {
+    try {
+      const settings = await storage.createApprovalSettings(req.body);
+      res.status(201).json(settings);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.put("/api/approval-settings/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const settings = await storage.updateApprovalSettings(id, req.body);
+      if (!settings) {
+        return res.status(404).json({ message: "Approval settings not found" });
+      }
+      res.json(settings);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Request Approval routes
+  app.get("/api/request-approvals/:requestId", async (req, res) => {
+    try {
+      const requestId = parseInt(req.params.requestId);
+      const approvals = await storage.getRequestApprovalsByRequest(requestId);
+      res.json(approvals);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/pending-approvals", async (req, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      const approvals = await storage.getRequestApprovalsByApprover(req.user.id);
+      const pendingApprovals = approvals.filter(approval => approval.status === 'pending');
+      
+      // Enrich with request data
+      const enrichedApprovals = await Promise.all(pendingApprovals.map(async approval => {
+        const request = await storage.getRequest(approval.requestId);
+        const requestItems = await storage.getRequestItemsByRequest(approval.requestId);
+        const requester = request ? await storage.getUser(request.userId) : null;
+        return {
+          ...approval,
+          request,
+          requestItems,
+          requester
+        };
+      }));
+      
+      res.json(enrichedApprovals);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/request-approvals/:id/approve", async (req, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      const approvalId = parseInt(req.params.id);
+      const { comments } = req.body;
+      
+      const approval = await storage.getRequestApproval(approvalId);
+      if (!approval) {
+        return res.status(404).json({ message: "Approval not found" });
+      }
+      
+      // Check if user can approve this request
+      const canApprove = await storage.canApproveRequest(req.user.id, approval.requestId);
+      if (!canApprove) {
+        return res.status(403).json({ message: "You don't have permission to approve this request" });
+      }
+      
+      const updatedApproval = await storage.updateRequestApproval(approvalId, {
+        status: 'approved',
+        comments,
+        approvedAt: new Date()
+      });
+      
+      // Check if all required approvals are complete
+      const request = await storage.getRequest(approval.requestId);
+      if (request) {
+        const allApprovals = await storage.getRequestApprovalsByRequest(approval.requestId);
+        const allApproved = allApprovals.every(app => app.status === 'approved');
+        
+        if (allApproved) {
+          await storage.updateRequest(approval.requestId, { status: 'approved' });
+        }
+      }
+      
+      res.json(updatedApproval);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/request-approvals/:id/reject", async (req, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      const approvalId = parseInt(req.params.id);
+      const { comments } = req.body;
+      
+      const approval = await storage.getRequestApproval(approvalId);
+      if (!approval) {
+        return res.status(404).json({ message: "Approval not found" });
+      }
+      
+      // Check if user can approve this request
+      const canApprove = await storage.canApproveRequest(req.user.id, approval.requestId);
+      if (!canApprove) {
+        return res.status(403).json({ message: "You don't have permission to reject this request" });
+      }
+      
+      const updatedApproval = await storage.updateRequestApproval(approvalId, {
+        status: 'rejected',
+        comments,
+        approvedAt: new Date()
+      });
+      
+      // Reject the entire request
+      await storage.updateRequest(approval.requestId, { status: 'rejected' });
+      
+      res.json(updatedApproval);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // User hierarchy routes
+  app.get("/api/users/:id/manager", async (req, res) => {
+    try {
+      const userId = parseInt(req.params.id);
+      const manager = await storage.getUserManager(userId);
+      res.json(manager);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/users/:id/hierarchy", async (req, res) => {
+    try {
+      const userId = parseInt(req.params.id);
+      const hierarchy = await storage.getUserHierarchy(userId);
+      res.json(hierarchy);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
