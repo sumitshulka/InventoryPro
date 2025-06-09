@@ -54,6 +54,8 @@ export default function TransfersPage() {
 
   const { data: transfers, isLoading: transfersLoading } = useQuery({
     queryKey: ["/api/transactions/type/transfer"],
+    refetchInterval: 5000, // Refresh every 5 seconds
+    refetchIntervalInBackground: true,
   });
 
   const { data: items, isLoading: itemsLoading } = useQuery({
@@ -66,6 +68,8 @@ export default function TransfersPage() {
 
   const { data: inventory, isLoading: inventoryLoading } = useQuery({
     queryKey: ["/api/reports/inventory-stock"],
+    refetchInterval: 5000,
+    refetchIntervalInBackground: true,
   });
 
   const form = useForm<FormValues>({

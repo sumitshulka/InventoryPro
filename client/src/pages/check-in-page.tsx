@@ -43,15 +43,23 @@ export default function CheckInPage() {
     queryKey: ["/api/warehouses"],
   });
 
-  const { data: checkInTransactions, isLoading: transactionsLoading, refetch: refetchTransactions } = useQuery({
+  const { data: checkInTransactions, isLoading: transactionsLoading } = useQuery({
     queryKey: ["/api/transactions/type/check-in"],
+    refetchInterval: 5000, // Refresh every 5 seconds
+    refetchIntervalInBackground: true,
   });
 
   const { data: users, isLoading: usersLoading } = useQuery({
     queryKey: ["/api/users"],
   });
 
-  const { data: organizationSettings } = useQuery({
+  const { data: organizationSettings } = useQuery<{
+    id: number;
+    organizationName: string;
+    currency: string;
+    currencySymbol: string;
+    timezone: string;
+  }>({
     queryKey: ["/api/organization-settings"],
   });
 
@@ -196,7 +204,7 @@ export default function CheckInPage() {
                     <SelectValue placeholder="Select an item" />
                   </SelectTrigger>
                   <SelectContent>
-                    {items?.map((item: any) => (
+                    {(items as any[])?.map((item: any) => (
                       <SelectItem key={item.id} value={item.id.toString()}>
                         {item.name} ({item.sku})
                       </SelectItem>
@@ -246,14 +254,20 @@ export default function CheckInPage() {
 
               <div className="space-y-2">
                 <Label htmlFor="cost">Procurement Cost (Optional)</Label>
-                <Input
-                  id="cost"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  placeholder="Enter cost"
-                  {...form.register("cost")}
-                />
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                    {organizationSettings?.currencySymbol || '$'}
+                  </span>
+                  <Input
+                    id="cost"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="0.00"
+                    className="pl-8"
+                    {...form.register("cost")}
+                  />
+                </div>
               </div>
 
               <div className="space-y-2">
@@ -366,7 +380,7 @@ export default function CheckInPage() {
                           <TableCell>{item ? item.name : `Item #${transaction.itemId}`}</TableCell>
                           <TableCell>{transaction.quantity}</TableCell>
                           <TableCell>
-                            {transaction.cost ? `$${parseFloat(transaction.cost).toFixed(2)}` : '-'}
+                            {transaction.cost ? `${organizationSettings?.currencySymbol || '$'}${parseFloat(transaction.cost).toFixed(2)}` : '-'}
                           </TableCell>
                           <TableCell>{warehouse ? warehouse.name : `Warehouse #${transaction.destinationWarehouseId}`}</TableCell>
                           <TableCell>{formatDateTime(transaction.createdAt)}</TableCell>
