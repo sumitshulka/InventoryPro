@@ -54,6 +54,22 @@ export default function Sidebar({ user, isOpen, onClose }: SidebarProps) {
     });
   }
 
+  // Show Approval Management for managers and admins
+  if (user.role === "manager" || user.role === "admin") {
+    // Find or create the OPERATIONS category
+    let operationsCategory = navigationItems.find(cat => cat.category === "OPERATIONS");
+    if (operationsCategory) {
+      operationsCategory.items.push({ name: "Approvals", path: "/approvals", icon: "approval" });
+    } else {
+      navigationItems.push({
+        category: "OPERATIONS",
+        items: [
+          { name: "Approvals", path: "/approvals", icon: "approval" },
+        ],
+      });
+    }
+  }
+
   return (
     <>
       <aside 
