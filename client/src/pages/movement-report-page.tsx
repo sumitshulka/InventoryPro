@@ -19,7 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2, Download, RefreshCw, Calendar } from "lucide-react";
+import { Loader2, Download, RefreshCw, Calendar, ArrowUpCircle, ArrowDownCircle, ArrowRightLeft, Package, TrendingUp, TrendingDown } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { getTransactionTypeColor, getStatusColor, formatDateTime } from "@/lib/utils";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -28,6 +28,7 @@ export default function MovementReportPage() {
   const { toast } = useToast();
   const [warehouseFilter, setWarehouseFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
+  const [itemFilter, setItemFilter] = useState("all");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [dateRange, setDateRange] = useState("all");
@@ -38,6 +39,10 @@ export default function MovementReportPage() {
 
   const { data: warehouses, isLoading: warehousesLoading } = useQuery({
     queryKey: ["/api/warehouses"],
+  });
+
+  const { data: items, isLoading: itemsLoading } = useQuery({
+    queryKey: ["/api/items"],
   });
 
   const exportMutation = useMutation({
@@ -111,7 +116,7 @@ export default function MovementReportPage() {
   };
 
   // Apply filters to transaction data
-  const filteredTransactions = transactions
+  const filteredTransactions = transactions && Array.isArray(transactions)
     ? transactions.filter((transaction: any) => {
         // Warehouse filter
         const matchesWarehouse = 
@@ -123,6 +128,11 @@ export default function MovementReportPage() {
         const matchesType = 
           typeFilter === "all" || 
           transaction.transactionType === typeFilter;
+        
+        // Item filter
+        const matchesItem = 
+          itemFilter === "all" || 
+          transaction.itemId?.toString() === itemFilter;
         
         // Date filter
         let matchesDate = true;
@@ -140,7 +150,7 @@ export default function MovementReportPage() {
           matchesDate = transactionDate <= filterEndDate;
         }
         
-        return matchesWarehouse && matchesType && matchesDate;
+        return matchesWarehouse && matchesType && matchesItem && matchesDate;
       })
     : [];
 
@@ -176,7 +186,7 @@ export default function MovementReportPage() {
   
   const transactionCounts = getTransactionCounts();
 
-  if (transactionsLoading || warehousesLoading) {
+  if (transactionsLoading || warehousesLoading || itemsLoading) {
     return (
       <AppLayout>
         <div className="flex items-center justify-center h-[calc(100vh-200px)]">
@@ -222,7 +232,7 @@ export default function MovementReportPage() {
                 <h2 className="text-3xl font-bold">{transactionCounts.total}</h2>
               </div>
               <div className="bg-primary bg-opacity-10 p-3 rounded-full">
-                <span className="material-icons text-primary">swap_horiz</span>
+                <Package className="h-6 w-6 text-primary" />
               </div>
             </div>
           </CardContent>
@@ -233,10 +243,10 @@ export default function MovementReportPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-500">Check-ins</p>
-                <h2 className="text-3xl font-bold">{transactionCounts.checkIn}</h2>
+                <h2 className="text-3xl font-bold text-green-600">{transactionCounts.checkIn}</h2>
               </div>
               <div className="bg-green-100 p-3 rounded-full">
-                <span className="material-icons text-green-600">login</span>
+                <ArrowUpCircle className="h-6 w-6 text-green-600" />
               </div>
             </div>
           </CardContent>
@@ -247,10 +257,10 @@ export default function MovementReportPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-500">Issues</p>
-                <h2 className="text-3xl font-bold">{transactionCounts.issue}</h2>
+                <h2 className="text-3xl font-bold text-red-600">{transactionCounts.issue}</h2>
               </div>
               <div className="bg-red-100 p-3 rounded-full">
-                <span className="material-icons text-red-600">logout</span>
+                <ArrowDownCircle className="h-6 w-6 text-red-600" />
               </div>
             </div>
           </CardContent>
@@ -261,10 +271,10 @@ export default function MovementReportPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-500">Transfers</p>
-                <h2 className="text-3xl font-bold">{transactionCounts.transfer}</h2>
+                <h2 className="text-3xl font-bold text-blue-600">{transactionCounts.transfer}</h2>
               </div>
               <div className="bg-blue-100 p-3 rounded-full">
-                <span className="material-icons text-blue-600">sync_alt</span>
+                <ArrowRightLeft className="h-6 w-6 text-blue-600" />
               </div>
             </div>
           </CardContent>
@@ -277,7 +287,7 @@ export default function MovementReportPage() {
           <CardTitle>Filters</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
             <div>
               <Select
                 value={warehouseFilter}
@@ -288,11 +298,11 @@ export default function MovementReportPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Warehouses</SelectItem>
-                  {warehouses?.map((warehouse: any) => (
+                  {warehouses && Array.isArray(warehouses) ? warehouses.map((warehouse: any) => (
                     <SelectItem key={warehouse.id} value={warehouse.id.toString()}>
                       {warehouse.name}
                     </SelectItem>
-                  ))}
+                  )) : null}
                 </SelectContent>
               </Select>
             </div>
@@ -310,6 +320,25 @@ export default function MovementReportPage() {
                   <SelectItem value="check-in">Check-ins</SelectItem>
                   <SelectItem value="issue">Issues</SelectItem>
                   <SelectItem value="transfer">Transfers</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div>
+              <Select
+                value={itemFilter}
+                onValueChange={setItemFilter}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Item Filter" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Items</SelectItem>
+                  {items && Array.isArray(items) ? items.map((item: any) => (
+                    <SelectItem key={item.id} value={item.id.toString()}>
+                      {item.name} ({item.sku})
+                    </SelectItem>
+                  )) : null}
                 </SelectContent>
               </Select>
             </div>
