@@ -189,13 +189,15 @@ export const insertApprovalSettingsSchema = createInsertSchema(approvalSettings)
   createdAt: true,
 });
 
-// Organization settings
+// Organization settings with enhanced configuration
 export const organizationSettings = pgTable("organization_settings", {
   id: serial("id").primaryKey(),
   organizationName: text("organization_name").notNull().default("My Organization"),
   currency: text("currency").notNull().default("USD"),
   currencySymbol: text("currency_symbol").notNull().default("$"),
   timezone: text("timezone").notNull().default("UTC"),
+  defaultUnits: text("default_units").array().notNull().default(["pcs", "boxes", "reams", "kg", "liters"]),
+  allowedCategories: text("allowed_categories").array().notNull().default(["Electronics", "Office Supplies", "Furniture"]),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at"),
 });

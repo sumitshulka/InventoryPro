@@ -50,6 +50,8 @@ const organizationSettingsSchema = z.object({
   currency: z.string().min(1, "Currency is required"),
   currencySymbol: z.string().min(1, "Currency symbol is required"),
   timezone: z.string().min(1, "Timezone is required"),
+  defaultUnits: z.array(z.string()).min(1, "At least one unit is required"),
+  allowedCategories: z.array(z.string()).min(1, "At least one category is required"),
 });
 
 type ApprovalSettingsFormValues = z.infer<typeof approvalSettingsSchema>;
@@ -86,6 +88,8 @@ export default function SettingsPage() {
       currency: "USD",
       currencySymbol: "$",
       timezone: "UTC",
+      defaultUnits: ["pcs", "boxes", "reams", "kg", "liters"],
+      allowedCategories: ["Electronics", "Office Supplies", "Furniture"],
     },
   });
 
@@ -97,6 +101,8 @@ export default function SettingsPage() {
         currency: (organizationSettings as any).currency || "USD",
         currencySymbol: (organizationSettings as any).currencySymbol || "$",
         timezone: (organizationSettings as any).timezone || "UTC",
+        defaultUnits: (organizationSettings as any).defaultUnits || ["pcs", "boxes", "reams", "kg", "liters"],
+        allowedCategories: (organizationSettings as any).allowedCategories || ["Electronics", "Office Supplies", "Furniture"],
       });
     }
   }, [organizationSettings, orgForm]);
