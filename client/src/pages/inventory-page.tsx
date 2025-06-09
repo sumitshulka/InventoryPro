@@ -328,11 +328,11 @@ export default function InventoryPage() {
                     <SelectValue placeholder="Select a warehouse" />
                   </SelectTrigger>
                   <SelectContent>
-                    {warehouses?.map((warehouse: any) => (
+                    {warehouses && Array.isArray(warehouses) ? warehouses.map((warehouse: any) => (
                       <SelectItem key={warehouse.id} value={warehouse.id.toString()}>
                         {warehouse.name}
                       </SelectItem>
-                    ))}
+                    )) : null}
                   </SelectContent>
                 </Select>
                 {form.formState.errors.warehouseId && (
