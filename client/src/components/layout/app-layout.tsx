@@ -16,9 +16,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [location, setLocation] = useLocation();
 
-  console.log("AppLayout render - isMobile:", isMobile);
-  console.log("AppLayout render - isSidebarOpen:", isSidebarOpen);
-  console.log("AppLayout render - location:", location);
+
 
   // If user is not authenticated, redirect to login
   useEffect(() => {
