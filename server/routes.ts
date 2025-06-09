@@ -1199,8 +1199,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get all departments
   app.get("/api/departments", async (req, res) => {
     try {
-      const departments = await db.select().from(departments);
-      res.json(departments);
+      const allDepartments = await db.select().from(departments);
+      res.json(allDepartments);
     } catch (error: any) {
       res.status(400).json({ message: error.message });
     }

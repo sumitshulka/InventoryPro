@@ -389,6 +389,26 @@ export default function UsersManagementPage() {
                     </SelectContent>
                   </Select>
                 </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="departmentId">Department</Label>
+                  <Select
+                    value={form.watch("departmentId")?.toString() || "none"}
+                    onValueChange={(value) => form.setValue("departmentId", value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select department" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">No Department</SelectItem>
+                      {(departments as any[])?.map((department: any) => (
+                        <SelectItem key={department.id} value={department.id.toString()}>
+                          {department.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
               <DialogFooter>
