@@ -119,7 +119,12 @@ export default function Sidebar({ user, isOpen, onClose }: SidebarProps) {
                           ? "active bg-primary/10 border-l-4 border-primary text-primary" 
                           : "text-gray-700 hover:text-primary hover:bg-primary/5"
                       )}
-                      onClick={onClose}
+                      onClick={() => {
+                        // Only close sidebar on mobile devices
+                        if (window.innerWidth < 768) {
+                          onClose();
+                        }
+                      }}
                     >
                       <span className="material-icons mr-3">{item.icon}</span>
                       <span className="whitespace-nowrap">{item.name}</span>
