@@ -42,7 +42,7 @@ export const warehouses = pgTable("warehouses", {
   id: serial("id").primaryKey(),
   name: text("name").notNull().unique(),
   location: text("location").notNull(),
-  manager: text("manager"),
+  managerId: integer("manager_id").references(() => users.id),
   capacity: integer("capacity").notNull(),
   isActive: boolean("is_active").notNull().default(true),
 });
@@ -50,7 +50,7 @@ export const warehouses = pgTable("warehouses", {
 export const insertWarehouseSchema = createInsertSchema(warehouses).pick({
   name: true,
   location: true,
-  manager: true,
+  managerId: true,
   capacity: true,
   isActive: true,
 });

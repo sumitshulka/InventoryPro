@@ -24,6 +24,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Loader2, Plus, Edit } from "lucide-react";
@@ -33,8 +40,8 @@ import { useAuth } from "@/hooks/use-auth";
 const formSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters" }),
   location: z.string().min(2, { message: "Location is required" }),
-  manager: z.string().optional(),
-  capacity: z.string().min(1, { message: "Capacity is required" }).transform(val => parseInt(val)),
+  managerId: z.string().optional().transform(val => val === "" || val === "none" ? null : parseInt(val)),
+  capacity: z.number().min(1, { message: "Capacity is required" }),
   isActive: z.boolean().default(true),
 });
 
@@ -51,12 +58,16 @@ export default function WarehousesPage() {
     queryKey: ["/api/warehouses"],
   });
 
+  const { data: users } = useQuery({
+    queryKey: ["/api/users"],
+  });
+
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       name: "",
       location: "",
-      manager: "",
+      managerId: "none",
       capacity: "1000",
       isActive: true,
     },
@@ -65,8 +76,11 @@ export default function WarehousesPage() {
   const createWarehouseMutation = useMutation({
     mutationFn: async (data: FormValues) => {
       const payload = {
-        ...data,
-        capacity: parseInt(data.capacity),
+        name: data.name,
+        location: data.location,
+        managerId: data.managerId,
+        capacity: data.capacity,
+        isActive: data.isActive,
       };
       
       if (isEditMode && editWarehouseId) {
