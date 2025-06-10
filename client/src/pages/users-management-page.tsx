@@ -134,9 +134,10 @@ export default function UsersManagementPage() {
       password: "",
       name: "",
       email: "",
-      role: "employee",
+      role: "employee" as const,
       managerId: "none",
       warehouseId: "none",
+      departmentId: "none",
     });
     setIsEditMode(false);
     setEditUserId(null);
@@ -152,6 +153,7 @@ export default function UsersManagementPage() {
       role: userData.role,
       managerId: userData.managerId?.toString() || "none",
       warehouseId: userData.warehouseId?.toString() || "none",
+      departmentId: userData.departmentId?.toString() || "none",
     });
     setIsEditMode(true);
     setEditUserId(userData.id);
