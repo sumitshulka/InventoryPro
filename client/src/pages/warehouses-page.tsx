@@ -36,6 +36,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Loader2, Plus, Edit } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
+import { formatCapacity } from "@/lib/formatters";
 
 const formSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters" }),
@@ -202,7 +203,7 @@ export default function WarehousesPage() {
               <div className="grid grid-cols-2 gap-2 text-center mt-4">
                 <div className="bg-gray-50 rounded p-2">
                   <p className="text-xs text-gray-500">Capacity</p>
-                  <p className="font-medium">{warehouse.capacity}</p>
+                  <p className="font-medium">{formatCapacity(warehouse.capacity)}</p>
                 </div>
                 {isAdmin && (
                   <Button

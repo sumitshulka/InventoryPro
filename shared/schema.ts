@@ -401,3 +401,31 @@ export type InsertTransferItem = z.infer<typeof insertTransferItemSchema>;
 
 export type TransferUpdate = typeof transferUpdates.$inferSelect;
 export type InsertTransferUpdate = z.infer<typeof insertTransferUpdateSchema>;
+
+// Rejected Goods table for tracking rejected transfer items
+export const rejectedGoods = pgTable("rejected_goods", {
+  id: serial("id").primaryKey(),
+  transferId: integer("transfer_id").notNull(),
+  itemId: integer("item_id").notNull(),
+  quantity: integer("quantity").notNull(),
+  rejectionReason: text("rejection_reason").notNull(),
+  rejectedBy: integer("rejected_by").notNull(),
+  rejectedAt: timestamp("rejected_at").defaultNow().notNull(),
+  warehouseId: integer("warehouse_id").notNull(), // Where the rejected goods are stored
+  status: text("status").notNull().default("rejected"), // rejected, disposed, returned
+  notes: text("notes"),
+});
+
+export const insertRejectedGoodsSchema = createInsertSchema(rejectedGoods).pick({
+  transferId: true,
+  itemId: true,
+  quantity: true,
+  rejectionReason: true,
+  rejectedBy: true,
+  warehouseId: true,
+  status: true,
+  notes: true,
+});
+
+export type RejectedGoods = typeof rejectedGoods.$inferSelect;
+export type InsertRejectedGoods = z.infer<typeof insertRejectedGoodsSchema>;
