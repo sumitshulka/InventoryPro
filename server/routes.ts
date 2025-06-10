@@ -1593,7 +1593,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const allItems = await storage.getAllItems();
       const allWarehouses = await storage.getAllWarehouses();
       const allInventory = await storage.getAllInventory();
-      const allDepartments = await storage.getAllDepartments();
+      // For now, we'll skip departments since they're not implemented yet
+      const allDepartments: any[] = [];
       
       // Create maps for lookup
       const itemMap = new Map();
@@ -1609,7 +1610,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       
       const departmentMap = new Map();
-      allDepartments.forEach(dept => departmentMap.set(dept.id, dept));
+      allDepartments.forEach((dept: any) => departmentMap.set(dept.id, dept));
       
       // Enrich with complete request data
       const enrichedApprovals = await Promise.all(pendingApprovals.map(async approval => {
