@@ -30,6 +30,8 @@ import {
   TransferUpdate,
   InsertTransferUpdate,
   TransactionType,
+  RejectedGoods,
+  InsertRejectedGoods,
   users,
   categories,
   warehouses,
@@ -44,7 +46,8 @@ import {
   transferNotifications,
   transfers,
   transferItems,
-  transferUpdates
+  transferUpdates,
+  rejectedGoods
 } from "@shared/schema";
 import session from "express-session";
 import connectPg from "connect-pg-simple";

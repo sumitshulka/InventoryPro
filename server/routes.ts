@@ -1918,6 +1918,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Rejected Goods Management Routes
+  app.get("/api/rejected-goods", async (req: Request, res: Response) => {
+    try {
+      const rejectedGoods = await storage.getAllRejectedGoods();
+      
+      // Enrich with item and warehouse details
+      const enrichedGoods = await Promise.all(rejectedGoods.map(async (goods) => {
+        const item = await storage.getItem(goods.itemId);
+        const warehouse = await storage.getWarehouse(goods.warehouseId);
+        const rejectedByUser = await storage.getUser(goods.rejectedBy);
+        return { ...goods, item, warehouse, rejectedByUser };
+      }));
+      
+      res.json(enrichedGoods);
+    } catch (error) {
+      console.error("Error fetching rejected goods:", error);
+      res.status(500).json({ message: "Failed to fetch rejected goods" });
+    }
+  });
+
+  app.get("/api/rejected-goods/warehouse/:warehouseId", async (req: Request, res: Response) => {
+    try {
+      const warehouseId = parseInt(req.params.warehouseId);
+      const rejectedGoods = await storage.getRejectedGoodsByWarehouse(warehouseId);
+      
+      // Enrich with item details
+      const enrichedGoods = await Promise.all(rejectedGoods.map(async (goods) => {
+        const item = await storage.getItem(goods.itemId);
+        const rejectedByUser = await storage.getUser(goods.rejectedBy);
+        return { ...goods, item, rejectedByUser };
+      }));
+      
+      res.json(enrichedGoods);
+    } catch (error) {
+      console.error("Error fetching rejected goods by warehouse:", error);
+      res.status(500).json({ message: "Failed to fetch rejected goods" });
+    }
+  });
+
+  app.patch("/api/rejected-goods/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      const updatedGoods = await storage.updateRejectedGoods(id, req.body);
+      if (!updatedGoods) {
+        return res.status(404).json({ message: "Rejected goods not found" });
+      }
+      res.json(updatedGoods);
+    } catch (error) {
+      console.error("Error updating rejected goods:", error);
+      res.status(500).json({ message: "Failed to update rejected goods" });
+    }
+  });
+
   // Enhanced Transfer Management Routes
   
   // Get all transfers with enriched data
@@ -2155,7 +2208,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 requesterId: req.user!.id,
                 transactionType: 'check-out',
                 quantity: item.requestedQuantity,
-                notes: `Transfer out via ${updatedTransfer.transferCode}`,
               });
 
               // Create transaction records for transfer in
@@ -2165,7 +2217,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 requesterId: filteredData.receivedBy || req.user!.id,
                 transactionType: 'check-in',
                 quantity: item.actualQuantity || item.requestedQuantity,
-                notes: `Transfer in via ${updatedTransfer.transferCode}`,
               });
             }
           } else if (filteredData.status === 'rejected') {
@@ -2197,7 +2248,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 requesterId: req.user!.id,
                 transactionType: 'check-out',
                 quantity: item.requestedQuantity,
-                notes: `Transfer rejected - moved to rejected goods: ${updatedTransfer.transferCode}`,
               });
             }
           }
