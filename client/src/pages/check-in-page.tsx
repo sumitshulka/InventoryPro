@@ -100,6 +100,7 @@ export default function CheckInPage() {
       
       for (const item of values.items) {
         const payload = {
+          transactionType: "check-in",
           itemId: parseInt(item.itemId),
           quantity: parseInt(item.quantity),
           destinationWarehouseId: parseInt(values.destinationWarehouseId),
@@ -110,18 +111,16 @@ export default function CheckInPage() {
           purchaseOrderNumber: values.purchaseOrderNumber || null,
           deliveryChallanNumber: values.deliveryChallanNumber || null,
           supplierName: values.supplierName || null,
+          status: "completed"
         };
 
-        const result = await apiRequest("/api/transactions", {
-          method: "POST",
-          body: JSON.stringify(payload),
-        });
+        const result = await apiRequest("POST", "/api/transactions", payload);
         
         results.push(result);
       }
       return results;
     },
-    onSuccess: () => {
+    onSuccess: (data, variables) => {
       form.reset({
         destinationWarehouseId: "",
         purchaseOrderNumber: "",
@@ -139,7 +138,7 @@ export default function CheckInPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/warehouses/stats"] });
       toast({
         title: "Success",
-        description: `Successfully checked in ${values.items.length} item(s)`,
+        description: `Successfully checked in ${variables.items.length} item(s)`,
       });
     },
     onError: (error: Error) => {

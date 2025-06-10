@@ -339,8 +339,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(transactions);
   });
 
-  // Create transaction (check-in, issue, transfer) (manager+)
-  app.post("/api/transactions", checkRole("manager"), async (req, res) => {
+  // Create transaction (check-in, issue, transfer) - check-in for all authenticated users, others require manager
+  app.post("/api/transactions", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    // Check if it's a check-in transaction or requires manager role
+    const transactionType = req.body.transactionType;
+    if (transactionType !== "check-in") {
+      const user = req.user;
+      if (user.role !== "admin" && user.role !== "manager") {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+    }
     try {
       console.log("Transaction request body:", JSON.stringify(req.body, null, 2));
       
