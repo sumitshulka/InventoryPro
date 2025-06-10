@@ -1076,6 +1076,55 @@ export class MemStorage implements IStorage {
       .filter(op => op.userId === userId && op.isActive)
       .map(op => op.warehouseId);
   }
+
+  // Transfer Notification operations
+  async getTransferNotification(id: number): Promise<TransferNotification | undefined> {
+    return this.transferNotificationsMap.get(id);
+  }
+
+  async getTransferNotificationsByRequest(requestId: number): Promise<TransferNotification[]> {
+    return Array.from(this.transferNotificationsMap.values())
+      .filter(notification => notification.requestId === requestId);
+  }
+
+  async getTransferNotificationsByWarehouse(warehouseId: number): Promise<TransferNotification[]> {
+    return Array.from(this.transferNotificationsMap.values())
+      .filter(notification => notification.warehouseId === warehouseId && notification.status === 'pending');
+  }
+
+  async getPendingTransferNotifications(): Promise<TransferNotification[]> {
+    return Array.from(this.transferNotificationsMap.values())
+      .filter(notification => notification.status === 'pending');
+  }
+
+  async createTransferNotification(notification: InsertTransferNotification): Promise<TransferNotification> {
+    const newNotification: TransferNotification = {
+      id: this.transferNotificationIdCounter++,
+      ...notification,
+      status: notification.status || 'pending',
+      notes: notification.notes || null,
+      availableQuantity: notification.availableQuantity || 0,
+      notifiedUserId: notification.notifiedUserId || null,
+      transferId: notification.transferId || null,
+      createdAt: new Date(),
+      resolvedAt: null
+    };
+    this.transferNotificationsMap.set(newNotification.id, newNotification);
+    return newNotification;
+  }
+
+  async updateTransferNotification(id: number, notificationData: Partial<InsertTransferNotification>): Promise<TransferNotification | undefined> {
+    const notification = this.transferNotificationsMap.get(id);
+    if (!notification) return undefined;
+    
+    const updatedNotification = { ...notification, ...notificationData };
+    this.transferNotificationsMap.set(id, updatedNotification);
+    return updatedNotification;
+  }
+
+  async deleteTransferNotification(id: number): Promise<boolean> {
+    return this.transferNotificationsMap.delete(id);
+  }
 }
 
 

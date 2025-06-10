@@ -686,12 +686,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      // If transfer is needed, mark request for warehouse manager attention
+      // If transfer is needed, create transfer notifications and mark request
       if (needsTransfer) {
         await storage.updateRequest(request.id, { 
           status: "pending-transfer",
           notes: `${request.notes || ''}\n\nStock Transfer Required: Some items are not available in sufficient quantities in the requested warehouse.`
         });
+
+        // Get all warehouses for reference
+        const allWarehouses = await storage.getAllWarehouses();
+        const allInventory = await storage.getAllInventory();
+
+        // Create transfer notifications for each item that needs transfer
+        for (const requirement of transferRequirements) {
+          // Find warehouses that have the required item
+          const availableInventory = allInventory.filter(inv => 
+            inv.itemId === requirement.itemId && 
+            inv.warehouseId !== requestData.warehouseId && 
+            inv.quantity > 0
+          );
+
+          // Create notification for each warehouse that has stock
+          for (const inv of availableInventory) {
+            try {
+              const sourceWarehouse = allWarehouses.find(w => w.id === inv.warehouseId);
+              const targetWarehouse = allWarehouses.find(w => w.id === requestData.warehouseId);
+              
+              await storage.createTransferNotification({
+                requestId: request.id,
+                warehouseId: inv.warehouseId,
+                itemId: requirement.itemId,
+                requiredQuantity: Math.min(requirement.requiredQuantity, inv.quantity),
+                availableQuantity: inv.quantity,
+                status: 'pending',
+                notifiedUserId: null, // Will be assigned when warehouse manager checks
+                transferId: null,
+                notes: `Transfer needed for request ${request.requestCode}. Item shortage in ${targetWarehouse?.name || 'requested warehouse'}. Available in ${sourceWarehouse?.name || 'source warehouse'}.`
+              });
+            } catch (error) {
+              console.error("Error creating transfer notification:", error);
+            }
+          }
+        }
       }
 
       // Create approval records based on user hierarchy and approval settings
