@@ -193,10 +193,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ==== Warehouse Routes ====
-  // Get all warehouses
+  // Get all warehouses with manager information
   app.get("/api/warehouses", async (req, res) => {
-    const warehouses = await storage.getAllWarehouses();
-    res.json(warehouses);
+    try {
+      const warehouses = await storage.getAllWarehouses();
+      
+      // Enrich warehouses with manager information
+      const enrichedWarehouses = await Promise.all(warehouses.map(async (warehouse) => {
+        let manager = null;
+        if (warehouse.managerId) {
+          manager = await storage.getUser(warehouse.managerId);
+        }
+        return {
+          ...warehouse,
+          manager: manager ? { id: manager.id, name: manager.name, email: manager.email, role: manager.role } : null
+        };
+      }));
+      
+      res.json(enrichedWarehouses);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
   });
 
   // Create warehouse (admin only)
@@ -221,6 +238,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const warehouseData = insertWarehouseSchema.partial().parse(req.body);
       const updatedWarehouse = await storage.updateWarehouse(warehouseId, warehouseData);
+      if (!updatedWarehouse) {
+        return res.status(404).json({ message: "Warehouse not found" });
+      }
+      res.json(updatedWarehouse);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Update warehouse manager (admin only)
+  app.patch("/api/warehouses/:id", checkRole("admin"), async (req, res) => {
+    const warehouseId = parseInt(req.params.id, 10);
+    try {
+      const { managerId } = req.body;
+      
+      // Validate managerId if provided
+      if (managerId !== null && managerId !== undefined) {
+        const manager = await storage.getUser(managerId);
+        if (!manager) {
+          return res.status(400).json({ message: "Manager not found" });
+        }
+        if (manager.role !== 'admin' && manager.role !== 'manager') {
+          return res.status(400).json({ message: "User must be an admin or manager" });
+        }
+      }
+
+      const updatedWarehouse = await storage.updateWarehouse(warehouseId, { managerId });
       if (!updatedWarehouse) {
         return res.status(404).json({ message: "Warehouse not found" });
       }

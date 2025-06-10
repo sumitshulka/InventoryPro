@@ -644,14 +644,44 @@ export default function SettingsPage() {
                           <p className="text-sm text-muted-foreground">
                             {warehouse.location}
                           </p>
+                          {warehouse.manager && (
+                            <p className="text-sm text-blue-600 font-medium">
+                              Current Manager: {warehouse.manager.name} ({warehouse.manager.role})
+                            </p>
+                          )}
                         </div>
                         <div className="ml-4">
                           <Select
                             value={warehouse.managerId?.toString() || "none"}
-                            onValueChange={(value) => {
+                            onValueChange={async (value) => {
                               // Update warehouse manager
                               const managerId = value === "none" ? null : parseInt(value);
-                              // This would trigger an API call to update the warehouse
+                              try {
+                                const response = await fetch(`/api/warehouses/${warehouse.id}`, {
+                                  method: 'PATCH',
+                                  headers: {
+                                    'Content-Type': 'application/json',
+                                  },
+                                  body: JSON.stringify({ managerId }),
+                                });
+                                
+                                if (response.ok) {
+                                  toast({
+                                    title: "Success",
+                                    description: "Warehouse manager updated successfully",
+                                  });
+                                  // Refresh warehouses data
+                                  queryClient.invalidateQueries({ queryKey: ['/api/warehouses'] });
+                                } else {
+                                  throw new Error('Failed to update warehouse manager');
+                                }
+                              } catch (error) {
+                                toast({
+                                  title: "Error",
+                                  description: "Failed to update warehouse manager",
+                                  variant: "destructive",
+                                });
+                              }
                             }}
                           >
                             <SelectTrigger className="w-40">
