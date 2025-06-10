@@ -21,6 +21,8 @@ import {
   InsertRequestApproval,
   WarehouseOperator,
   InsertWarehouseOperator,
+  TransferNotification,
+  InsertTransferNotification,
   TransactionType,
   users,
   categories,
@@ -32,7 +34,8 @@ import {
   requestItems,
   approvalSettings,
   requestApprovals,
-  warehouseOperators
+  warehouseOperators,
+  transferNotifications
 } from "@shared/schema";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
@@ -140,6 +143,15 @@ export interface IStorage {
   isUserWarehouseOperator(userId: number, warehouseId: number): Promise<boolean>;
   getUserOperatedWarehouses(userId: number): Promise<number[]>;
 
+  // Transfer Notification operations
+  getTransferNotification(id: number): Promise<TransferNotification | undefined>;
+  getTransferNotificationsByRequest(requestId: number): Promise<TransferNotification[]>;
+  getTransferNotificationsByWarehouse(warehouseId: number): Promise<TransferNotification[]>;
+  getPendingTransferNotifications(): Promise<TransferNotification[]>;
+  createTransferNotification(notification: InsertTransferNotification): Promise<TransferNotification>;
+  updateTransferNotification(id: number, notificationData: Partial<InsertTransferNotification>): Promise<TransferNotification | undefined>;
+  deleteTransferNotification(id: number): Promise<boolean>;
+
   // Hierarchy and Approval Workflow helpers
   getUserManager(userId: number): Promise<User | undefined>;
   getUsersByManager(managerId: number): Promise<User[]>;
@@ -162,6 +174,7 @@ export class MemStorage implements IStorage {
   private approvalSettingsMap: Map<number, ApprovalSettings>;
   private requestApprovalsMap: Map<number, RequestApproval>;
   private warehouseOperatorsMap: Map<number, WarehouseOperator>;
+  private transferNotificationsMap: Map<number, TransferNotification>;
   
   private userIdCounter: number;
   private categoryIdCounter: number;
@@ -174,6 +187,7 @@ export class MemStorage implements IStorage {
   private approvalSettingsIdCounter: number;
   private requestApprovalIdCounter: number;
   private warehouseOperatorIdCounter: number;
+  private transferNotificationIdCounter: number;
   
   sessionStore: session.Store;
 
@@ -189,6 +203,7 @@ export class MemStorage implements IStorage {
     this.approvalSettingsMap = new Map();
     this.requestApprovalsMap = new Map();
     this.warehouseOperatorsMap = new Map();
+    this.transferNotificationsMap = new Map();
     
     this.userIdCounter = 1;
     this.categoryIdCounter = 1;
@@ -201,6 +216,7 @@ export class MemStorage implements IStorage {
     this.approvalSettingsIdCounter = 1;
     this.requestApprovalIdCounter = 1;
     this.warehouseOperatorIdCounter = 1;
+    this.transferNotificationIdCounter = 1;
     
     this.sessionStore = new MemoryStore({
       checkPeriod: 86400000,
@@ -1555,6 +1571,48 @@ export class DatabaseStorage implements IStorage {
       .from(warehouseOperators)
       .where(and(eq(warehouseOperators.userId, userId), eq(warehouseOperators.isActive, true)));
     return operators.map(op => op.warehouseId);
+  }
+
+  // Transfer Notification operations
+  async getTransferNotification(id: number): Promise<TransferNotification | undefined> {
+    const [notification] = await db.select().from(transferNotifications).where(eq(transferNotifications.id, id));
+    return notification || undefined;
+  }
+
+  async getTransferNotificationsByRequest(requestId: number): Promise<TransferNotification[]> {
+    return await db.select().from(transferNotifications).where(eq(transferNotifications.requestId, requestId));
+  }
+
+  async getTransferNotificationsByWarehouse(warehouseId: number): Promise<TransferNotification[]> {
+    return await db.select().from(transferNotifications)
+      .where(and(eq(transferNotifications.warehouseId, warehouseId), eq(transferNotifications.status, 'pending')));
+  }
+
+  async getPendingTransferNotifications(): Promise<TransferNotification[]> {
+    return await db.select().from(transferNotifications).where(eq(transferNotifications.status, 'pending'));
+  }
+
+  async createTransferNotification(notification: InsertTransferNotification): Promise<TransferNotification> {
+    const [newNotification] = await db.insert(transferNotifications).values({
+      ...notification,
+      createdAt: new Date()
+    }).returning();
+    return newNotification;
+  }
+
+  async updateTransferNotification(id: number, notificationData: Partial<InsertTransferNotification>): Promise<TransferNotification | undefined> {
+    const [updatedNotification] = await db.update(transferNotifications)
+      .set(notificationData)
+      .where(eq(transferNotifications.id, id))
+      .returning();
+    return updatedNotification || undefined;
+  }
+
+  async deleteTransferNotification(id: number): Promise<boolean> {
+    const [deletedNotification] = await db.delete(transferNotifications)
+      .where(eq(transferNotifications.id, id))
+      .returning();
+    return !!deletedNotification;
   }
 
   // User hierarchy operations
