@@ -70,6 +70,11 @@ export default function RequestsPage() {
     queryKey: ["/api/requests"],
   });
 
+  const { data: userOperatedWarehouses = [], isLoading: operatedWarehousesLoading } = useQuery<number[]>({
+    queryKey: ["/api/users", user?.id, "operated-warehouses"],
+    enabled: !!user?.id,
+  });
+
   const { data: items, isLoading: itemsLoading } = useQuery({
     queryKey: ["/api/items"],
   });
@@ -187,8 +192,17 @@ export default function RequestsPage() {
     updateRequestStatusMutation.mutate({ id, status });
   };
 
+  // Filter requests based on user permissions
+  const isWarehouseOperator = userOperatedWarehouses.length > 0;
+  const canViewAllRequests = user?.role === 'admin' || user?.role === 'manager' || isWarehouseOperator;
+
   const filteredRequests = requests
     ? requests.filter((request: any) => {
+        // Role-based filtering: employees can only see their own requests unless they're warehouse operators
+        if (!canViewAllRequests && request.userId !== user?.id) {
+          return false;
+        }
+        
         if (activeTab === "all") return true;
         return request.status === activeTab;
       })

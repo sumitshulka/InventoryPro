@@ -191,12 +191,50 @@ export default function TransfersPage() {
     return stock ? stock.quantity : 0;
   };
 
+  // Filter warehouses based on user permissions
+  const availableWarehouses = user?.role === 'admin' || user?.role === 'manager' 
+    ? (warehouses as any[] || [])
+    : (warehouses as any[] || []).filter((warehouse: any) => userOperatedWarehouses.includes(warehouse.id));
+
+  // Check if user has permission to access transfers functionality
+  const hasTransferPermission = user?.role === 'admin' || user?.role === 'manager' || userOperatedWarehouses.length > 0;
+
   const filteredTransfers = transfers && Array.isArray(transfers) ? transfers.filter((transfer: any) => {
     if (activeTab === "all") return true;
     if (activeTab === "in-transit") return transfer.status === "in-transit";
     if (activeTab === "completed") return transfer.status === "completed";
     return true;
   }) : [];
+
+  if (transfersLoading || itemsLoading || warehousesLoading || inventoryLoading || operatedWarehousesLoading) {
+    return (
+      <AppLayout>
+        <div className="flex justify-center items-center h-64">
+          <Loader2 className="h-8 w-8 animate-spin" />
+        </div>
+      </AppLayout>
+    );
+  }
+
+  if (!hasTransferPermission) {
+    return (
+      <AppLayout>
+        <div className="flex justify-center items-center h-64">
+          <Card className="w-full max-w-md">
+            <CardHeader>
+              <CardTitle className="text-center">Access Restricted</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-center text-muted-foreground">
+                You don't have permission to access the transfers functionality. 
+                Only warehouse managers, admins, and warehouse operators can perform transfer operations.
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      </AppLayout>
+    );
+  }
 
   return (
     <AppLayout>
@@ -255,7 +293,7 @@ export default function TransfersPage() {
                         <SelectValue placeholder="Select source warehouse" />
                       </SelectTrigger>
                       <SelectContent>
-                        {warehouses && Array.isArray(warehouses) && warehouses.map((warehouse: any) => (
+                        {availableWarehouses && Array.isArray(availableWarehouses) && availableWarehouses.map((warehouse: any) => (
                           <SelectItem key={warehouse.id} value={warehouse.id.toString()}>
                             {warehouse.name}
                           </SelectItem>
@@ -277,7 +315,7 @@ export default function TransfersPage() {
                         <SelectValue placeholder="Select destination warehouse" />
                       </SelectTrigger>
                       <SelectContent>
-                        {warehouses && Array.isArray(warehouses) && warehouses.map((warehouse: any) => (
+                        {availableWarehouses && Array.isArray(availableWarehouses) && availableWarehouses.map((warehouse: any) => (
                           <SelectItem key={warehouse.id} value={warehouse.id.toString()}>
                             {warehouse.name}
                           </SelectItem>
