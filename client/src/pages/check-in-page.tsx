@@ -20,7 +20,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Loader2, CalendarIcon, Plus, Trash2, Package } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
-import { formatDateTime, getStatusColor, cn } from "@/lib/utils";
+import { formatDateTime, cn } from "@/lib/utils";
 
 const itemSchema = z.object({
   itemId: z.string().min(1, { message: "Item is required" }),
@@ -48,21 +48,54 @@ export default function CheckInPage() {
   const { toast } = useToast();
   const { user } = useAuth();
 
-  const { data: items, isLoading: itemsLoading } = useQuery({
+  const { data: items = [], isLoading: itemsLoading } = useQuery<Array<{
+    id: number;
+    name: string;
+    sku: string;
+    description?: string;
+    unitOfMeasure: string;
+    categoryId: number;
+  }>>({
     queryKey: ["/api/items"],
   });
 
-  const { data: warehouses, isLoading: warehousesLoading } = useQuery({
+  const { data: warehouses = [], isLoading: warehousesLoading } = useQuery<Array<{
+    id: number;
+    name: string;
+    location: string;
+    managerId?: number;
+  }>>({
     queryKey: ["/api/warehouses"],
   });
 
-  const { data: checkInTransactions, isLoading: transactionsLoading } = useQuery({
+  const { data: checkInTransactions = [], isLoading: transactionsLoading } = useQuery<Array<{
+    id: number;
+    transactionCode: string;
+    itemId: number;
+    quantity: number;
+    transactionDate: string;
+    cost?: number;
+    notes?: string;
+    status?: string;
+    purchaseOrderNumber?: string;
+    supplierName?: string;
+    destinationWarehouseId?: number;
+    requesterId?: number;
+    item?: any;
+    user?: any;
+    destinationWarehouse?: any;
+  }>>({
     queryKey: ["/api/transactions/type/check-in"],
     refetchInterval: 5000,
     refetchIntervalInBackground: true,
   });
 
-  const { data: users, isLoading: usersLoading } = useQuery({
+  const { data: users = [], isLoading: usersLoading } = useQuery<Array<{
+    id: number;
+    name: string;
+    username: string;
+    role: string;
+  }>>({
     queryKey: ["/api/users"],
   });
 
@@ -208,7 +241,7 @@ export default function CheckInPage() {
                                 </SelectTrigger>
                               </FormControl>
                               <SelectContent>
-                                {warehouses?.map((warehouse) => (
+                                {warehouses.map((warehouse) => (
                                   <SelectItem key={warehouse.id} value={warehouse.id.toString()}>
                                     {warehouse.name}
                                   </SelectItem>
@@ -337,7 +370,7 @@ export default function CheckInPage() {
                                       </SelectTrigger>
                                     </FormControl>
                                     <SelectContent>
-                                      {items?.map((item) => (
+                                      {items.map((item) => (
                                         <SelectItem key={item.id} value={item.id.toString()}>
                                           {item.name} ({item.sku})
                                         </SelectItem>
@@ -497,8 +530,8 @@ export default function CheckInPage() {
                               <TableCell>{warehouse?.name || "Unknown Warehouse"}</TableCell>
                               <TableCell>{formatTransactionDate(transaction.transactionDate)}</TableCell>
                               <TableCell>
-                                <span className={`px-2 py-1 rounded-full text-xs ${getStatusColor(transaction.status)}`}>
-                                  {transaction.status}
+                                <span className={`px-2 py-1 rounded-full text-xs ${getStatusColor(transaction.status || "completed")}`}>
+                                  {transaction.status || "completed"}
                                 </span>
                               </TableCell>
                               <TableCell>{transaction.purchaseOrderNumber || "-"}</TableCell>
