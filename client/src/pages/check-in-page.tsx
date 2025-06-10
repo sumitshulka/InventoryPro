@@ -456,6 +456,7 @@ export default function CheckInPage() {
                         <TableHead>Transaction Code</TableHead>
                         <TableHead>Item</TableHead>
                         <TableHead>Quantity</TableHead>
+                        <TableHead>Price ({organizationSettings?.currencySymbol || "$"})</TableHead>
                         <TableHead>Warehouse</TableHead>
                         <TableHead>Date</TableHead>
                         <TableHead>Status</TableHead>
@@ -470,13 +471,32 @@ export default function CheckInPage() {
                           const warehouse = warehouses?.find(w => w.id === transaction.destinationWarehouseId);
                           const requester = users?.find(u => u.id === transaction.requesterId);
                           
+                          // Fix date formatting - use simple date formatting
+                          const formatTransactionDate = (dateString: string) => {
+                            try {
+                              const date = new Date(dateString);
+                              if (isNaN(date.getTime())) {
+                                return "Invalid Date";
+                              }
+                              return date.toLocaleDateString() + " " + date.toLocaleTimeString();
+                            } catch (error) {
+                              return "Invalid Date";
+                            }
+                          };
+                          
                           return (
                             <TableRow key={transaction.id}>
                               <TableCell className="font-medium">{transaction.transactionCode}</TableCell>
                               <TableCell>{item?.name || "Unknown Item"}</TableCell>
                               <TableCell>{transaction.quantity}</TableCell>
+                              <TableCell>
+                                {transaction.cost ? 
+                                  `${organizationSettings?.currencySymbol || "$"}${Number(transaction.cost).toFixed(2)}` : 
+                                  "-"
+                                }
+                              </TableCell>
                               <TableCell>{warehouse?.name || "Unknown Warehouse"}</TableCell>
-                              <TableCell>{formatDateTime(transaction.transactionDate, organizationSettings?.timezone)}</TableCell>
+                              <TableCell>{formatTransactionDate(transaction.transactionDate)}</TableCell>
                               <TableCell>
                                 <span className={`px-2 py-1 rounded-full text-xs ${getStatusColor(transaction.status)}`}>
                                   {transaction.status}
@@ -489,7 +509,7 @@ export default function CheckInPage() {
                         })
                       ) : (
                         <TableRow>
-                          <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                          <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                             No check-in transactions found
                           </TableCell>
                         </TableRow>
