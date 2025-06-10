@@ -76,37 +76,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/users/:id", checkRole("admin"), async (req, res) => {
     const userId = parseInt(req.params.id, 10);
     try {
+      console.log("User update request body:", JSON.stringify(req.body, null, 2));
+      
       // Validate the user data
       const userData = insertUserSchema.partial().parse(req.body);
+      console.log("Parsed user data:", JSON.stringify(userData, null, 2));
       
       // Check if the user exists
       const existingUser = await storage.getUser(userId);
       if (!existingUser) {
         return res.status(404).json({ message: "User not found" });
       }
+      console.log("Existing user:", JSON.stringify(existingUser, null, 2));
       
       // Check for unique constraint violations only if username or email is being changed
       if (userData.username && userData.username !== existingUser.username) {
+        console.log("Checking username uniqueness:", userData.username);
         const userWithSameUsername = await storage.getUserByUsername(userData.username);
         if (userWithSameUsername) {
+          console.log("Username conflict found:", userWithSameUsername.username);
           return res.status(400).json({ message: "Username already exists" });
         }
       }
       
       if (userData.email && userData.email !== existingUser.email) {
+        console.log("Checking email uniqueness:", userData.email);
         const allUsers = await storage.getAllUsers();
         const userWithSameEmail = allUsers.find(u => u.email === userData.email && u.id !== userId);
         if (userWithSameEmail) {
+          console.log("Email conflict found:", userWithSameEmail.email);
           return res.status(400).json({ message: "Email already exists" });
         }
       }
       
-      const updatedUser = await storage.updateUser(userId, userData);
+      // Filter out undefined values to prevent constraint issues
+      const cleanUserData = Object.entries(userData).reduce((acc, [key, value]) => {
+        if (value !== undefined && value !== "") {
+          acc[key] = value;
+        }
+        return acc;
+      }, {} as any);
+      
+      console.log("Clean user data for update:", JSON.stringify(cleanUserData, null, 2));
+      
+      const updatedUser = await storage.updateUser(userId, cleanUserData);
       if (!updatedUser) {
         return res.status(404).json({ message: "User not found" });
       }
       res.json(updatedUser);
     } catch (error: any) {
+      console.error("User update error:", error);
       res.status(400).json({ message: error.message });
     }
   });
