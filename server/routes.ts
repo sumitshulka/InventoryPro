@@ -2141,19 +2141,82 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const transferId = parseInt(req.params.id);
+      const user = req.user!;
       
-      // Filter out fields that shouldn't be updated directly
-      const allowedFields = [
-        'status', 'transferMode', 'expectedShipmentDate', 'expectedArrivalDate',
-        'actualShipmentDate', 'actualArrivalDate', 'courierName', 'trackingNumber',
+      // Get the transfer to check permissions
+      const transfer = await storage.getTransfer(transferId);
+      if (!transfer) {
+        return res.status(404).json({ message: "Transfer not found" });
+      }
+
+      // Get warehouse information to check management roles
+      const sourceWarehouse = await storage.getWarehouse(transfer.sourceWarehouseId);
+      const destinationWarehouse = await storage.getWarehouse(transfer.destinationWarehouseId);
+      
+      // Check if user manages source or destination warehouse
+      const managesSourceWarehouse = user.role === 'admin' || sourceWarehouse?.managerId === user.id;
+      const managesDestinationWarehouse = user.role === 'admin' || destinationWarehouse?.managerId === user.id;
+      
+      // Define field permissions based on role and warehouse management
+      const sourceWarehouseFields = [
         'receiptNumber', 'handoverPersonName', 'handoverPersonContact', 'handoverDate',
-        'receiptDocument', 'receivedBy', 'receivedDate', 'receiverNotes', 'overallCondition', 'notes'
+        'courierName', 'trackingNumber', 'transportNotes'
       ];
       
+      const destinationWarehouseFields = [
+        'receivedBy', 'receivedDate', 'receiverNotes', 'overallCondition'
+      ];
+      
+      // Status change permissions
+      const canUpdateStatus = (newStatus: string) => {
+        if (newStatus === 'in-transit' && transfer.status === 'approved') {
+          return managesSourceWarehouse;
+        }
+        if ((newStatus === 'completed' || newStatus === 'rejected') && transfer.status === 'in-transit') {
+          return managesDestinationWarehouse;
+        }
+        return false;
+      };
+      
       const filteredData: any = {};
-      for (const field of allowedFields) {
-        if (req.body[field] !== undefined) {
-          filteredData[field] = req.body[field];
+      
+      // Check permissions for each field
+      for (const [field, value] of Object.entries(req.body)) {
+        if (value === undefined) continue;
+        
+        if (field === 'status') {
+          if (canUpdateStatus(value as string)) {
+            filteredData[field] = value;
+          } else {
+            return res.status(403).json({ 
+              message: `You don't have permission to change status to ${value}` 
+            });
+          }
+        } else if (sourceWarehouseFields.includes(field)) {
+          if (managesSourceWarehouse) {
+            filteredData[field] = value;
+          } else {
+            return res.status(403).json({ 
+              message: `Only source warehouse managers can update ${field}` 
+            });
+          }
+        } else if (destinationWarehouseFields.includes(field)) {
+          if (managesDestinationWarehouse) {
+            filteredData[field] = value;
+          } else {
+            return res.status(403).json({ 
+              message: `Only destination warehouse managers can update ${field}` 
+            });
+          }
+        } else if (['items', 'rejectionReason'].includes(field)) {
+          // Items and rejection reason can be updated by destination warehouse managers
+          if (managesDestinationWarehouse) {
+            filteredData[field] = value;
+          } else {
+            return res.status(403).json({ 
+              message: `Only destination warehouse managers can update ${field}` 
+            });
+          }
         }
       }
 
