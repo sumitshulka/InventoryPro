@@ -42,9 +42,9 @@ const formSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters" }),
   email: z.string().email({ message: "Invalid email address" }),
   role: z.enum(["admin", "manager", "employee"], { message: "Role is required" }),
-  managerId: z.string().optional().transform(val => val === "" || val === "none" ? null : parseInt(val || "0")),
-  warehouseId: z.string().optional().transform(val => val === "" || val === "none" ? null : parseInt(val || "0")),
-  departmentId: z.string().optional().transform(val => val === "" || val === "none" ? null : parseInt(val || "0")),
+  managerId: z.string().optional(),
+  warehouseId: z.string().optional(),
+  departmentId: z.string().optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -58,8 +58,10 @@ export default function UsersManagementPage() {
 
   const isAdmin = user?.role === "admin";
 
-  const { data: users, isLoading } = useQuery({
+  const { data: users, isLoading, refetch: refetchUsers } = useQuery({
     queryKey: ["/api/users"],
+    staleTime: 0, // Always consider data stale
+    refetchOnWindowFocus: true,
   });
 
   const { data: warehouses } = useQuery({
@@ -77,9 +79,9 @@ export default function UsersManagementPage() {
       password: "",
       name: "",
       email: "",
-      role: "employee",
+      role: "employee" as const,
       managerId: "none",
-      warehouseId: "none",
+      warehouseId: "none", 
       departmentId: "none",
     },
   });
@@ -92,8 +94,9 @@ export default function UsersManagementPage() {
         name: data.name,
         email: data.email,
         role: data.role,
-        managerId: data.managerId,
-        warehouseId: data.warehouseId,
+        managerId: data.managerId === "none" || !data.managerId ? null : parseInt(data.managerId),
+        warehouseId: data.warehouseId === "none" || !data.warehouseId ? null : parseInt(data.warehouseId),
+        departmentId: data.departmentId === "none" || !data.departmentId ? null : parseInt(data.departmentId),
       };
 
       if (isEditMode && editUserId) {
@@ -104,8 +107,10 @@ export default function UsersManagementPage() {
         return res.json();
       }
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+    onSuccess: async () => {
+      // Force immediate cache invalidation and refetch
+      await queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      await refetchUsers();
       toast({
         title: isEditMode ? "User updated" : "User created",
         description: isEditMode
