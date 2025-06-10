@@ -87,6 +87,11 @@ export default function ItemMasterPage() {
     queryKey: ["/api/categories"]
   });
 
+  // Fetch inventory data to calculate total available quantities
+  const { data: inventoryData = [], isLoading: inventoryLoading } = useQuery<any[]>({
+    queryKey: ["/api/reports/inventory-stock"]
+  });
+
   // Log categories when they change
   useEffect(() => {
     console.log("Categories data updated:", categories);
@@ -207,9 +212,18 @@ export default function ItemMasterPage() {
     return category ? category.name : "Uncategorized";
   };
 
+  // Calculate total available quantity for an item across all warehouses
+  const getTotalAvailableQuantity = (itemId: number) => {
+    if (!inventoryData || !Array.isArray(inventoryData) || inventoryData.length === 0) return 0;
+    
+    return inventoryData
+      .filter((inventory: any) => inventory.itemId === itemId)
+      .reduce((total: number, inventory: any) => total + (inventory.quantity || 0), 0);
+  };
+
   const isManager = user?.role === "admin" || user?.role === "manager";
 
-  if (itemsLoading || categoriesLoading) {
+  if (itemsLoading || categoriesLoading || inventoryLoading) {
     return (
       <AppLayout>
         <div className="flex items-center justify-center h-[calc(100vh-200px)]">
@@ -277,6 +291,7 @@ export default function ItemMasterPage() {
                   <TableHead>Description</TableHead>
                   <TableHead>Category</TableHead>
                   <TableHead>Min Stock</TableHead>
+                  <TableHead>Total Available</TableHead>
                   <TableHead>Unit</TableHead>
                   {isManager && <TableHead>Actions</TableHead>}
                 </TableRow>
@@ -284,32 +299,42 @@ export default function ItemMasterPage() {
               <TableBody>
                 {filteredItems.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={isManager ? 7 : 6} className="text-center py-8 text-gray-500">
+                    <TableCell colSpan={isManager ? 8 : 7} className="text-center py-8 text-gray-500">
                       No items found
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredItems.map((item: Item) => (
-                    <TableRow key={item.id}>
-                      <TableCell className="font-medium">{item.sku}</TableCell>
-                      <TableCell>{item.name}</TableCell>
-                      <TableCell className="max-w-xs truncate">{item.description || "—"}</TableCell>
-                      <TableCell>{getCategoryName(item.categoryId)}</TableCell>
-                      <TableCell>{item.minStockLevel}</TableCell>
-                      <TableCell>{item.unit}</TableCell>
-                      {isManager && (
+                  filteredItems.map((item: Item) => {
+                    const totalAvailable = getTotalAvailableQuantity(item.id);
+                    const isLowStock = totalAvailable <= item.minStockLevel;
+                    
+                    return (
+                      <TableRow key={item.id}>
+                        <TableCell className="font-medium">{item.sku}</TableCell>
+                        <TableCell>{item.name}</TableCell>
+                        <TableCell className="max-w-xs truncate">{item.description || "—"}</TableCell>
+                        <TableCell>{getCategoryName(item.categoryId)}</TableCell>
+                        <TableCell>{item.minStockLevel}</TableCell>
                         <TableCell>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleEditItem(item)}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
+                          <span className={`font-medium ${isLowStock ? 'text-red-600' : 'text-green-600'}`}>
+                            {totalAvailable}
+                          </span>
                         </TableCell>
-                      )}
-                    </TableRow>
-                  ))
+                        <TableCell>{item.unit}</TableCell>
+                        {isManager && (
+                          <TableCell>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleEditItem(item)}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
+                        )}
+                      </TableRow>
+                    );
+                  })
                 )}
               </TableBody>
             </Table>
