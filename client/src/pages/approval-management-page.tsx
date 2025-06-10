@@ -173,8 +173,17 @@ export default function ApprovalManagementPage() {
                       </CardTitle>
                       <div className="flex items-center gap-2">
                         {approval.request?.priority && (
-                          <Badge className={getPriorityColor(approval.request.priority)} variant="outline">
-                            {approval.request.priority}
+                          <Badge 
+                            variant="outline" 
+                            className={`${
+                              approval.request.priority === 'urgent' ? 'border-red-500 text-red-700 bg-red-50' :
+                              approval.request.priority === 'high' ? 'border-orange-500 text-orange-700 bg-orange-50' :
+                              'border-green-500 text-green-700 bg-green-50'
+                            }`}
+                          >
+                            {approval.request.priority === 'urgent' ? '🔴 Urgent' :
+                             approval.request.priority === 'high' ? '🟠 High' :
+                             '🟢 Normal'}
                           </Badge>
                         )}
                         <Badge variant="outline">

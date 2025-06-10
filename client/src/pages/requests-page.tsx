@@ -51,6 +51,7 @@ const requestItemSchema = z.object({
 
 const formSchema = z.object({
   warehouseId: z.string().min(1, { message: "Warehouse is required" }),
+  priority: z.string().min(1, { message: "Priority is required" }),
   notes: z.string().optional(),
   items: z.array(requestItemSchema).min(1, { message: "At least one item is required" }),
 });
@@ -95,6 +96,7 @@ export default function RequestsPage() {
     resolver: zodResolver(formSchema),
     defaultValues: {
       warehouseId: user?.warehouseId ? user.warehouseId.toString() : "",
+      priority: "normal",
       notes: "",
       items: [{ itemId: "", quantity: "" }],
     },
@@ -377,6 +379,26 @@ export default function RequestsPage() {
               </div>
 
               <div className="space-y-2">
+                <Label htmlFor="priority">Priority</Label>
+                <Select
+                  onValueChange={(value) => form.setValue("priority", value)}
+                  defaultValue={form.getValues("priority")}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select priority level" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="urgent">🔴 Urgent</SelectItem>
+                    <SelectItem value="high">🟠 High</SelectItem>
+                    <SelectItem value="normal">🟢 Normal</SelectItem>
+                  </SelectContent>
+                </Select>
+                {form.formState.errors.priority && (
+                  <p className="text-sm text-red-500">{form.formState.errors.priority.message}</p>
+                )}
+              </div>
+
+              <div className="space-y-2">
                 <Label htmlFor="notes">Notes</Label>
                 <Textarea
                   id="notes"
@@ -507,6 +529,18 @@ export default function RequestsPage() {
                   <h4 className="text-sm font-medium text-gray-500">Status</h4>
                   <span className={`inline-block mt-1 px-2 py-1 text-xs rounded-full ${getStatusColor(selectedRequest.status)}`}>
                     {selectedRequest.status.charAt(0).toUpperCase() + selectedRequest.status.slice(1)}
+                  </span>
+                </div>
+                <div>
+                  <h4 className="text-sm font-medium text-gray-500">Priority</h4>
+                  <span className={`inline-block mt-1 px-2 py-1 text-xs rounded-full ${
+                    selectedRequest.priority === 'urgent' ? 'bg-red-100 text-red-800' :
+                    selectedRequest.priority === 'high' ? 'bg-orange-100 text-orange-800' :
+                    'bg-green-100 text-green-800'
+                  }`}>
+                    {selectedRequest.priority === 'urgent' ? '🔴 Urgent' :
+                     selectedRequest.priority === 'high' ? '🟠 High' :
+                     '🟢 Normal'}
                   </span>
                 </div>
                 <div>
