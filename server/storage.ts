@@ -1871,6 +1871,34 @@ export class DatabaseStorage implements IStorage {
       .returning();
     return !!deletedTransferUpdate;
   }
+
+  // Inventory quantity update method for transfers
+  async updateInventoryQuantity(itemId: number, warehouseId: number, quantityChange: number): Promise<void> {
+    // Check if inventory record exists
+    const [existingInventory] = await db.select()
+      .from(inventory)
+      .where(and(eq(inventory.itemId, itemId), eq(inventory.warehouseId, warehouseId)));
+
+    if (existingInventory) {
+      // Update existing inventory
+      const newQuantity = Math.max(0, existingInventory.quantity + quantityChange);
+      await db.update(inventory)
+        .set({ 
+          quantity: newQuantity,
+          lastUpdated: new Date()
+        })
+        .where(and(eq(inventory.itemId, itemId), eq(inventory.warehouseId, warehouseId)));
+    } else if (quantityChange > 0) {
+      // Create new inventory record if adding quantity
+      await db.insert(inventory).values({
+        itemId,
+        warehouseId,
+        quantity: quantityChange,
+        lastUpdated: new Date()
+      });
+    }
+    // If quantityChange is negative and no existing inventory, do nothing
+  }
 }
 
 // Use the database storage implementation

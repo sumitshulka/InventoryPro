@@ -489,28 +489,36 @@ export default function EnhancedTransfersPage() {
                                     <CheckCircle className="h-4 w-4" />
                                   </Button>
                                 )}
-                                {transfer.status === "approved" && (
+                                {transfer.status === "approved" && user?.warehouseId === transfer.sourceWarehouseId && (
                                   <Button
                                     variant="ghost"
                                     size="sm"
                                     className="text-blue-600"
-                                    onClick={() => handleUpdateStatus(transfer.id, "in-transit", {
-                                      actualShipmentDate: new Date(),
-                                      updateDescription: "Transfer marked as in-transit"
-                                    })}
+                                    onClick={() => {
+                                      setSelectedTransfer(transfer);
+                                      setReceiptDialogOpen(true);
+                                    }}
+                                    title="Add receipt and handover details"
                                   >
-                                    <Truck className="h-4 w-4" />
+                                    <FileText className="h-4 w-4" />
                                   </Button>
                                 )}
-                                {transfer.status === "in-transit" && (
+                                {transfer.status === "in-transit" && user?.warehouseId === transfer.destinationWarehouseId && (
                                   <Button
                                     variant="ghost"
                                     size="sm"
                                     className="text-green-600"
-                                    onClick={() => handleUpdateStatus(transfer.id, "completed", {
-                                      actualArrivalDate: new Date(),
-                                      updateDescription: "Transfer completed"
-                                    })}
+                                    onClick={() => {
+                                      setSelectedTransfer(transfer);
+                                      acceptanceForm.setValue('items', transfer.items?.map((item: any) => ({
+                                        itemId: item.itemId,
+                                        actualQuantity: item.requestedQuantity,
+                                        condition: 'good',
+                                        notes: ''
+                                      })) || []);
+                                      setAcceptanceDialogOpen(true);
+                                    }}
+                                    title="Accept or return transfer"
                                   >
                                     <Package className="h-4 w-4" />
                                   </Button>
@@ -949,6 +957,202 @@ export default function EnhancedTransfersPage() {
             </DialogContent>
           </Dialog>
         )}
+
+        {/* Receipt Management Dialog */}
+        <Dialog open={receiptDialogOpen} onOpenChange={setReceiptDialogOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Add Receipt Details</DialogTitle>
+              <DialogDescription>
+                Enter receipt number, handover date, and any additional notes for this transfer.
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={receiptForm.handleSubmit(handleReceiptSubmit)} className="space-y-4">
+              <div>
+                <Label htmlFor="receiptNumber">Receipt Number</Label>
+                <Input
+                  id="receiptNumber"
+                  {...receiptForm.register("receiptNumber")}
+                  placeholder="Enter receipt number"
+                />
+                {receiptForm.formState.errors.receiptNumber && (
+                  <p className="text-sm text-red-600 mt-1">
+                    {receiptForm.formState.errors.receiptNumber.message}
+                  </p>
+                )}
+              </div>
+              <div>
+                <Label htmlFor="handoverDate">Handover Date</Label>
+                <Input
+                  id="handoverDate"
+                  type="datetime-local"
+                  {...receiptForm.register("handoverDate")}
+                />
+                {receiptForm.formState.errors.handoverDate && (
+                  <p className="text-sm text-red-600 mt-1">
+                    {receiptForm.formState.errors.handoverDate.message}
+                  </p>
+                )}
+              </div>
+              <div>
+                <Label htmlFor="receiptNotes">Notes (Optional)</Label>
+                <Textarea
+                  id="receiptNotes"
+                  {...receiptForm.register("notes")}
+                  placeholder="Any additional notes or instructions"
+                  rows={3}
+                />
+              </div>
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setReceiptDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={updateTransferMutation.isPending}>
+                  {updateTransferMutation.isPending ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Updating...
+                    </>
+                  ) : (
+                    "Submit Receipt"
+                  )}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Transfer Acceptance Dialog */}
+        <Dialog open={acceptanceDialogOpen} onOpenChange={setAcceptanceDialogOpen}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Accept or Return Transfer</DialogTitle>
+              <DialogDescription>
+                Review the received items and specify their condition. You can accept the transfer or return it if there are issues.
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={acceptanceForm.handleSubmit(handleAcceptanceSubmit)} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="receivedDate">Date Received</Label>
+                  <Input
+                    id="receivedDate"
+                    type="datetime-local"
+                    {...acceptanceForm.register("receivedDate")}
+                  />
+                  {acceptanceForm.formState.errors.receivedDate && (
+                    <p className="text-sm text-red-600 mt-1">
+                      {acceptanceForm.formState.errors.receivedDate.message}
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <Label htmlFor="overallCondition">Overall Condition</Label>
+                  <Select
+                    value={acceptanceForm.watch("overallCondition")}
+                    onValueChange={(value) => acceptanceForm.setValue("overallCondition", value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="good">Good - Accept Transfer</SelectItem>
+                      <SelectItem value="damaged">Damaged - Some Issues</SelectItem>
+                      <SelectItem value="mixed">Mixed - Partial Issues</SelectItem>
+                      <SelectItem value="rejected">Rejected - Return Transfer</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {acceptanceForm.formState.errors.overallCondition && (
+                    <p className="text-sm text-red-600 mt-1">
+                      {acceptanceForm.formState.errors.overallCondition.message}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* Item Details */}
+              <div>
+                <Label>Item Details</Label>
+                <div className="mt-2 space-y-3 max-h-60 overflow-y-auto border rounded-md p-3">
+                  {selectedTransfer?.items?.map((item: any, index: number) => (
+                    <div key={item.itemId} className="grid grid-cols-4 gap-3 items-center p-2 bg-gray-50 rounded">
+                      <div>
+                        <p className="font-medium text-sm">{getItemName(item.itemId)}</p>
+                        <p className="text-xs text-gray-500">Qty: {item.requestedQuantity}</p>
+                      </div>
+                      <div>
+                        <Label className="text-xs">Actual Qty</Label>
+                        <Input
+                          type="number"
+                          min="0"
+                          defaultValue={item.requestedQuantity}
+                          {...acceptanceForm.register(`items.${index}.actualQuantity`, { valueAsNumber: true })}
+                          className="h-8"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs">Condition</Label>
+                        <Select
+                          defaultValue="good"
+                          onValueChange={(value) => acceptanceForm.setValue(`items.${index}.condition`, value)}
+                        >
+                          <SelectTrigger className="h-8">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="good">Good</SelectItem>
+                            <SelectItem value="damaged">Damaged</SelectItem>
+                            <SelectItem value="missing">Missing</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label className="text-xs">Notes</Label>
+                        <Input
+                          {...acceptanceForm.register(`items.${index}.notes`)}
+                          placeholder="Item notes"
+                          className="h-8"
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <Label htmlFor="receiverNotes">Receiver Notes</Label>
+                <Textarea
+                  id="receiverNotes"
+                  {...acceptanceForm.register("receiverNotes")}
+                  placeholder="Overall notes about the received transfer"
+                  rows={3}
+                />
+              </div>
+
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setAcceptanceDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button 
+                  type="submit" 
+                  disabled={updateTransferMutation.isPending}
+                  className={acceptanceForm.watch("overallCondition") === "rejected" ? "bg-red-600 hover:bg-red-700" : ""}
+                >
+                  {updateTransferMutation.isPending ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Processing...
+                    </>
+                  ) : acceptanceForm.watch("overallCondition") === "rejected" ? (
+                    "Return Transfer"
+                  ) : (
+                    "Accept Transfer"
+                  )}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
       </div>
     </AppLayout>
   );

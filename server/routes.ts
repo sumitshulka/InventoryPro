@@ -2049,7 +2049,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const allowedFields = [
         'status', 'transferMode', 'expectedShipmentDate', 'expectedArrivalDate',
         'actualShipmentDate', 'actualArrivalDate', 'courierName', 'trackingNumber',
-        'receiptNumber', 'handoverPersonName', 'handoverPersonContact', 'notes'
+        'receiptNumber', 'handoverPersonName', 'handoverPersonContact', 'handoverDate',
+        'receiptDocument', 'receivedBy', 'receivedDate', 'receiverNotes', 'overallCondition', 'notes'
       ];
       
       const filteredData: any = {};
@@ -2072,8 +2073,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (filteredData.actualArrivalDate) {
         filteredData.actualArrivalDate = new Date(filteredData.actualArrivalDate);
       }
+      if (filteredData.handoverDate) {
+        filteredData.handoverDate = new Date(filteredData.handoverDate);
+      }
+      if (filteredData.receivedDate) {
+        filteredData.receivedDate = new Date(filteredData.receivedDate);
+      }
 
       const updatedTransfer = await storage.updateTransfer(transferId, filteredData);
+
+      // Handle inventory updates when transfer is completed (accepted)
+      if (filteredData.status === 'completed' && updatedTransfer) {
+        const transferItems = await storage.getTransferItemsByTransfer(transferId);
+        if (transferItems && transferItems.length > 0) {
+          // Update inventory for accepted items
+          for (const item of transferItems) {
+            // Remove from source warehouse
+            await storage.updateInventoryQuantity(
+              item.itemId, 
+              updatedTransfer.sourceWarehouseId, 
+              -item.requestedQuantity
+            );
+            
+            // Add to destination warehouse
+            await storage.updateInventoryQuantity(
+              item.itemId, 
+              updatedTransfer.destinationWarehouseId, 
+              item.actualQuantity || item.requestedQuantity
+            );
+
+            // Create transaction records for transfer out
+            await storage.createTransaction({
+              itemId: item.itemId,
+              warehouseId: updatedTransfer.sourceWarehouseId,
+              userId: req.user!.id,
+              transactionType: 'check-out',
+              quantity: item.requestedQuantity,
+              notes: `Transfer out via ${updatedTransfer.transferCode}`,
+            });
+
+            // Create transaction records for transfer in
+            await storage.createTransaction({
+              itemId: item.itemId,
+              warehouseId: updatedTransfer.destinationWarehouseId,
+              userId: filteredData.receivedBy || req.user!.id,
+              transactionType: 'check-in',
+              quantity: item.actualQuantity || item.requestedQuantity,
+              notes: `Transfer in via ${updatedTransfer.transferCode}`,
+            });
+          }
+        }
+      }
 
       if (!updatedTransfer) {
         return res.status(404).json({ message: "Transfer not found" });
