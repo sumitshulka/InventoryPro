@@ -302,6 +302,12 @@ export const transfers = pgTable("transfers", {
   receiptNumber: text("receipt_number"),
   handoverPersonName: text("handover_person_name"),
   handoverPersonContact: text("handover_person_contact"),
+  handoverDate: timestamp("handover_date"),
+  receiptDocument: text("receipt_document"), // file path or URL to uploaded receipt
+  receivedBy: integer("received_by"), // destination warehouse manager who received
+  receivedDate: timestamp("received_date"),
+  receiverNotes: text("receiver_notes"),
+  overallCondition: text("overall_condition").default("good"), // good, damaged, mixed
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at"),

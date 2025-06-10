@@ -79,11 +79,34 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>;
 
+const receiptSchema = z.object({
+  receiptNumber: z.string().min(1, "Receipt number is required"),
+  handoverDate: z.string().min(1, "Handover date is required"),
+  notes: z.string().optional(),
+});
+
+const acceptanceSchema = z.object({
+  receivedDate: z.string().min(1, "Received date is required"),
+  overallCondition: z.string().min(1, "Overall condition is required"),
+  receiverNotes: z.string().optional(),
+  items: z.array(z.object({
+    itemId: z.number(),
+    actualQuantity: z.number().min(0, "Quantity cannot be negative"),
+    condition: z.string().min(1, "Condition is required"),
+    notes: z.string().optional(),
+  })),
+});
+
+type ReceiptFormValues = z.infer<typeof receiptSchema>;
+type AcceptanceFormValues = z.infer<typeof acceptanceSchema>;
+
 export default function EnhancedTransfersPage() {
   const { toast } = useToast();
   const { user } = useAuth();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
+  const [receiptDialogOpen, setReceiptDialogOpen] = useState(false);
+  const [acceptanceDialogOpen, setAcceptanceDialogOpen] = useState(false);
   const [selectedTransfer, setSelectedTransfer] = useState<any>(null);
   const [activeTab, setActiveTab] = useState("all");
 
@@ -123,6 +146,25 @@ export default function EnhancedTransfersPage() {
   const { fields, append, remove } = useFieldArray({
     control: form.control,
     name: "items",
+  });
+
+  const receiptForm = useForm<ReceiptFormValues>({
+    resolver: zodResolver(receiptSchema),
+    defaultValues: {
+      receiptNumber: "",
+      handoverDate: "",
+      notes: "",
+    },
+  });
+
+  const acceptanceForm = useForm<AcceptanceFormValues>({
+    resolver: zodResolver(acceptanceSchema),
+    defaultValues: {
+      receivedDate: "",
+      overallCondition: "good",
+      receiverNotes: "",
+      items: [],
+    },
   });
 
   const createTransferMutation = useMutation({
@@ -221,6 +263,43 @@ export default function EnhancedTransfersPage() {
       updateDescription: `Status changed to ${newStatus}`,
       ...updateData,
     });
+  };
+
+  const handleReceiptSubmit = (data: ReceiptFormValues) => {
+    if (!selectedTransfer) return;
+    
+    updateTransferMutation.mutate({
+      id: selectedTransfer.id,
+      receiptNumber: data.receiptNumber,
+      handoverDate: new Date(data.handoverDate),
+      status: 'in-transit',
+      notes: data.notes,
+      updateType: 'receipt_info',
+      updateDescription: 'Receipt information updated',
+    });
+    
+    setReceiptDialogOpen(false);
+    receiptForm.reset();
+  };
+
+  const handleAcceptanceSubmit = (data: AcceptanceFormValues) => {
+    if (!selectedTransfer) return;
+    
+    const isAccepted = data.overallCondition !== 'rejected';
+    
+    updateTransferMutation.mutate({
+      id: selectedTransfer.id,
+      receivedBy: user?.id,
+      receivedDate: new Date(data.receivedDate),
+      overallCondition: data.overallCondition,
+      receiverNotes: data.receiverNotes,
+      status: isAccepted ? 'completed' : 'returned',
+      updateType: 'receipt_confirmation',
+      updateDescription: isAccepted ? 'Transfer completed and accepted' : 'Transfer returned due to issues',
+    });
+    
+    setAcceptanceDialogOpen(false);
+    acceptanceForm.reset();
   };
 
   const getItemName = (itemId: number) => {
