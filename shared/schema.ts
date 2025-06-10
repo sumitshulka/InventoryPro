@@ -73,6 +73,24 @@ export const insertWarehouseSchema = createInsertSchema(warehouses).pick({
   isActive: true,
 });
 
+// Warehouse Operators - maps users to warehouses as operators
+export const warehouseOperators = pgTable("warehouse_operators", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id),
+  warehouseId: integer("warehouse_id").notNull().references(() => warehouses.id),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  // Ensure a user can't be added as operator to same warehouse multiple times
+  uniqueUserWarehouse: unique().on(table.userId, table.warehouseId),
+}));
+
+export const insertWarehouseOperatorSchema = createInsertSchema(warehouseOperators).pick({
+  userId: true,
+  warehouseId: true,
+  isActive: true,
+});
+
 // Items master
 export const items = pgTable("items", {
   id: serial("id").primaryKey(),
@@ -273,3 +291,6 @@ export type InsertApprovalSettings = z.infer<typeof insertApprovalSettingsSchema
 
 export type RequestApproval = typeof requestApprovals.$inferSelect;
 export type InsertRequestApproval = z.infer<typeof insertRequestApprovalSchema>;
+
+export type WarehouseOperator = typeof warehouseOperators.$inferSelect;
+export type InsertWarehouseOperator = z.infer<typeof insertWarehouseOperatorSchema>;

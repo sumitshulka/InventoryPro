@@ -19,6 +19,8 @@ import {
   InsertApprovalSettings,
   RequestApproval,
   InsertRequestApproval,
+  WarehouseOperator,
+  InsertWarehouseOperator,
   TransactionType,
   users,
   categories,
@@ -29,7 +31,8 @@ import {
   requests,
   requestItems,
   approvalSettings,
-  requestApprovals
+  requestApprovals,
+  warehouseOperators
 } from "@shared/schema";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
@@ -125,6 +128,17 @@ export interface IStorage {
   createRequestApproval(approval: InsertRequestApproval): Promise<RequestApproval>;
   updateRequestApproval(id: number, approvalData: Partial<InsertRequestApproval>): Promise<RequestApproval | undefined>;
   deleteRequestApproval(id: number): Promise<boolean>;
+
+  // Warehouse Operator operations
+  getWarehouseOperator(id: number): Promise<WarehouseOperator | undefined>;
+  getWarehouseOperatorsByUser(userId: number): Promise<WarehouseOperator[]>;
+  getWarehouseOperatorsByWarehouse(warehouseId: number): Promise<WarehouseOperator[]>;
+  createWarehouseOperator(operator: InsertWarehouseOperator): Promise<WarehouseOperator>;
+  getAllWarehouseOperators(): Promise<WarehouseOperator[]>;
+  updateWarehouseOperator(id: number, operatorData: Partial<InsertWarehouseOperator>): Promise<WarehouseOperator | undefined>;
+  deleteWarehouseOperator(id: number): Promise<boolean>;
+  isUserWarehouseOperator(userId: number, warehouseId: number): Promise<boolean>;
+  getUserOperatedWarehouses(userId: number): Promise<number[]>;
 
   // Hierarchy and Approval Workflow helpers
   getUserManager(userId: number): Promise<User | undefined>;
@@ -1421,6 +1435,66 @@ export class DatabaseStorage implements IStorage {
       .where(eq(requestApprovals.id, id))
       .returning();
     return !!deletedApproval;
+  }
+
+  // Warehouse Operator operations
+  async getWarehouseOperator(id: number): Promise<WarehouseOperator | undefined> {
+    const [operator] = await db.select().from(warehouseOperators).where(eq(warehouseOperators.id, id));
+    return operator || undefined;
+  }
+
+  async getWarehouseOperatorsByUser(userId: number): Promise<WarehouseOperator[]> {
+    return await db.select().from(warehouseOperators)
+      .where(and(eq(warehouseOperators.userId, userId), eq(warehouseOperators.isActive, true)));
+  }
+
+  async getWarehouseOperatorsByWarehouse(warehouseId: number): Promise<WarehouseOperator[]> {
+    return await db.select().from(warehouseOperators)
+      .where(and(eq(warehouseOperators.warehouseId, warehouseId), eq(warehouseOperators.isActive, true)));
+  }
+
+  async createWarehouseOperator(operator: InsertWarehouseOperator): Promise<WarehouseOperator> {
+    const [newOperator] = await db.insert(warehouseOperators).values({
+      ...operator,
+      createdAt: new Date()
+    }).returning();
+    return newOperator;
+  }
+
+  async getAllWarehouseOperators(): Promise<WarehouseOperator[]> {
+    return await db.select().from(warehouseOperators).where(eq(warehouseOperators.isActive, true));
+  }
+
+  async updateWarehouseOperator(id: number, operatorData: Partial<InsertWarehouseOperator>): Promise<WarehouseOperator | undefined> {
+    const [updatedOperator] = await db.update(warehouseOperators)
+      .set(operatorData)
+      .where(eq(warehouseOperators.id, id))
+      .returning();
+    return updatedOperator || undefined;
+  }
+
+  async deleteWarehouseOperator(id: number): Promise<boolean> {
+    const [deletedOperator] = await db.delete(warehouseOperators)
+      .where(eq(warehouseOperators.id, id))
+      .returning();
+    return !!deletedOperator;
+  }
+
+  async isUserWarehouseOperator(userId: number, warehouseId: number): Promise<boolean> {
+    const [operator] = await db.select().from(warehouseOperators)
+      .where(and(
+        eq(warehouseOperators.userId, userId),
+        eq(warehouseOperators.warehouseId, warehouseId),
+        eq(warehouseOperators.isActive, true)
+      ));
+    return !!operator;
+  }
+
+  async getUserOperatedWarehouses(userId: number): Promise<number[]> {
+    const operators = await db.select({ warehouseId: warehouseOperators.warehouseId })
+      .from(warehouseOperators)
+      .where(and(eq(warehouseOperators.userId, userId), eq(warehouseOperators.isActive, true)));
+    return operators.map(op => op.warehouseId);
   }
 
   // User hierarchy operations
