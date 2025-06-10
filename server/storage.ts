@@ -161,6 +161,7 @@ export class MemStorage implements IStorage {
   private requestItems: Map<number, RequestItem>;
   private approvalSettingsMap: Map<number, ApprovalSettings>;
   private requestApprovalsMap: Map<number, RequestApproval>;
+  private warehouseOperatorsMap: Map<number, WarehouseOperator>;
   
   private userIdCounter: number;
   private categoryIdCounter: number;
@@ -172,6 +173,7 @@ export class MemStorage implements IStorage {
   private requestItemIdCounter: number;
   private approvalSettingsIdCounter: number;
   private requestApprovalIdCounter: number;
+  private warehouseOperatorIdCounter: number;
   
   sessionStore: session.Store;
 
@@ -186,6 +188,7 @@ export class MemStorage implements IStorage {
     this.requestItems = new Map();
     this.approvalSettingsMap = new Map();
     this.requestApprovalsMap = new Map();
+    this.warehouseOperatorsMap = new Map();
     
     this.userIdCounter = 1;
     this.categoryIdCounter = 1;
@@ -197,6 +200,7 @@ export class MemStorage implements IStorage {
     this.requestItemIdCounter = 1;
     this.approvalSettingsIdCounter = 1;
     this.requestApprovalIdCounter = 1;
+    this.warehouseOperatorIdCounter = 1;
     
     this.sessionStore = new MemoryStore({
       checkPeriod: 86400000,
@@ -463,7 +467,8 @@ export class MemStorage implements IStorage {
       createdAt,
       role: user.role || 'user',
       managerId: user.managerId || null,
-      warehouseId: user.warehouseId || null
+      warehouseId: user.warehouseId || null,
+      departmentId: user.departmentId || null
     };
     this.users.set(id, newUser);
     return newUser;
@@ -999,6 +1004,61 @@ export class MemStorage implements IStorage {
     }
     
     return false;
+  }
+
+  // Warehouse Operator operations
+  async getWarehouseOperator(id: number): Promise<WarehouseOperator | undefined> {
+    return this.warehouseOperatorsMap.get(id);
+  }
+
+  async getWarehouseOperatorsByUser(userId: number): Promise<WarehouseOperator[]> {
+    return Array.from(this.warehouseOperatorsMap.values())
+      .filter(op => op.userId === userId && op.isActive);
+  }
+
+  async getWarehouseOperatorsByWarehouse(warehouseId: number): Promise<WarehouseOperator[]> {
+    return Array.from(this.warehouseOperatorsMap.values())
+      .filter(op => op.warehouseId === warehouseId && op.isActive);
+  }
+
+  async createWarehouseOperator(operator: InsertWarehouseOperator): Promise<WarehouseOperator> {
+    const newOperator: WarehouseOperator = {
+      id: this.warehouseOperatorIdCounter++,
+      ...operator,
+      isActive: operator.isActive ?? true,
+      createdAt: new Date()
+    };
+    this.warehouseOperatorsMap.set(newOperator.id, newOperator);
+    return newOperator;
+  }
+
+  async getAllWarehouseOperators(): Promise<WarehouseOperator[]> {
+    return Array.from(this.warehouseOperatorsMap.values())
+      .filter(op => op.isActive);
+  }
+
+  async updateWarehouseOperator(id: number, operatorData: Partial<InsertWarehouseOperator>): Promise<WarehouseOperator | undefined> {
+    const operator = this.warehouseOperatorsMap.get(id);
+    if (!operator) return undefined;
+    
+    const updatedOperator = { ...operator, ...operatorData };
+    this.warehouseOperatorsMap.set(id, updatedOperator);
+    return updatedOperator;
+  }
+
+  async deleteWarehouseOperator(id: number): Promise<boolean> {
+    return this.warehouseOperatorsMap.delete(id);
+  }
+
+  async isUserWarehouseOperator(userId: number, warehouseId: number): Promise<boolean> {
+    return Array.from(this.warehouseOperatorsMap.values())
+      .some(op => op.userId === userId && op.warehouseId === warehouseId && op.isActive);
+  }
+
+  async getUserOperatedWarehouses(userId: number): Promise<number[]> {
+    return Array.from(this.warehouseOperatorsMap.values())
+      .filter(op => op.userId === userId && op.isActive)
+      .map(op => op.warehouseId);
   }
 }
 
