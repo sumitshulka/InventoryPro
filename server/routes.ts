@@ -1106,6 +1106,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Approve or reject approval request
+  app.patch("/api/approvals/:id/:action", async (req: Request, res: Response) => {
+    try {
+      const { id, action } = req.params;
+      const { notes } = req.body;
+
+      if (!req.user) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      if (!['approve', 'reject'].includes(action)) {
+        return res.status(400).json({ message: "Invalid action. Must be 'approve' or 'reject'" });
+      }
+
+      const approvalId = parseInt(id, 10);
+      if (isNaN(approvalId)) {
+        return res.status(400).json({ message: "Invalid approval ID" });
+      }
+
+      // Get the approval record
+      const approval = await storage.getRequestApproval(approvalId);
+      if (!approval) {
+        return res.status(404).json({ message: "Approval not found" });
+      }
+
+      // Check if user has permission to approve this request
+      if (approval.approverId !== req.user.id) {
+        return res.status(403).json({ message: "Not authorized to approve this request" });
+      }
+
+      // Check if already processed
+      if (approval.status !== 'pending') {
+        return res.status(400).json({ message: "Approval already processed" });
+      }
+
+      // Update approval record
+      const updatedApproval = await storage.updateRequestApproval(approvalId, {
+        status: action === 'approve' ? 'approved' : 'rejected',
+        approvedAt: new Date().toISOString(),
+        notes: notes || null
+      });
+
+      // Update request status based on approval
+      const request = await storage.getRequest(approval.requestId);
+      if (request) {
+        let newStatus = action === 'approve' ? 'approved' : 'rejected';
+        await storage.updateRequest(approval.requestId, { status: newStatus });
+      }
+
+      res.json(updatedApproval);
+    } catch (error: any) {
+      console.error("Error processing approval:", error);
+      res.status(500).json({ message: "Failed to process approval" });
+    }
+  });
+
   // Export transactions to CSV
   app.get("/api/export/transactions", async (req, res) => {
     try {
