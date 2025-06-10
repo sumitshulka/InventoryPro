@@ -736,8 +736,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Create approval records based on user hierarchy and approval settings
       try {
-        // For regular users, get their manager for approval
-        if (req.user!.role === "user") {
+        // For employees, get their manager for approval
+        if (req.user!.role === "employee") {
           const manager = await storage.getUserManager(req.user!.id);
           if (manager) {
             await storage.createRequestApproval({
@@ -774,7 +774,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
           }
         }
-        // Admins can auto-approve their own requests
+        // Admins can auto-approve their own requests (no approval record needed)
       } catch (error) {
         console.error("Error creating approval records:", error);
       }
