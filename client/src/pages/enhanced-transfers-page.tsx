@@ -61,7 +61,7 @@ import { formatDateTime, getStatusColor } from "@/lib/utils";
 
 const transferItemSchema = z.object({
   itemId: z.string().min(1, { message: "Item is required" }),
-  requestedQuantity: z.string().min(1, { message: "Quantity is required" }).transform(val => parseInt(val)),
+  requestedQuantity: z.string().min(1, { message: "Quantity is required" }),
 });
 
 const formSchema = z.object({
@@ -115,7 +115,7 @@ export default function EnhancedTransfersPage() {
       handoverPersonName: "",
       handoverPersonContact: "",
       notes: "",
-      items: [{ itemId: "", requestedQuantity: "" }],
+      items: [{ itemId: "", requestedQuantity: "1" }],
     },
   });
 
@@ -598,11 +598,20 @@ export default function EnhancedTransfersPage() {
                               <SelectValue placeholder="Select an item" />
                             </SelectTrigger>
                             <SelectContent>
-                              {items?.map((item: any) => (
-                                <SelectItem key={item.id} value={item.id.toString()}>
-                                  {item.name} ({item.sku})
-                                </SelectItem>
-                              ))}
+                              {(items && Array.isArray(items) ? items : []).map((item: any) => {
+                                const sourceWarehouseId = parseInt(form.watch("sourceWarehouseId") || "0");
+                                const availableQty = getItemQuantity(item.id, sourceWarehouseId);
+                                return (
+                                  <SelectItem key={item.id} value={item.id.toString()}>
+                                    <div className="flex justify-between items-center w-full">
+                                      <span>{item.name} ({item.sku})</span>
+                                      <span className={`ml-2 text-sm ${availableQty > 0 ? 'text-green-600' : 'text-red-500'}`}>
+                                        Available: {availableQty}
+                                      </span>
+                                    </div>
+                                  </SelectItem>
+                                );
+                              })}
                             </SelectContent>
                           </Select>
                         </div>
