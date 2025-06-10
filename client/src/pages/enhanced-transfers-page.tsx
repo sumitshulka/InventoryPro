@@ -95,6 +95,10 @@ export default function EnhancedTransfersPage() {
     queryKey: ["/api/items"],
   });
 
+  const { data: inventory } = useQuery({
+    queryKey: ["/api/inventory"],
+  });
+
   const { data: warehouses, isLoading: warehousesLoading } = useQuery({
     queryKey: ["/api/warehouses"],
   });
@@ -130,14 +134,21 @@ export default function EnhancedTransfersPage() {
         destinationWarehouseId: parseInt(data.destinationWarehouseId),
         items: data.items.map(item => ({
           itemId: parseInt(item.itemId),
-          requestedQuantity: item.requestedQuantity,
+          requestedQuantity: typeof item.requestedQuantity === 'string' ? parseInt(item.requestedQuantity) : item.requestedQuantity,
         })),
       };
 
-      return apiRequest("/api/transfers", {
+      const response = await fetch("/api/transfers", {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(transferData),
       });
+
+      if (!response.ok) {
+        throw new Error(`Failed to create transfer: ${response.statusText}`);
+      }
+
+      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/transfers"] });
@@ -159,10 +170,17 @@ export default function EnhancedTransfersPage() {
 
   const updateTransferMutation = useMutation({
     mutationFn: async ({ id, ...data }: any) => {
-      return apiRequest(`/api/transfers/${id}`, {
+      const response = await fetch(`/api/transfers/${id}`, {
         method: "PATCH",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       });
+
+      if (!response.ok) {
+        throw new Error(`Failed to update transfer: ${response.statusText}`);
+      }
+
+      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/transfers"] });
@@ -195,13 +213,23 @@ export default function EnhancedTransfersPage() {
   };
 
   const getItemName = (itemId: number) => {
-    const item = items?.find((i: any) => i.id === itemId);
+    if (!items || !Array.isArray(items)) return `Item #${itemId}`;
+    const item = items.find((i: any) => i.id === itemId);
     return item ? item.name : `Item #${itemId}`;
   };
 
   const getWarehouseName = (warehouseId: number) => {
-    const warehouse = warehouses?.find((w: any) => w.id === warehouseId);
+    if (!warehouses || !Array.isArray(warehouses)) return `Warehouse #${warehouseId}`;
+    const warehouse = warehouses.find((w: any) => w.id === warehouseId);
     return warehouse ? warehouse.name : `Warehouse #${warehouseId}`;
+  };
+
+  const getItemQuantity = (itemId: number, warehouseId: number) => {
+    if (!inventory || !Array.isArray(inventory)) return 0;
+    const inventoryItem = inventory.find((inv: any) => 
+      inv.itemId === itemId && inv.warehouseId === warehouseId
+    );
+    return inventoryItem ? inventoryItem.quantity : 0;
   };
 
   const getStatusBadge = (status: string) => {
@@ -237,7 +265,7 @@ export default function EnhancedTransfersPage() {
     }
   };
 
-  const filteredTransfers = transfers?.filter((transfer: any) => {
+  const filteredTransfers = (transfers && Array.isArray(transfers) ? transfers : []).filter((transfer: any) => {
     switch (activeTab) {
       case "pending":
         return transfer.status === "pending" || transfer.status === "approved";
@@ -248,7 +276,7 @@ export default function EnhancedTransfersPage() {
       default:
         return true;
     }
-  }) || [];
+  });
 
   return (
     <AppLayout>
