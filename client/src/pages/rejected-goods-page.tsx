@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { AlertTriangle, Package, Warehouse, Calendar, User, RefreshCw, CheckCircle, XCircle } from "lucide-react";
-import { AppLayout } from "@/components/layout/AppLayout";
+import AppLayout from "@/components/layout/app-layout";
 import { formatDateTime } from "@/lib/utils";
 import { formatNumber } from "@/lib/formatters";
 import { apiRequest } from "@/lib/queryClient";
@@ -58,10 +58,13 @@ export default function RejectedGoodsPage() {
 
   const updateStatusMutation = useMutation({
     mutationFn: async ({ id, status, notes }: { id: number; status: string; notes?: string }) => {
-      return apiRequest(`/api/rejected-goods/${id}`, {
+      const response = await fetch(`/api/rejected-goods/${id}`, {
         method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status, notes }),
       });
+      if (!response.ok) throw new Error('Failed to update status');
+      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/rejected-goods'] });
@@ -106,7 +109,7 @@ export default function RejectedGoodsPage() {
   const handleStatusUpdate = () => {
     if (!selectedItem) return;
 
-    let newStatus = actionType;
+    let newStatus: string = actionType;
     if (actionType === 'dispose') newStatus = 'disposed';
     if (actionType === 'return') newStatus = 'returned';
     if (actionType === 'restock') newStatus = 'restocked';

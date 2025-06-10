@@ -11,6 +11,7 @@ import CheckInPage from "@/pages/check-in-page";
 import RequestsPage from "@/pages/requests-page";
 import EnhancedTransfersPage from "@/pages/enhanced-transfers-page";
 import TransferNotificationsPage from "@/pages/transfer-notifications-page";
+import RejectedGoodsPage from "@/pages/rejected-goods-page";
 import MyRequestsPage from "@/pages/my-requests-page";
 import StockReportPage from "@/pages/stock-report-page";
 import MovementReportPage from "@/pages/movement-report-page";
@@ -47,6 +48,7 @@ function Router() {
       <ProtectedRoute path="/requests" component={RequestsPage} />
       <ProtectedRoute path="/transfers" component={EnhancedTransfersPage} />
       <ProtectedRoute path="/transfer-notifications" component={TransferNotificationsPage} />
+      <ProtectedRoute path="/rejected-goods" component={RejectedGoodsPage} />
       <ProtectedRoute path="/my-requests" component={MyRequestsPage} />
       <ProtectedRoute path="/stock-report" component={StockReportPage} />
       <ProtectedRoute path="/movement-report" component={MovementReportPage} />
