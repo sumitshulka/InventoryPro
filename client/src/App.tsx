@@ -9,7 +9,7 @@ import ItemMasterPage from "@/pages/item-master-page";
 import WarehousesPage from "@/pages/warehouses-page";
 import CheckInPage from "@/pages/check-in-page";
 import RequestsPage from "@/pages/requests-page";
-import TransfersPage from "@/pages/transfers-page";
+import EnhancedTransfersPage from "@/pages/enhanced-transfers-page";
 import TransferNotificationsPage from "@/pages/transfer-notifications-page";
 import MyRequestsPage from "@/pages/my-requests-page";
 import StockReportPage from "@/pages/stock-report-page";
@@ -45,7 +45,7 @@ function Router() {
       <ProtectedRoute path="/warehouses" component={WarehousesPage} />
       <ProtectedRoute path="/check-in" component={CheckInPage} />
       <ProtectedRoute path="/requests" component={RequestsPage} />
-      <ProtectedRoute path="/transfers" component={TransfersPage} />
+      <ProtectedRoute path="/transfers" component={EnhancedTransfersPage} />
       <ProtectedRoute path="/transfer-notifications" component={TransferNotificationsPage} />
       <ProtectedRoute path="/my-requests" component={MyRequestsPage} />
       <ProtectedRoute path="/stock-report" component={StockReportPage} />

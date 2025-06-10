@@ -14,6 +14,9 @@ import {
   insertDepartmentSchema,
   insertUserSchema,
   insertWarehouseOperatorSchema,
+  insertTransferSchema,
+  insertTransferItemSchema,
+  insertTransferUpdateSchema,
   departments,
   organizationSettings
 } from "@shared/schema";
@@ -1866,6 +1869,231 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const warehouseId = parseInt(req.params.warehouseId);
       const isOperator = await storage.isUserWarehouseOperator(userId, warehouseId);
       res.json({ isOperator });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Enhanced Transfer Management Routes
+  
+  // Get all transfers with enriched data
+  app.get("/api/transfers", async (req, res) => {
+    try {
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const transfers = await storage.getAllTransfers();
+      
+      // Enrich transfers with additional data
+      const enrichedTransfers = await Promise.all(transfers.map(async (transfer) => {
+        const sourceWarehouse = await storage.getWarehouse(transfer.sourceWarehouseId);
+        const destinationWarehouse = await storage.getWarehouse(transfer.destinationWarehouseId);
+        const initiatedByUser = await storage.getUser(transfer.initiatedBy);
+        const approvedByUser = transfer.approvedBy ? await storage.getUser(transfer.approvedBy) : null;
+        const transferItems = await storage.getTransferItemsByTransfer(transfer.id);
+        
+        // Enrich transfer items with item details
+        const enrichedItems = await Promise.all(transferItems.map(async (item) => {
+          const itemDetails = await storage.getItem(item.itemId);
+          return { ...item, item: itemDetails };
+        }));
+
+        return {
+          ...transfer,
+          sourceWarehouse,
+          destinationWarehouse,
+          initiatedByUser,
+          approvedByUser,
+          items: enrichedItems
+        };
+      }));
+
+      res.json(enrichedTransfers);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Get transfers by status
+  app.get("/api/transfers/status/:status", async (req, res) => {
+    try {
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const status = req.params.status;
+      const transfers = await storage.getTransfersByStatus(status);
+      
+      // Enrich with basic data
+      const enrichedTransfers = await Promise.all(transfers.map(async (transfer) => {
+        const sourceWarehouse = await storage.getWarehouse(transfer.sourceWarehouseId);
+        const destinationWarehouse = await storage.getWarehouse(transfer.destinationWarehouseId);
+        const initiatedByUser = await storage.getUser(transfer.initiatedBy);
+        
+        return {
+          ...transfer,
+          sourceWarehouse,
+          destinationWarehouse,
+          initiatedByUser
+        };
+      }));
+
+      res.json(enrichedTransfers);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Create new transfer
+  app.post("/api/transfers", async (req, res) => {
+    try {
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const transferData = insertTransferSchema.parse({
+        ...req.body,
+        initiatedBy: req.user!.id
+      });
+
+      const transfer = await storage.createTransfer(transferData);
+
+      // Create transfer items
+      if (req.body.items && Array.isArray(req.body.items)) {
+        for (const item of req.body.items) {
+          await storage.createTransferItem({
+            transferId: transfer.id,
+            itemId: item.itemId,
+            requestedQuantity: item.requestedQuantity,
+            approvedQuantity: item.requestedQuantity // Initially same as requested
+          });
+        }
+      }
+
+      // Create initial transfer update
+      await storage.createTransferUpdate({
+        transferId: transfer.id,
+        updatedBy: req.user!.id,
+        status: 'pending',
+        updateType: 'status_change',
+        description: 'Transfer created'
+      });
+
+      res.status(201).json(transfer);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Get specific transfer with full details
+  app.get("/api/transfers/:id", async (req, res) => {
+    try {
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const transferId = parseInt(req.params.id);
+      const transfer = await storage.getTransfer(transferId);
+
+      if (!transfer) {
+        return res.status(404).json({ message: "Transfer not found" });
+      }
+
+      // Get enriched data
+      const sourceWarehouse = await storage.getWarehouse(transfer.sourceWarehouseId);
+      const destinationWarehouse = await storage.getWarehouse(transfer.destinationWarehouseId);
+      const initiatedByUser = await storage.getUser(transfer.initiatedBy);
+      const approvedByUser = transfer.approvedBy ? await storage.getUser(transfer.approvedBy) : null;
+      const transferItems = await storage.getTransferItemsByTransfer(transfer.id);
+      const transferUpdates = await storage.getTransferUpdatesByTransfer(transfer.id);
+
+      // Enrich transfer items with item details
+      const enrichedItems = await Promise.all(transferItems.map(async (item) => {
+        const itemDetails = await storage.getItem(item.itemId);
+        return { ...item, item: itemDetails };
+      }));
+
+      // Enrich transfer updates with user details
+      const enrichedUpdates = await Promise.all(transferUpdates.map(async (update) => {
+        const user = await storage.getUser(update.updatedBy);
+        return { ...update, user };
+      }));
+
+      res.json({
+        ...transfer,
+        sourceWarehouse,
+        destinationWarehouse,
+        initiatedByUser,
+        approvedByUser,
+        items: enrichedItems,
+        updates: enrichedUpdates
+      });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Update transfer (for status changes, shipment details, etc.)
+  app.patch("/api/transfers/:id", async (req, res) => {
+    try {
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const transferId = parseInt(req.params.id);
+      const updateData = insertTransferSchema.partial().parse(req.body);
+
+      const updatedTransfer = await storage.updateTransfer(transferId, updateData);
+
+      if (!updatedTransfer) {
+        return res.status(404).json({ message: "Transfer not found" });
+      }
+
+      // Create transfer update log
+      await storage.createTransferUpdate({
+        transferId,
+        updatedBy: req.user!.id,
+        status: updatedTransfer.status,
+        updateType: req.body.updateType || 'status_change',
+        description: req.body.updateDescription || `Transfer updated`,
+        metadata: req.body.metadata ? JSON.stringify(req.body.metadata) : undefined
+      });
+
+      res.json(updatedTransfer);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Update transfer items (for received quantities, condition, etc.)
+  app.patch("/api/transfers/:transferId/items/:itemId", async (req, res) => {
+    try {
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const transferId = parseInt(req.params.transferId);
+      const itemId = parseInt(req.params.itemId);
+      const updateData = insertTransferItemSchema.partial().parse(req.body);
+
+      const updatedItem = await storage.updateTransferItem(itemId, updateData);
+
+      if (!updatedItem) {
+        return res.status(404).json({ message: "Transfer item not found" });
+      }
+
+      // Create update log
+      await storage.createTransferUpdate({
+        transferId,
+        updatedBy: req.user!.id,
+        status: 'updated',
+        updateType: 'receipt_info',
+        description: `Item ${itemId} updated`,
+        metadata: JSON.stringify(updateData)
+      });
+
+      res.json(updatedItem);
     } catch (error: any) {
       res.status(400).json({ message: error.message });
     }

@@ -161,6 +161,28 @@ export interface IStorage {
   updateTransferNotification(id: number, notificationData: Partial<InsertTransferNotification>): Promise<TransferNotification | undefined>;
   deleteTransferNotification(id: number): Promise<boolean>;
 
+  // Enhanced Transfer operations
+  getTransfer(id: number): Promise<Transfer | undefined>;
+  getAllTransfers(): Promise<Transfer[]>;
+  getTransfersByStatus(status: string): Promise<Transfer[]>;
+  getTransfersByWarehouse(warehouseId: number, type: 'source' | 'destination'): Promise<Transfer[]>;
+  createTransfer(transfer: InsertTransfer): Promise<Transfer>;
+  updateTransfer(id: number, transferData: Partial<InsertTransfer>): Promise<Transfer | undefined>;
+  deleteTransfer(id: number): Promise<boolean>;
+
+  // Transfer Item operations
+  getTransferItem(id: number): Promise<TransferItem | undefined>;
+  getTransferItemsByTransfer(transferId: number): Promise<TransferItem[]>;
+  createTransferItem(transferItem: InsertTransferItem): Promise<TransferItem>;
+  updateTransferItem(id: number, transferItemData: Partial<InsertTransferItem>): Promise<TransferItem | undefined>;
+  deleteTransferItem(id: number): Promise<boolean>;
+
+  // Transfer Update operations
+  getTransferUpdate(id: number): Promise<TransferUpdate | undefined>;
+  getTransferUpdatesByTransfer(transferId: number): Promise<TransferUpdate[]>;
+  createTransferUpdate(transferUpdate: InsertTransferUpdate): Promise<TransferUpdate>;
+  deleteTransferUpdate(id: number): Promise<boolean>;
+
   // Hierarchy and Approval Workflow helpers
   getUserManager(userId: number): Promise<User | undefined>;
   getUsersByManager(managerId: number): Promise<User[]>;
@@ -1711,6 +1733,105 @@ export class DatabaseStorage implements IStorage {
     );
     
     return !!userApproval;
+  }
+
+  // Enhanced Transfer operations
+  async getTransfer(id: number): Promise<Transfer | undefined> {
+    const [transfer] = await db.select().from(transfers).where(eq(transfers.id, id));
+    return transfer || undefined;
+  }
+
+  async getAllTransfers(): Promise<Transfer[]> {
+    return await db.select().from(transfers).orderBy(desc(transfers.createdAt));
+  }
+
+  async getTransfersByStatus(status: string): Promise<Transfer[]> {
+    return await db.select().from(transfers).where(eq(transfers.status, status)).orderBy(desc(transfers.createdAt));
+  }
+
+  async getTransfersByWarehouse(warehouseId: number, type: 'source' | 'destination'): Promise<Transfer[]> {
+    const column = type === 'source' ? transfers.sourceWarehouseId : transfers.destinationWarehouseId;
+    return await db.select().from(transfers).where(eq(column, warehouseId)).orderBy(desc(transfers.createdAt));
+  }
+
+  async createTransfer(transfer: InsertTransfer): Promise<Transfer> {
+    // Generate unique transfer code
+    const transferCount = await db.select().from(transfers);
+    const transferCode = `TRF-${(transferCount.length + 1).toString().padStart(4, '0')}`;
+    
+    const [newTransfer] = await db.insert(transfers).values({
+      ...transfer,
+      transferCode,
+      updatedAt: new Date()
+    }).returning();
+    return newTransfer;
+  }
+
+  async updateTransfer(id: number, transferData: Partial<InsertTransfer>): Promise<Transfer | undefined> {
+    const [updatedTransfer] = await db.update(transfers)
+      .set({ ...transferData, updatedAt: new Date() })
+      .where(eq(transfers.id, id))
+      .returning();
+    return updatedTransfer || undefined;
+  }
+
+  async deleteTransfer(id: number): Promise<boolean> {
+    const [deletedTransfer] = await db.delete(transfers)
+      .where(eq(transfers.id, id))
+      .returning();
+    return !!deletedTransfer;
+  }
+
+  // Transfer Item operations
+  async getTransferItem(id: number): Promise<TransferItem | undefined> {
+    const [transferItem] = await db.select().from(transferItems).where(eq(transferItems.id, id));
+    return transferItem || undefined;
+  }
+
+  async getTransferItemsByTransfer(transferId: number): Promise<TransferItem[]> {
+    return await db.select().from(transferItems).where(eq(transferItems.transferId, transferId));
+  }
+
+  async createTransferItem(transferItem: InsertTransferItem): Promise<TransferItem> {
+    const [newTransferItem] = await db.insert(transferItems).values(transferItem).returning();
+    return newTransferItem;
+  }
+
+  async updateTransferItem(id: number, transferItemData: Partial<InsertTransferItem>): Promise<TransferItem | undefined> {
+    const [updatedTransferItem] = await db.update(transferItems)
+      .set(transferItemData)
+      .where(eq(transferItems.id, id))
+      .returning();
+    return updatedTransferItem || undefined;
+  }
+
+  async deleteTransferItem(id: number): Promise<boolean> {
+    const [deletedTransferItem] = await db.delete(transferItems)
+      .where(eq(transferItems.id, id))
+      .returning();
+    return !!deletedTransferItem;
+  }
+
+  // Transfer Update operations
+  async getTransferUpdate(id: number): Promise<TransferUpdate | undefined> {
+    const [transferUpdate] = await db.select().from(transferUpdates).where(eq(transferUpdates.id, id));
+    return transferUpdate || undefined;
+  }
+
+  async getTransferUpdatesByTransfer(transferId: number): Promise<TransferUpdate[]> {
+    return await db.select().from(transferUpdates).where(eq(transferUpdates.transferId, transferId)).orderBy(desc(transferUpdates.createdAt));
+  }
+
+  async createTransferUpdate(transferUpdate: InsertTransferUpdate): Promise<TransferUpdate> {
+    const [newTransferUpdate] = await db.insert(transferUpdates).values(transferUpdate).returning();
+    return newTransferUpdate;
+  }
+
+  async deleteTransferUpdate(id: number): Promise<boolean> {
+    const [deletedTransferUpdate] = await db.delete(transferUpdates)
+      .where(eq(transferUpdates.id, id))
+      .returning();
+    return !!deletedTransferUpdate;
   }
 }
 
