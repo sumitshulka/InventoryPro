@@ -23,6 +23,12 @@ import {
   InsertWarehouseOperator,
   TransferNotification,
   InsertTransferNotification,
+  Transfer,
+  InsertTransfer,
+  TransferItem,
+  InsertTransferItem,
+  TransferUpdate,
+  InsertTransferUpdate,
   TransactionType,
   users,
   categories,
@@ -35,7 +41,10 @@ import {
   approvalSettings,
   requestApprovals,
   warehouseOperators,
-  transferNotifications
+  transferNotifications,
+  transfers,
+  transferItems,
+  transferUpdates
 } from "@shared/schema";
 import session from "express-session";
 import connectPg from "connect-pg-simple";

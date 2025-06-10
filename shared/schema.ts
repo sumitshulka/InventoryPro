@@ -283,6 +283,70 @@ export const insertTransferNotificationSchema = createInsertSchema(transferNotif
   resolvedAt: true,
 });
 
+// Enhanced transfer management system
+export const transfers = pgTable("transfers", {
+  id: serial("id").primaryKey(),
+  transferCode: text("transfer_code").notNull().unique(),
+  sourceWarehouseId: integer("source_warehouse_id").notNull(),
+  destinationWarehouseId: integer("destination_warehouse_id").notNull(),
+  initiatedBy: integer("initiated_by").notNull(), // user who created the transfer
+  approvedBy: integer("approved_by"), // user who approved the transfer
+  status: text("status").notNull().default("pending"), // pending, approved, in-transit, completed, cancelled
+  transferMode: text("transfer_mode").notNull().default("courier"), // courier, handover, pickup
+  expectedShipmentDate: timestamp("expected_shipment_date"),
+  expectedArrivalDate: timestamp("expected_arrival_date"),
+  actualShipmentDate: timestamp("actual_shipment_date"),
+  actualArrivalDate: timestamp("actual_arrival_date"),
+  courierName: text("courier_name"),
+  trackingNumber: text("tracking_number"),
+  receiptNumber: text("receipt_number"),
+  handoverPersonName: text("handover_person_name"),
+  handoverPersonContact: text("handover_person_contact"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at"),
+});
+
+export const insertTransferSchema = createInsertSchema(transfers).omit({
+  id: true,
+  transferCode: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+// Transfer items (individual items in a transfer)
+export const transferItems = pgTable("transfer_items", {
+  id: serial("id").primaryKey(),
+  transferId: integer("transfer_id").notNull(),
+  itemId: integer("item_id").notNull(),
+  requestedQuantity: integer("requested_quantity").notNull(),
+  approvedQuantity: integer("approved_quantity"),
+  actualQuantity: integer("actual_quantity"), // quantity actually received
+  condition: text("condition").default("good"), // good, damaged, missing
+  notes: text("notes"),
+});
+
+export const insertTransferItemSchema = createInsertSchema(transferItems).omit({
+  id: true,
+});
+
+// Transfer updates/logs for tracking status changes
+export const transferUpdates = pgTable("transfer_updates", {
+  id: serial("id").primaryKey(),
+  transferId: integer("transfer_id").notNull(),
+  updatedBy: integer("updated_by").notNull(),
+  status: text("status").notNull(),
+  updateType: text("update_type").notNull(), // status_change, shipment_info, receipt_info, note
+  description: text("description"),
+  metadata: text("metadata"), // JSON string for additional data
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertTransferUpdateSchema = createInsertSchema(transferUpdates).omit({
+  id: true,
+  createdAt: true,
+});
+
 // Export types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -319,3 +383,12 @@ export type InsertWarehouseOperator = z.infer<typeof insertWarehouseOperatorSche
 
 export type TransferNotification = typeof transferNotifications.$inferSelect;
 export type InsertTransferNotification = z.infer<typeof insertTransferNotificationSchema>;
+
+export type Transfer = typeof transfers.$inferSelect;
+export type InsertTransfer = z.infer<typeof insertTransferSchema>;
+
+export type TransferItem = typeof transferItems.$inferSelect;
+export type InsertTransferItem = z.infer<typeof insertTransferItemSchema>;
+
+export type TransferUpdate = typeof transferUpdates.$inferSelect;
+export type InsertTransferUpdate = z.infer<typeof insertTransferUpdateSchema>;
