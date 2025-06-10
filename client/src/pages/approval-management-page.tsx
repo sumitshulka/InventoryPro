@@ -187,6 +187,11 @@ export default function ApprovalManagementPage() {
                       <div className="flex items-center gap-2">
                         <User className="w-4 h-4" />
                         Requested by {approval.request?.user?.name || 'Unknown User'}
+                        {approval.request?.user?.department && (
+                          <span className="text-xs text-gray-500">
+                            • {approval.request.user.department.name}
+                          </span>
+                        )}
                       </div>
                     </CardDescription>
                   </CardHeader>
@@ -265,16 +270,48 @@ export default function ApprovalManagementPage() {
                         <h4 className="font-semibold text-sm text-gray-700 mb-2">Requested Items</h4>
                         <div className="space-y-2">
                           {selectedApproval.request.items.map((item: any) => (
-                            <div key={item.id} className="flex items-center justify-between p-3 bg-gray-50 rounded">
-                              <div>
-                                <p className="font-medium text-sm">{getItemName(item.itemId)}</p>
-                                {item.justification && (
-                                  <p className="text-xs text-gray-500">{item.justification}</p>
-                                )}
+                            <div key={item.id} className="p-3 bg-gray-50 rounded border-l-4 border-l-blue-500">
+                              <div className="flex items-center justify-between mb-2">
+                                <div>
+                                  <p className="font-medium text-sm">{item.item?.name || `Item #${item.itemId}`}</p>
+                                  <p className="text-xs text-gray-500">{item.item?.sku || 'N/A'}</p>
+                                  {item.justification && (
+                                    <p className="text-xs text-gray-600 mt-1">{item.justification}</p>
+                                  )}
+                                </div>
+                                <div className="text-right">
+                                  <p className="font-semibold text-sm">Requested: {item.quantity}</p>
+                                  <p className="text-xs text-gray-500">Urgency: {item.urgency}</p>
+                                </div>
                               </div>
-                              <div className="text-right">
-                                <p className="font-semibold text-sm">{item.quantity}</p>
-                                <p className="text-xs text-gray-500">{item.urgency}</p>
+                              <div className="flex items-center justify-between pt-2 border-t border-gray-200">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs text-gray-600">Available:</span>
+                                  <span className={`text-xs font-semibold ${
+                                    item.availableQuantity >= item.quantity 
+                                      ? 'text-green-600' 
+                                      : item.availableQuantity > 0 
+                                        ? 'text-yellow-600' 
+                                        : 'text-red-600'
+                                  }`}>
+                                    {item.availableQuantity || 0} {item.item?.unit || 'units'}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  {item.availableQuantity >= item.quantity ? (
+                                    <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
+                                      ✓ Available
+                                    </span>
+                                  ) : item.availableQuantity > 0 ? (
+                                    <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
+                                      ⚠ Partial
+                                    </span>
+                                  ) : (
+                                    <span className="text-xs bg-red-100 text-red-800 px-2 py-1 rounded">
+                                      ✗ Transfer Required
+                                    </span>
+                                  )}
+                                </div>
                               </div>
                             </div>
                           ))}

@@ -1589,16 +1589,67 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const approvals = await storage.getRequestApprovalsByApprover(req.user.id);
       const pendingApprovals = approvals.filter(approval => approval.status === 'pending');
       
-      // Enrich with request data
+      // Get all reference data
+      const allItems = await storage.getAllItems();
+      const allWarehouses = await storage.getAllWarehouses();
+      const allInventory = await storage.getAllInventory();
+      const allDepartments = await storage.getAllDepartments();
+      
+      // Create maps for lookup
+      const itemMap = new Map();
+      allItems.forEach(item => itemMap.set(item.id, item));
+      
+      const warehouseMap = new Map();
+      allWarehouses.forEach(warehouse => warehouseMap.set(warehouse.id, warehouse));
+      
+      const inventoryMap = new Map();
+      allInventory.forEach(inv => {
+        const key = `${inv.itemId}-${inv.warehouseId}`;
+        inventoryMap.set(key, inv);
+      });
+      
+      const departmentMap = new Map();
+      allDepartments.forEach(dept => departmentMap.set(dept.id, dept));
+      
+      // Enrich with complete request data
       const enrichedApprovals = await Promise.all(pendingApprovals.map(async approval => {
         const request = await storage.getRequest(approval.requestId);
         const requestItems = await storage.getRequestItemsByRequest(approval.requestId);
         const requester = request ? await storage.getUser(request.userId) : null;
+        
+        // Enrich request items with item details and availability
+        const enrichedRequestItems = requestItems.map(requestItem => {
+          const item = itemMap.get(requestItem.itemId);
+          const inventoryKey = `${requestItem.itemId}-${request?.warehouseId}`;
+          const inventory = inventoryMap.get(inventoryKey);
+          const availableQuantity = inventory ? inventory.quantity : 0;
+          
+          return {
+            ...requestItem,
+            item,
+            availableQuantity,
+            isAvailable: availableQuantity >= requestItem.quantity
+          };
+        });
+        
+        // Enrich requester with department info
+        const enrichedRequester = requester ? {
+          ...requester,
+          department: requester.departmentId ? departmentMap.get(requester.departmentId) : null
+        } : null;
+        
+        // Enrich request with complete information
+        const enrichedRequest = request ? {
+          ...request,
+          user: enrichedRequester,
+          items: enrichedRequestItems,
+          warehouse: warehouseMap.get(request.warehouseId),
+          priority: request.priority || 'medium' // Default priority if not set
+        } : null;
+        
         return {
           ...approval,
-          request,
-          requestItems,
-          requester
+          request: enrichedRequest
         };
       }));
       
