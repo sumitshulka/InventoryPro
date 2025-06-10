@@ -227,36 +227,56 @@ export default function Sidebar({ user, isOpen, onClose }: SidebarProps) {
           <div className="mb-4">
             <p className="text-xs font-medium text-gray-500 px-3 py-2">REPORTS</p>
             <ul>
-              <li>
-                <Link 
-                  href="/stock-report"
-                  onClick={handleNavClick}
-                  className={cn(
-                    "flex items-center px-3 py-2 rounded-md",
-                    isActive("/stock-report") 
-                      ? "bg-primary/10 border-l-4 border-primary text-primary" 
-                      : "text-gray-700 hover:text-primary hover:bg-primary/5"
-                  )}
-                >
-                  <span className="material-icons mr-3">bar_chart</span>
-                  <span className="whitespace-nowrap">Stock</span>
-                </Link>
-              </li>
-              <li>
-                <Link 
-                  href="/movement-report"
-                  onClick={handleNavClick}
-                  className={cn(
-                    "flex items-center px-3 py-2 rounded-md",
-                    isActive("/movement-report") 
-                      ? "bg-primary/10 border-l-4 border-primary text-primary" 
-                      : "text-gray-700 hover:text-primary hover:bg-primary/5"
-                  )}
-                >
-                  <span className="material-icons mr-3">timeline</span>
-                  <span className="whitespace-nowrap">Movement</span>
-                </Link>
-              </li>
+              {user.role === 'employee' && !hasCheckInPermission ? (
+                <li>
+                  <Link 
+                    href="/my-requests"
+                    onClick={handleNavClick}
+                    className={cn(
+                      "flex items-center px-3 py-2 rounded-md",
+                      isActive("/my-requests") 
+                        ? "bg-primary/10 border-l-4 border-primary text-primary" 
+                        : "text-gray-700 hover:text-primary hover:bg-primary/5"
+                    )}
+                  >
+                    <span className="material-icons mr-3">assignment</span>
+                    <span className="whitespace-nowrap">My Requests</span>
+                  </Link>
+                </li>
+              ) : (
+                <>
+                  <li>
+                    <Link 
+                      href="/stock-report"
+                      onClick={handleNavClick}
+                      className={cn(
+                        "flex items-center px-3 py-2 rounded-md",
+                        isActive("/stock-report") 
+                          ? "bg-primary/10 border-l-4 border-primary text-primary" 
+                          : "text-gray-700 hover:text-primary hover:bg-primary/5"
+                      )}
+                    >
+                      <span className="material-icons mr-3">bar_chart</span>
+                      <span className="whitespace-nowrap">Stock</span>
+                    </Link>
+                  </li>
+                  <li>
+                    <Link 
+                      href="/movement-report"
+                      onClick={handleNavClick}
+                      className={cn(
+                        "flex items-center px-3 py-2 rounded-md",
+                        isActive("/movement-report") 
+                          ? "bg-primary/10 border-l-4 border-primary text-primary" 
+                          : "text-gray-700 hover:text-primary hover:bg-primary/5"
+                      )}
+                    >
+                      <span className="material-icons mr-3">timeline</span>
+                      <span className="whitespace-nowrap">Movement</span>
+                    </Link>
+                  </li>
+                </>
+              )}
             </ul>
           </div>
 
