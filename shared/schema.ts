@@ -261,6 +261,28 @@ export const insertRequestApprovalSchema = createInsertSchema(requestApprovals).
   createdAt: true,
 });
 
+// Transfer notifications for warehouse managers
+export const transferNotifications = pgTable("transfer_notifications", {
+  id: serial("id").primaryKey(),
+  requestId: integer("request_id").notNull(),
+  warehouseId: integer("warehouse_id").notNull(),
+  itemId: integer("item_id").notNull(),
+  requiredQuantity: integer("required_quantity").notNull(),
+  availableQuantity: integer("available_quantity").notNull().default(0),
+  status: text("status").notNull().default("pending"), // pending, approved, rejected, transferred
+  notifiedUserId: integer("notified_user_id"), // warehouse manager notified
+  transferId: integer("transfer_id"), // reference to actual transfer if created
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  resolvedAt: timestamp("resolved_at"),
+});
+
+export const insertTransferNotificationSchema = createInsertSchema(transferNotifications).omit({
+  id: true,
+  createdAt: true,
+  resolvedAt: true,
+});
+
 // Export types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -294,3 +316,6 @@ export type InsertRequestApproval = z.infer<typeof insertRequestApprovalSchema>;
 
 export type WarehouseOperator = typeof warehouseOperators.$inferSelect;
 export type InsertWarehouseOperator = z.infer<typeof insertWarehouseOperatorSchema>;
+
+export type TransferNotification = typeof transferNotifications.$inferSelect;
+export type InsertTransferNotification = z.infer<typeof insertTransferNotificationSchema>;

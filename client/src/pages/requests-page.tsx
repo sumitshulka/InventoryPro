@@ -87,10 +87,14 @@ export default function RequestsPage() {
     queryKey: ["/api/users"],
   });
 
+  const { data: inventory, isLoading: inventoryLoading } = useQuery({
+    queryKey: ["/api/reports/inventory-stock"],
+  });
+
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      warehouseId: "",
+      warehouseId: user?.warehouseId ? user.warehouseId.toString() : "",
       notes: "",
       items: [{ itemId: "", quantity: "" }],
     },
@@ -122,7 +126,7 @@ export default function RequestsPage() {
         description: "Your inventory request has been created successfully.",
       });
       form.reset({
-        warehouseId: "",
+        warehouseId: user?.warehouseId ? user.warehouseId.toString() : "",
         notes: "",
         items: [{ itemId: "", quantity: "" }],
       });

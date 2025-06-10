@@ -649,7 +649,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Create request
       const request = await storage.createRequest(requestData);
       
-      // Add items to request
+      // Check stock availability for each item in the requested warehouse
+      let needsTransfer = false;
+      const transferRequirements = [];
+      
+      // Add items to request and check stock
       if (req.body.items && Array.isArray(req.body.items)) {
         for (const item of req.body.items) {
           try {
@@ -659,10 +663,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
             });
             
             await storage.createRequestItem(requestItemData);
+            
+            // Check if the requested warehouse has sufficient stock
+            const inventory = await storage.getAllInventory();
+            const stockInWarehouse = inventory.find(inv => 
+              inv.itemId === item.itemId && inv.warehouseId === requestData.warehouseId
+            );
+            
+            if (!stockInWarehouse || stockInWarehouse.quantity < item.quantity) {
+              needsTransfer = true;
+              const shortfall = item.quantity - (stockInWarehouse?.quantity || 0);
+              transferRequirements.push({
+                itemId: item.itemId,
+                requiredQuantity: shortfall,
+                requestedQuantity: item.quantity,
+                availableQuantity: stockInWarehouse?.quantity || 0
+              });
+            }
           } catch (error) {
             console.error("Error adding item to request:", error);
           }
         }
+      }
+      
+      // If transfer is needed, mark request for warehouse manager attention
+      if (needsTransfer) {
+        await storage.updateRequest(request.id, { 
+          status: "pending-transfer",
+          notes: `${request.notes || ''}\n\nStock Transfer Required: Some items are not available in sufficient quantities in the requested warehouse.`
+        });
       }
 
       // Create approval records based on user hierarchy and approval settings
