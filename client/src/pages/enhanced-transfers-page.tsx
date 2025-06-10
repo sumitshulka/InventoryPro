@@ -107,6 +107,7 @@ export default function EnhancedTransfersPage() {
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
   const [receiptDialogOpen, setReceiptDialogOpen] = useState(false);
   const [acceptanceDialogOpen, setAcceptanceDialogOpen] = useState(false);
+  const [auditDialogOpen, setAuditDialogOpen] = useState(false);
   const [selectedTransfer, setSelectedTransfer] = useState<any>(null);
   const [activeTab, setActiveTab] = useState("all");
 
@@ -476,8 +477,21 @@ export default function EnhancedTransfersPage() {
                                     setSelectedTransfer(transfer);
                                     setDetailsDialogOpen(true);
                                   }}
+                                  title="View transfer details"
                                 >
                                   <Eye className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => {
+                                    setSelectedTransfer(transfer);
+                                    setAuditDialogOpen(true);
+                                  }}
+                                  title="View audit trail"
+                                  className="text-purple-600"
+                                >
+                                  <FileText className="h-4 w-4" />
                                 </Button>
                                 {transfer.status === "pending" && (
                                   <Button
@@ -489,7 +503,7 @@ export default function EnhancedTransfersPage() {
                                     <CheckCircle className="h-4 w-4" />
                                   </Button>
                                 )}
-                                {transfer.status === "approved" && user?.warehouseId === transfer.sourceWarehouseId && (
+                                {transfer.status === "approved" && (user?.warehouseId === transfer.sourceWarehouseId || transfer.sourceWarehouse?.managerId === user?.id) && (
                                   <Button
                                     variant="ghost"
                                     size="sm"
@@ -503,7 +517,7 @@ export default function EnhancedTransfersPage() {
                                     <FileText className="h-4 w-4" />
                                   </Button>
                                 )}
-                                {transfer.status === "in-transit" && user?.warehouseId === transfer.destinationWarehouseId && (
+                                {transfer.status === "in-transit" && (user?.warehouseId === transfer.destinationWarehouseId || transfer.destinationWarehouse?.managerId === user?.id) && (
                                   <Button
                                     variant="ghost"
                                     size="sm"
@@ -1151,6 +1165,238 @@ export default function EnhancedTransfersPage() {
                 </Button>
               </DialogFooter>
             </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Audit Trail Dialog */}
+        <Dialog open={auditDialogOpen} onOpenChange={setAuditDialogOpen}>
+          <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <FileText className="h-5 w-5" />
+                Transfer Audit Trail - {selectedTransfer?.transferCode}
+              </DialogTitle>
+            </DialogHeader>
+
+            {selectedTransfer && (
+              <div className="space-y-6">
+                {/* Transfer Overview */}
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <h3 className="font-semibold mb-3">Transfer Overview</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                    <div>
+                      <span className="font-medium">Status:</span>
+                      <span className={`ml-2 px-2 py-1 rounded text-xs font-medium ${
+                        selectedTransfer.status === 'completed' ? 'bg-green-100 text-green-800' :
+                        selectedTransfer.status === 'rejected' ? 'bg-red-100 text-red-800' :
+                        selectedTransfer.status === 'in-transit' ? 'bg-blue-100 text-blue-800' :
+                        selectedTransfer.status === 'approved' ? 'bg-yellow-100 text-yellow-800' :
+                        'bg-gray-100 text-gray-800'
+                      }`}>
+                        {selectedTransfer.status}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="font-medium">Priority:</span>
+                      <span className={`ml-2 px-2 py-1 rounded text-xs font-medium ${
+                        selectedTransfer.priority === 'high' ? 'bg-red-100 text-red-800' :
+                        selectedTransfer.priority === 'medium' ? 'bg-yellow-100 text-yellow-800' :
+                        'bg-green-100 text-green-800'
+                      }`}>
+                        {selectedTransfer.priority}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="font-medium">Transport:</span>
+                      <span className="ml-2">{selectedTransfer.transportMethod}</span>
+                    </div>
+                    <div>
+                      <span className="font-medium">From:</span>
+                      <span className="ml-2">{selectedTransfer.sourceWarehouse?.name}</span>
+                    </div>
+                    <div>
+                      <span className="font-medium">To:</span>
+                      <span className="ml-2">{selectedTransfer.destinationWarehouse?.name}</span>
+                    </div>
+                    <div>
+                      <span className="font-medium">Created:</span>
+                      <span className="ml-2">{formatDateTime(selectedTransfer.createdAt)}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Transfer Items */}
+                <div>
+                  <h3 className="font-semibold mb-3">Transfer Items</h3>
+                  <div className="border rounded-lg overflow-hidden">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Item</TableHead>
+                          <TableHead>SKU</TableHead>
+                          <TableHead>Requested Qty</TableHead>
+                          <TableHead>Actual Qty</TableHead>
+                          <TableHead>Condition</TableHead>
+                          <TableHead>Notes</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {selectedTransfer.items?.map((item: any, index: number) => (
+                          <TableRow key={index}>
+                            <TableCell>{item.item?.name}</TableCell>
+                            <TableCell>{item.item?.sku}</TableCell>
+                            <TableCell>{item.requestedQuantity}</TableCell>
+                            <TableCell>{item.actualQuantity || '-'}</TableCell>
+                            <TableCell>
+                              {item.condition && (
+                                <span className={`px-2 py-1 rounded text-xs font-medium ${
+                                  item.condition === 'good' ? 'bg-green-100 text-green-800' :
+                                  item.condition === 'damaged' ? 'bg-red-100 text-red-800' :
+                                  'bg-yellow-100 text-yellow-800'
+                                }`}>
+                                  {item.condition}
+                                </span>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-sm">{item.notes || '-'}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+
+                {/* Transport Details */}
+                {(selectedTransfer.receiptNumber || selectedTransfer.handoverDate) && (
+                  <div>
+                    <h3 className="font-semibold mb-3">Transport Details</h3>
+                    <div className="bg-blue-50 p-4 rounded-lg">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                        {selectedTransfer.receiptNumber && (
+                          <div>
+                            <span className="font-medium">Receipt Number:</span>
+                            <span className="ml-2">{selectedTransfer.receiptNumber}</span>
+                          </div>
+                        )}
+                        {selectedTransfer.handoverDate && (
+                          <div>
+                            <span className="font-medium">Handover Date:</span>
+                            <span className="ml-2">{formatDateTime(selectedTransfer.handoverDate)}</span>
+                          </div>
+                        )}
+                        {selectedTransfer.transportNotes && (
+                          <div className="md:col-span-2">
+                            <span className="font-medium">Transport Notes:</span>
+                            <p className="mt-1 text-gray-700">{selectedTransfer.transportNotes}</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Reception Details */}
+                {(selectedTransfer.receiverNotes || selectedTransfer.receivedDate) && (
+                  <div>
+                    <h3 className="font-semibold mb-3">Reception Details</h3>
+                    <div className="bg-green-50 p-4 rounded-lg">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                        {selectedTransfer.receivedDate && (
+                          <div>
+                            <span className="font-medium">Received Date:</span>
+                            <span className="ml-2">{formatDateTime(selectedTransfer.receivedDate)}</span>
+                          </div>
+                        )}
+                        {selectedTransfer.receiverNotes && (
+                          <div className="md:col-span-2">
+                            <span className="font-medium">Receiver Notes:</span>
+                            <p className="mt-1 text-gray-700">{selectedTransfer.receiverNotes}</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Rejection Details */}
+                {selectedTransfer.status === 'rejected' && selectedTransfer.rejectionReason && (
+                  <div>
+                    <h3 className="font-semibold mb-3">Rejection Details</h3>
+                    <div className="bg-red-50 p-4 rounded-lg">
+                      <div className="text-sm">
+                        <span className="font-medium">Rejection Reason:</span>
+                        <p className="mt-1 text-gray-700">{selectedTransfer.rejectionReason}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Timeline */}
+                <div>
+                  <h3 className="font-semibold mb-3">Timeline</h3>
+                  <div className="space-y-3">
+                    <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
+                      <div className="w-2 h-2 bg-blue-500 rounded-full mt-2"></div>
+                      <div className="flex-1">
+                        <div className="font-medium text-sm">Transfer Created</div>
+                        <div className="text-xs text-gray-600">{formatDateTime(selectedTransfer.createdAt)}</div>
+                        <div className="text-xs text-gray-700">Transfer request initiated</div>
+                      </div>
+                    </div>
+
+                    {selectedTransfer.status !== 'pending' && (
+                      <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
+                        <div className="w-2 h-2 bg-green-500 rounded-full mt-2"></div>
+                        <div className="flex-1">
+                          <div className="font-medium text-sm">Transfer Approved</div>
+                          <div className="text-xs text-gray-600">{formatDateTime(selectedTransfer.updatedAt)}</div>
+                          <div className="text-xs text-gray-700">Transfer approved for processing</div>
+                        </div>
+                      </div>
+                    )}
+
+                    {selectedTransfer.handoverDate && (
+                      <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
+                        <div className="w-2 h-2 bg-yellow-500 rounded-full mt-2"></div>
+                        <div className="flex-1">
+                          <div className="font-medium text-sm">Items Dispatched</div>
+                          <div className="text-xs text-gray-600">{formatDateTime(selectedTransfer.handoverDate)}</div>
+                          <div className="text-xs text-gray-700">Items handed over to transport</div>
+                        </div>
+                      </div>
+                    )}
+
+                    {selectedTransfer.receivedDate && (
+                      <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
+                        <div className="w-2 h-2 bg-green-500 rounded-full mt-2"></div>
+                        <div className="flex-1">
+                          <div className="font-medium text-sm">Transfer Completed</div>
+                          <div className="text-xs text-gray-600">{formatDateTime(selectedTransfer.receivedDate)}</div>
+                          <div className="text-xs text-gray-700">Items received and processed</div>
+                        </div>
+                      </div>
+                    )}
+
+                    {selectedTransfer.status === 'rejected' && (
+                      <div className="flex items-start gap-3 p-3 bg-red-50 rounded-lg">
+                        <div className="w-2 h-2 bg-red-500 rounded-full mt-2"></div>
+                        <div className="flex-1">
+                          <div className="font-medium text-sm">Transfer Rejected</div>
+                          <div className="text-xs text-gray-600">{formatDateTime(selectedTransfer.updatedAt)}</div>
+                          <div className="text-xs text-gray-700">Transfer rejected and items returned</div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setAuditDialogOpen(false)}>
+                Close
+              </Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
       </div>
