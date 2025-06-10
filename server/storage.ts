@@ -1777,18 +1777,34 @@ export class DatabaseStorage implements IStorage {
     const transferCount = await db.select().from(transfers);
     const transferCode = `TRF-${(transferCount.length + 1).toString().padStart(4, '0')}`;
     
-    const [newTransfer] = await db.insert(transfers).values({
+    // Process date fields properly
+    const processedTransfer = {
       ...transfer,
       transferCode,
-      status: 'pending',
+      status: 'pending' as const,
+      expectedShipmentDate: typeof transfer.expectedShipmentDate === 'string' ? new Date(transfer.expectedShipmentDate) : transfer.expectedShipmentDate,
+      expectedArrivalDate: typeof transfer.expectedArrivalDate === 'string' ? new Date(transfer.expectedArrivalDate) : transfer.expectedArrivalDate,
       createdAt: new Date()
-    }).returning();
+    };
+    
+    const [newTransfer] = await db.insert(transfers).values(processedTransfer).returning();
     return newTransfer;
   }
 
   async updateTransfer(id: number, transferData: Partial<InsertTransfer>): Promise<Transfer | undefined> {
+    // Create clean update object, filtering out string dates
+    const cleanData: any = { ...transferData, updatedAt: new Date() };
+    
+    // Convert string dates to Date objects for database
+    if (transferData.expectedShipmentDate && typeof transferData.expectedShipmentDate === 'string') {
+      cleanData.expectedShipmentDate = new Date(transferData.expectedShipmentDate);
+    }
+    if (transferData.expectedArrivalDate && typeof transferData.expectedArrivalDate === 'string') {
+      cleanData.expectedArrivalDate = new Date(transferData.expectedArrivalDate);
+    }
+
     const [updatedTransfer] = await db.update(transfers)
-      .set({ ...transferData, updatedAt: new Date() })
+      .set(cleanData)
       .where(eq(transfers.id, id))
       .returning();
     return updatedTransfer || undefined;

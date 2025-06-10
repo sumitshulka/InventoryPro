@@ -1954,7 +1954,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const transferData = insertTransferSchema.parse({
         ...req.body,
-        initiatedBy: req.user!.id
+        initiatedBy: req.user!.id,
+        expectedShipmentDate: req.body.expectedShipmentDate ? new Date(req.body.expectedShipmentDate) : null,
+        expectedArrivalDate: req.body.expectedArrivalDate ? new Date(req.body.expectedArrivalDate) : null
       });
 
       const transfer = await storage.createTransfer(transferData);
