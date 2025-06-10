@@ -89,6 +89,7 @@ export default function EnhancedTransfersPage() {
 
   const { data: transfers, isLoading: transfersLoading } = useQuery({
     queryKey: ["/api/transfers"],
+    refetchInterval: 30000, // Refresh every 30 seconds
   });
 
   const { data: items, isLoading: itemsLoading } = useQuery({
@@ -193,6 +194,11 @@ export default function EnhancedTransfersPage() {
         title: "Success",
         description: "Transfer updated successfully",
       });
+      
+      // Auto-refresh after 2 seconds to ensure table is updated
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ["/api/transfers"] });
+      }, 2000);
     },
     onError: (error: any) => {
       toast({

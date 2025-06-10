@@ -305,14 +305,7 @@ export const transfers = pgTable("transfers", {
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at"),
-}, (table) => ({
-  sourceWarehouseIdx: index("transfers_source_warehouse_idx").on(table.sourceWarehouseId),
-  destinationWarehouseIdx: index("transfers_destination_warehouse_idx").on(table.destinationWarehouseId),
-  statusIdx: index("transfers_status_idx").on(table.status),
-  initiatedByIdx: index("transfers_initiated_by_idx").on(table.initiatedBy),
-  createdAtIdx: index("transfers_created_at_idx").on(table.createdAt),
-  transferCodeIdx: index("transfers_transfer_code_idx").on(table.transferCode),
-}));
+});
 
 export const insertTransferSchema = createInsertSchema(transfers).omit({
   id: true,
