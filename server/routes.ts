@@ -75,7 +75,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/users/:id", checkRole("admin"), async (req, res) => {
     const userId = parseInt(req.params.id, 10);
     try {
-      const updatedUser = await storage.updateUser(userId, req.body);
+      // Validate the user data
+      const userData = insertUserSchema.partial().parse(req.body);
+      
+      // Check if the user exists
+      const existingUser = await storage.getUser(userId);
+      if (!existingUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      // Check for unique constraint violations only if username or email is being changed
+      if (userData.username && userData.username !== existingUser.username) {
+        const userWithSameUsername = await storage.getUserByUsername(userData.username);
+        if (userWithSameUsername) {
+          return res.status(400).json({ message: "Username already exists" });
+        }
+      }
+      
+      if (userData.email && userData.email !== existingUser.email) {
+        const allUsers = await storage.getAllUsers();
+        const userWithSameEmail = allUsers.find(u => u.email === userData.email && u.id !== userId);
+        if (userWithSameEmail) {
+          return res.status(400).json({ message: "Email already exists" });
+        }
+      }
+      
+      const updatedUser = await storage.updateUser(userId, userData);
       if (!updatedUser) {
         return res.status(404).json({ message: "User not found" });
       }
