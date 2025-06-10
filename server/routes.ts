@@ -2044,9 +2044,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const transferId = parseInt(req.params.id);
-      const updateData = insertTransferSchema.partial().parse(req.body);
+      
+      // Filter out fields that shouldn't be updated directly
+      const allowedFields = [
+        'status', 'transferMode', 'expectedShipmentDate', 'expectedArrivalDate',
+        'actualShipmentDate', 'actualArrivalDate', 'courierName', 'trackingNumber',
+        'receiptNumber', 'handoverPersonName', 'handoverPersonContact', 'notes'
+      ];
+      
+      const filteredData: any = {};
+      for (const field of allowedFields) {
+        if (req.body[field] !== undefined) {
+          filteredData[field] = req.body[field];
+        }
+      }
 
-      const updatedTransfer = await storage.updateTransfer(transferId, updateData);
+      // Convert date strings to Date objects
+      if (filteredData.expectedShipmentDate) {
+        filteredData.expectedShipmentDate = new Date(filteredData.expectedShipmentDate);
+      }
+      if (filteredData.expectedArrivalDate) {
+        filteredData.expectedArrivalDate = new Date(filteredData.expectedArrivalDate);
+      }
+      if (filteredData.actualShipmentDate) {
+        filteredData.actualShipmentDate = new Date(filteredData.actualShipmentDate);
+      }
+      if (filteredData.actualArrivalDate) {
+        filteredData.actualArrivalDate = new Date(filteredData.actualArrivalDate);
+      }
+
+      const updatedTransfer = await storage.updateTransfer(transferId, filteredData);
 
       if (!updatedTransfer) {
         return res.status(404).json({ message: "Transfer not found" });
@@ -2064,6 +2091,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json(updatedTransfer);
     } catch (error: any) {
+      console.error('Transfer update error:', error);
       res.status(400).json({ message: error.message });
     }
   });

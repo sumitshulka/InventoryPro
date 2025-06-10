@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { z } from "zod";
 import { useForm, useFieldArray } from "react-hook-form";
@@ -158,6 +158,11 @@ export default function EnhancedTransfersPage() {
         title: "Success",
         description: "Transfer created successfully",
       });
+      
+      // Auto-refresh after 2 seconds to ensure table is updated
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ["/api/transfers"] });
+      }, 2000);
     },
     onError: (error: any) => {
       toast({
