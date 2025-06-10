@@ -12,6 +12,7 @@ import {
   insertRequestSchema, 
   insertRequestItemSchema,
   insertDepartmentSchema,
+  insertUserSchema,
   departments,
   organizationSettings
 } from "@shared/schema";
