@@ -189,6 +189,23 @@ export default function Sidebar({ user, isOpen, onClose }: SidebarProps) {
               {(user.role === "manager" || user.role === "admin") && (
                 <li>
                   <Link 
+                    href="/transfer-notifications"
+                    onClick={handleNavClick}
+                    className={cn(
+                      "flex items-center px-3 py-2 rounded-md",
+                      isActive("/transfer-notifications") 
+                        ? "bg-primary/10 border-l-4 border-primary text-primary" 
+                        : "text-gray-700 hover:text-primary hover:bg-primary/5"
+                    )}
+                  >
+                    <span className="material-icons mr-3">notifications_active</span>
+                    <span className="whitespace-nowrap">Transfer Alerts</span>
+                  </Link>
+                </li>
+              )}
+              {(user.role === "manager" || user.role === "admin") && (
+                <li>
+                  <Link 
                     href="/approvals"
                     onClick={handleNavClick}
                     className={cn(

@@ -10,6 +10,7 @@ import WarehousesPage from "@/pages/warehouses-page";
 import CheckInPage from "@/pages/check-in-page";
 import RequestsPage from "@/pages/requests-page";
 import TransfersPage from "@/pages/transfers-page";
+import TransferNotificationsPage from "@/pages/transfer-notifications-page";
 import StockReportPage from "@/pages/stock-report-page";
 import MovementReportPage from "@/pages/movement-report-page";
 import UserManagementPage from "@/pages/user-management-page";
@@ -44,6 +45,7 @@ function Router() {
       <ProtectedRoute path="/check-in" component={CheckInPage} />
       <ProtectedRoute path="/requests" component={RequestsPage} />
       <ProtectedRoute path="/transfers" component={TransfersPage} />
+      <ProtectedRoute path="/transfer-notifications" component={TransferNotificationsPage} />
       <ProtectedRoute path="/stock-report" component={StockReportPage} />
       <ProtectedRoute path="/movement-report" component={MovementReportPage} />
       <ProtectedRoute path="/users" component={UserManagementPage} />

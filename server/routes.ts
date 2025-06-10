@@ -1048,6 +1048,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Transfer notification routes
+  // Get pending transfer notifications
+  app.get("/api/transfer-notifications", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const notifications = await storage.getPendingTransferNotifications();
+      res.json(notifications);
+    } catch (error) {
+      console.error("Error fetching transfer notifications:", error);
+      res.status(500).json({ message: "Failed to fetch transfer notifications" });
+    }
+  });
+
+  // Get transfer notifications by warehouse
+  app.get("/api/transfer-notifications/warehouse/:warehouseId", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const warehouseId = parseInt(req.params.warehouseId);
+      const notifications = await storage.getTransferNotificationsByWarehouse(warehouseId);
+      res.json(notifications);
+    } catch (error) {
+      console.error("Error fetching warehouse transfer notifications:", error);
+      res.status(500).json({ message: "Failed to fetch warehouse transfer notifications" });
+    }
+  });
+
+  // Update transfer notification status
+  app.patch("/api/transfer-notifications/:id", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const id = parseInt(req.params.id);
+      const updateData = req.body;
+      
+      const updatedNotification = await storage.updateTransferNotification(id, updateData);
+      if (!updatedNotification) {
+        return res.status(404).json({ message: "Transfer notification not found" });
+      }
+      
+      res.json(updatedNotification);
+    } catch (error) {
+      console.error("Error updating transfer notification:", error);
+      res.status(500).json({ message: "Failed to update transfer notification" });
+    }
+  });
+
   // Export transactions to CSV
   app.get("/api/export/transactions", async (req, res) => {
     try {
