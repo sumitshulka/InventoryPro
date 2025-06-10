@@ -2265,18 +2265,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
               );
 
               // Create transaction records for transfer out
+              const checkOutCode = `TRX-${Date.now()}-OUT`;
               await storage.createTransaction({
+                transactionCode: checkOutCode,
                 itemId: item.itemId,
                 sourceWarehouseId: updatedTransfer.sourceWarehouseId,
+                userId: req.user!.id,
                 requesterId: req.user!.id,
                 transactionType: 'check-out',
                 quantity: item.requestedQuantity,
               });
 
               // Create transaction records for transfer in
+              const checkInCode = `TRX-${Date.now()}-IN`;
               await storage.createTransaction({
+                transactionCode: checkInCode,
                 itemId: item.itemId,
                 destinationWarehouseId: updatedTransfer.destinationWarehouseId,
+                userId: req.user!.id,
                 requesterId: filteredData.receivedBy || req.user!.id,
                 transactionType: 'check-in',
                 quantity: item.actualQuantity || item.requestedQuantity,

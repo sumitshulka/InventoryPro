@@ -503,7 +503,7 @@ export default function EnhancedTransfersPage() {
                                     <CheckCircle className="h-4 w-4" />
                                   </Button>
                                 )}
-                                {transfer.status === "approved" && (user?.role === 'admin' || transfer.sourceWarehouse?.managerId === user?.id) && (
+                                {transfer.status === "approved" && transfer.sourceWarehouse?.managerId === user?.id && (
                                   <Button
                                     variant="ghost"
                                     size="sm"
@@ -517,7 +517,7 @@ export default function EnhancedTransfersPage() {
                                     <FileText className="h-4 w-4" />
                                   </Button>
                                 )}
-                                {transfer.status === "in-transit" && (user?.role === 'admin' || transfer.destinationWarehouse?.managerId === user?.id) && (
+                                {transfer.status === "in-transit" && transfer.destinationWarehouse?.managerId === user?.id && (
                                   <Button
                                     variant="ghost"
                                     size="sm"
