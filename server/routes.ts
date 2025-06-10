@@ -2126,45 +2126,80 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const updatedTransfer = await storage.updateTransfer(transferId, filteredData);
 
-      // Handle inventory updates when transfer is completed (accepted)
-      if (filteredData.status === 'completed' && updatedTransfer) {
+      // Handle inventory updates when transfer is completed (accepted) or rejected
+      if ((filteredData.status === 'completed' || filteredData.status === 'rejected') && updatedTransfer) {
         const transferItems = await storage.getTransferItemsByTransfer(transferId);
         if (transferItems && transferItems.length > 0) {
-          // Update inventory for accepted items
-          for (const item of transferItems) {
-            // Remove from source warehouse
-            await storage.updateInventoryQuantity(
-              item.itemId, 
-              updatedTransfer.sourceWarehouseId, 
-              -item.requestedQuantity
-            );
-            
-            // Add to destination warehouse
-            await storage.updateInventoryQuantity(
-              item.itemId, 
-              updatedTransfer.destinationWarehouseId, 
-              item.actualQuantity || item.requestedQuantity
-            );
+          
+          if (filteredData.status === 'completed') {
+            // Handle accepted transfer - normal inventory flow
+            for (const item of transferItems) {
+              // Remove from source warehouse
+              await storage.updateInventoryQuantity(
+                item.itemId, 
+                updatedTransfer.sourceWarehouseId, 
+                -item.requestedQuantity
+              );
+              
+              // Add to destination warehouse
+              await storage.updateInventoryQuantity(
+                item.itemId, 
+                updatedTransfer.destinationWarehouseId, 
+                item.actualQuantity || item.requestedQuantity
+              );
 
-            // Create transaction records for transfer out
-            await storage.createTransaction({
-              itemId: item.itemId,
-              warehouseId: updatedTransfer.sourceWarehouseId,
-              userId: req.user!.id,
-              transactionType: 'check-out',
-              quantity: item.requestedQuantity,
-              notes: `Transfer out via ${updatedTransfer.transferCode}`,
-            });
+              // Create transaction records for transfer out
+              await storage.createTransaction({
+                itemId: item.itemId,
+                sourceWarehouseId: updatedTransfer.sourceWarehouseId,
+                requesterId: req.user!.id,
+                transactionType: 'check-out',
+                quantity: item.requestedQuantity,
+                notes: `Transfer out via ${updatedTransfer.transferCode}`,
+              });
 
-            // Create transaction records for transfer in
-            await storage.createTransaction({
-              itemId: item.itemId,
-              warehouseId: updatedTransfer.destinationWarehouseId,
-              userId: filteredData.receivedBy || req.user!.id,
-              transactionType: 'check-in',
-              quantity: item.actualQuantity || item.requestedQuantity,
-              notes: `Transfer in via ${updatedTransfer.transferCode}`,
-            });
+              // Create transaction records for transfer in
+              await storage.createTransaction({
+                itemId: item.itemId,
+                destinationWarehouseId: updatedTransfer.destinationWarehouseId,
+                requesterId: filteredData.receivedBy || req.user!.id,
+                transactionType: 'check-in',
+                quantity: item.actualQuantity || item.requestedQuantity,
+                notes: `Transfer in via ${updatedTransfer.transferCode}`,
+              });
+            }
+          } else if (filteredData.status === 'rejected') {
+            // Handle rejected transfer - move items to rejected goods
+            for (const item of transferItems) {
+              // Remove from source warehouse (already shipped)
+              await storage.updateInventoryQuantity(
+                item.itemId, 
+                updatedTransfer.sourceWarehouseId, 
+                -item.requestedQuantity
+              );
+
+              // Create rejected goods record
+              await storage.createRejectedGoods({
+                transferId: transferId,
+                itemId: item.itemId,
+                quantity: item.requestedQuantity,
+                rejectionReason: filteredData.receiverNotes || 'Transfer rejected by destination warehouse',
+                rejectedBy: req.user!.id,
+                warehouseId: updatedTransfer.destinationWarehouseId,
+                status: 'rejected',
+                notes: filteredData.receiverNotes
+              });
+
+              // Create transaction record for rejection
+              await storage.createTransaction({
+                itemId: item.itemId,
+                sourceWarehouseId: updatedTransfer.sourceWarehouseId,
+                requesterId: req.user!.id,
+                transactionType: 'check-out',
+                quantity: item.requestedQuantity,
+                notes: `Transfer rejected - moved to rejected goods: ${updatedTransfer.transferCode}`,
+              });
+            }
           }
         }
       }

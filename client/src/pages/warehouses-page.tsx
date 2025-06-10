@@ -256,7 +256,7 @@ export default function WarehousesPage() {
                           : "—"
                         }
                       </TableCell>
-                      <TableCell>{warehouse.capacity}</TableCell>
+                      <TableCell>{formatCapacity(warehouse.capacity)}</TableCell>
                       <TableCell>
                         <span className={`${warehouse.isActive ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"} text-xs px-2 py-1 rounded-full`}>
                           {warehouse.isActive ? "Active" : "Inactive"}

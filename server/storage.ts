@@ -183,6 +183,15 @@ export interface IStorage {
   createTransferUpdate(transferUpdate: InsertTransferUpdate): Promise<TransferUpdate>;
   deleteTransferUpdate(id: number): Promise<boolean>;
 
+  // Rejected Goods operations
+  getRejectedGoods(id: number): Promise<RejectedGoods | undefined>;
+  getAllRejectedGoods(): Promise<RejectedGoods[]>;
+  getRejectedGoodsByWarehouse(warehouseId: number): Promise<RejectedGoods[]>;
+  getRejectedGoodsByTransfer(transferId: number): Promise<RejectedGoods[]>;
+  createRejectedGoods(rejectedGoods: InsertRejectedGoods): Promise<RejectedGoods>;
+  updateRejectedGoods(id: number, rejectedGoodsData: Partial<InsertRejectedGoods>): Promise<RejectedGoods | undefined>;
+  deleteRejectedGoods(id: number): Promise<boolean>;
+
   // Hierarchy and Approval Workflow helpers
   getUserManager(userId: number): Promise<User | undefined>;
   getUsersByManager(managerId: number): Promise<User[]>;
@@ -1870,6 +1879,47 @@ export class DatabaseStorage implements IStorage {
       .where(eq(transferUpdates.id, id))
       .returning();
     return !!deletedTransferUpdate;
+  }
+
+  // Rejected Goods operations
+  async getRejectedGoods(id: number): Promise<RejectedGoods | undefined> {
+    const [rejectedGood] = await db.select().from(rejectedGoods).where(eq(rejectedGoods.id, id));
+    return rejectedGood || undefined;
+  }
+
+  async getAllRejectedGoods(): Promise<RejectedGoods[]> {
+    return await db.select().from(rejectedGoods).orderBy(desc(rejectedGoods.rejectedAt));
+  }
+
+  async getRejectedGoodsByWarehouse(warehouseId: number): Promise<RejectedGoods[]> {
+    return await db.select().from(rejectedGoods).where(eq(rejectedGoods.warehouseId, warehouseId)).orderBy(desc(rejectedGoods.rejectedAt));
+  }
+
+  async getRejectedGoodsByTransfer(transferId: number): Promise<RejectedGoods[]> {
+    return await db.select().from(rejectedGoods).where(eq(rejectedGoods.transferId, transferId)).orderBy(desc(rejectedGoods.rejectedAt));
+  }
+
+  async createRejectedGoods(rejectedGoodsData: InsertRejectedGoods): Promise<RejectedGoods> {
+    const [newRejectedGoods] = await db.insert(rejectedGoods).values({
+      ...rejectedGoodsData,
+      rejectedAt: new Date()
+    }).returning();
+    return newRejectedGoods;
+  }
+
+  async updateRejectedGoods(id: number, rejectedGoodsData: Partial<InsertRejectedGoods>): Promise<RejectedGoods | undefined> {
+    const [updatedRejectedGoods] = await db.update(rejectedGoods)
+      .set(rejectedGoodsData)
+      .where(eq(rejectedGoods.id, id))
+      .returning();
+    return updatedRejectedGoods || undefined;
+  }
+
+  async deleteRejectedGoods(id: number): Promise<boolean> {
+    const [deletedRejectedGoods] = await db.delete(rejectedGoods)
+      .where(eq(rejectedGoods.id, id))
+      .returning();
+    return !!deletedRejectedGoods;
   }
 
   // Inventory quantity update method for transfers
