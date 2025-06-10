@@ -183,7 +183,7 @@ export default function WarehousesPage() {
               </div>
               <div className="flex items-center text-sm text-gray-600 mb-4">
                 <span className="material-icons text-gray-500 text-sm mr-1">person</span>
-                Manager: {warehouse.manager || "Not assigned"}
+                Manager: {warehouse.manager ? warehouse.manager.name : "Not assigned"}
               </div>
               {warehouse.capacityUsed !== undefined && (
                 <div className="mb-3">
