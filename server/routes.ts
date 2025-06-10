@@ -1528,6 +1528,118 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Warehouse Operator routes
+  app.get("/api/warehouse-operators", checkRole("manager"), async (req, res) => {
+    try {
+      const operators = await storage.getAllWarehouseOperators();
+      
+      // Enrich with user and warehouse data
+      const enrichedOperators = await Promise.all(operators.map(async (operator) => {
+        const user = await storage.getUser(operator.userId);
+        const warehouse = await storage.getWarehouse(operator.warehouseId);
+        return {
+          ...operator,
+          user,
+          warehouse
+        };
+      }));
+      
+      res.json(enrichedOperators);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/warehouse-operators/user/:userId", async (req, res) => {
+    try {
+      const userId = parseInt(req.params.userId);
+      const operators = await storage.getWarehouseOperatorsByUser(userId);
+      res.json(operators);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/warehouse-operators/warehouse/:warehouseId", async (req, res) => {
+    try {
+      const warehouseId = parseInt(req.params.warehouseId);
+      const operators = await storage.getWarehouseOperatorsByWarehouse(warehouseId);
+      
+      // Enrich with user data
+      const enrichedOperators = await Promise.all(operators.map(async (operator) => {
+        const user = await storage.getUser(operator.userId);
+        return {
+          ...operator,
+          user
+        };
+      }));
+      
+      res.json(enrichedOperators);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/warehouse-operators", checkRole("manager"), async (req, res) => {
+    try {
+      const operatorData = insertWarehouseOperatorSchema.parse(req.body);
+      const newOperator = await storage.createWarehouseOperator(operatorData);
+      res.status(201).json(newOperator);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.put("/api/warehouse-operators/:id", checkRole("manager"), async (req, res) => {
+    try {
+      const operatorId = parseInt(req.params.id);
+      const operatorData = insertWarehouseOperatorSchema.partial().parse(req.body);
+      const updatedOperator = await storage.updateWarehouseOperator(operatorId, operatorData);
+      
+      if (!updatedOperator) {
+        return res.status(404).json({ message: "Warehouse operator not found" });
+      }
+      res.json(updatedOperator);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/warehouse-operators/:id", checkRole("manager"), async (req, res) => {
+    try {
+      const operatorId = parseInt(req.params.id);
+      const deleted = await storage.deleteWarehouseOperator(operatorId);
+      
+      if (!deleted) {
+        return res.status(404).json({ message: "Warehouse operator not found" });
+      }
+      res.status(204).send();
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/users/:userId/operated-warehouses", async (req, res) => {
+    try {
+      const userId = parseInt(req.params.userId);
+      const warehouseIds = await storage.getUserOperatedWarehouses(userId);
+      res.json(warehouseIds);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/users/:userId/is-warehouse-operator/:warehouseId", async (req, res) => {
+    try {
+      const userId = parseInt(req.params.userId);
+      const warehouseId = parseInt(req.params.warehouseId);
+      const isOperator = await storage.isUserWarehouseOperator(userId, warehouseId);
+      res.json({ isOperator });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

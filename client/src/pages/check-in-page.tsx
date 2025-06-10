@@ -88,6 +88,11 @@ export default function CheckInPage() {
     queryKey: ["/api/warehouses"],
   });
 
+  const { data: userOperatedWarehouses = [], isLoading: operatedWarehousesLoading } = useQuery<number[]>({
+    queryKey: ["/api/users", user?.id, "operated-warehouses"],
+    enabled: !!user?.id,
+  });
+
   const { data: checkInTransactions = [], isLoading: transactionsLoading } = useQuery<Array<{
     id: number;
     transactionCode: string;
@@ -215,11 +220,39 @@ export default function CheckInPage() {
     checkInMutation.mutate(values);
   };
 
-  if (itemsLoading || warehousesLoading || transactionsLoading || usersLoading) {
+  // Filter warehouses based on user permissions
+  const availableWarehouses = user?.role === 'admin' || user?.role === 'manager' 
+    ? warehouses 
+    : warehouses.filter(warehouse => userOperatedWarehouses.includes(warehouse.id));
+
+  // Check if user has permission to access check-in functionality
+  const hasCheckInPermission = user?.role === 'admin' || user?.role === 'manager' || userOperatedWarehouses.length > 0;
+
+  if (itemsLoading || warehousesLoading || transactionsLoading || usersLoading || operatedWarehousesLoading) {
     return (
       <AppLayout>
         <div className="flex justify-center items-center h-64">
           <Loader2 className="h-8 w-8 animate-spin" />
+        </div>
+      </AppLayout>
+    );
+  }
+
+  if (!hasCheckInPermission) {
+    return (
+      <AppLayout>
+        <div className="flex justify-center items-center h-64">
+          <Card className="w-full max-w-md">
+            <CardHeader>
+              <CardTitle className="text-center">Access Restricted</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-center text-muted-foreground">
+                You don't have permission to access the check-in functionality. 
+                Only warehouse managers, admins, and warehouse operators can perform check-in operations.
+              </p>
+            </CardContent>
+          </Card>
         </div>
       </AppLayout>
     );
@@ -261,7 +294,7 @@ export default function CheckInPage() {
                                 </SelectTrigger>
                               </FormControl>
                               <SelectContent>
-                                {warehouses.map((warehouse) => (
+                                {availableWarehouses.map((warehouse) => (
                                   <SelectItem key={warehouse.id} value={warehouse.id.toString()}>
                                     {warehouse.name}
                                   </SelectItem>
