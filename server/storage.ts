@@ -1400,8 +1400,14 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createTransaction(transaction: InsertTransaction): Promise<Transaction> {
+    // Generate unique transaction code
+    const existingTransactions = await this.getAllTransactions();
+    const transactionCode = `TRX-${existingTransactions.length + 873}`;
+    
     const insertData: any = {
       ...transaction,
+      transactionCode,
+      userId: transaction.userId || transaction.requesterId || 1, // Default to admin if no user specified
       createdAt: new Date(),
       completedAt: transaction.status === 'completed' ? new Date() : null
     };

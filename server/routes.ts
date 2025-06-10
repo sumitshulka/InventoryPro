@@ -2268,6 +2268,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               await storage.createTransaction({
                 itemId: item.itemId,
                 sourceWarehouseId: updatedTransfer.sourceWarehouseId,
+                userId: req.user!.id,
                 requesterId: req.user!.id,
                 transactionType: 'check-out',
                 quantity: item.requestedQuantity,
@@ -2277,6 +2278,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               await storage.createTransaction({
                 itemId: item.itemId,
                 destinationWarehouseId: updatedTransfer.destinationWarehouseId,
+                userId: req.user!.id,
                 requesterId: filteredData.receivedBy || req.user!.id,
                 transactionType: 'check-in',
                 quantity: item.actualQuantity || item.requestedQuantity,
@@ -2308,6 +2310,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               await storage.createTransaction({
                 itemId: item.itemId,
                 sourceWarehouseId: updatedTransfer.sourceWarehouseId,
+                userId: req.user!.id,
                 requesterId: req.user!.id,
                 transactionType: 'check-out',
                 quantity: item.requestedQuantity,

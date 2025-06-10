@@ -156,11 +156,11 @@ export const insertTransactionSchema = createInsertSchema(transactions)
   .omit({
     id: true,
     transactionCode: true,
-    userId: true,
     createdAt: true,
     completedAt: true,
   })
   .extend({
+    userId: z.number().optional(),
     cost: z.preprocess((arg) => {
       if (typeof arg === 'number') return arg.toString();
       return arg;
