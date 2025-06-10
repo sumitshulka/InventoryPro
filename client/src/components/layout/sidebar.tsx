@@ -1,4 +1,5 @@
 import { Link, useLocation } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { getUserInitials } from "@/lib/utils";
 import { User } from "@shared/schema";
@@ -12,7 +13,13 @@ type SidebarProps = {
 export default function Sidebar({ user, isOpen, onClose }: SidebarProps) {
   const [location] = useLocation();
   
+  const { data: userOperatedWarehouses = [] } = useQuery<number[]>({
+    queryKey: ["/api/users", user?.id, "operated-warehouses"],
+    enabled: !!user?.id,
+  });
 
+  // Check if user has permission to access check-in functionality
+  const hasCheckInPermission = user?.role === 'admin' || user?.role === 'manager' || userOperatedWarehouses.length > 0;
   
   const isActive = (path: string) => {
     return location === path;
@@ -130,21 +137,23 @@ export default function Sidebar({ user, isOpen, onClose }: SidebarProps) {
           <div className="mb-4">
             <p className="text-xs font-medium text-gray-500 px-3 py-2">OPERATIONS</p>
             <ul>
-              <li>
-                <Link 
-                  href="/check-in"
-                  onClick={handleNavClick}
-                  className={cn(
-                    "flex items-center px-3 py-2 rounded-md",
-                    isActive("/check-in") 
-                      ? "bg-primary/10 border-l-4 border-primary text-primary" 
-                      : "text-gray-700 hover:text-primary hover:bg-primary/5"
-                  )}
-                >
-                  <span className="material-icons mr-3">login</span>
-                  <span className="whitespace-nowrap">CheckIn</span>
-                </Link>
-              </li>
+              {hasCheckInPermission && (
+                <li>
+                  <Link 
+                    href="/check-in"
+                    onClick={handleNavClick}
+                    className={cn(
+                      "flex items-center px-3 py-2 rounded-md",
+                      isActive("/check-in") 
+                        ? "bg-primary/10 border-l-4 border-primary text-primary" 
+                        : "text-gray-700 hover:text-primary hover:bg-primary/5"
+                    )}
+                  >
+                    <span className="material-icons mr-3">login</span>
+                    <span className="whitespace-nowrap">CheckIn</span>
+                  </Link>
+                </li>
+              )}
               <li>
                 <Link 
                   href="/requests"
@@ -160,21 +169,23 @@ export default function Sidebar({ user, isOpen, onClose }: SidebarProps) {
                   <span className="whitespace-nowrap">Requests</span>
                 </Link>
               </li>
-              <li>
-                <Link 
-                  href="/transfers"
-                  onClick={handleNavClick}
-                  className={cn(
-                    "flex items-center px-3 py-2 rounded-md",
-                    isActive("/transfers") 
-                      ? "bg-primary/10 border-l-4 border-primary text-primary" 
-                      : "text-gray-700 hover:text-primary hover:bg-primary/5"
-                  )}
-                >
-                  <span className="material-icons mr-3">swap_horiz</span>
-                  <span className="whitespace-nowrap">Transfers</span>
-                </Link>
-              </li>
+              {hasCheckInPermission && (
+                <li>
+                  <Link 
+                    href="/transfers"
+                    onClick={handleNavClick}
+                    className={cn(
+                      "flex items-center px-3 py-2 rounded-md",
+                      isActive("/transfers") 
+                        ? "bg-primary/10 border-l-4 border-primary text-primary" 
+                        : "text-gray-700 hover:text-primary hover:bg-primary/5"
+                    )}
+                  >
+                    <span className="material-icons mr-3">swap_horiz</span>
+                    <span className="whitespace-nowrap">Transfers</span>
+                  </Link>
+                </li>
+              )}
               {(user.role === "manager" || user.role === "admin") && (
                 <li>
                   <Link 

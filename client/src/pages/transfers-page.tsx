@@ -66,6 +66,11 @@ export default function TransfersPage() {
     queryKey: ["/api/warehouses"],
   });
 
+  const { data: userOperatedWarehouses = [], isLoading: operatedWarehousesLoading } = useQuery<number[]>({
+    queryKey: ["/api/users", user?.id, "operated-warehouses"],
+    enabled: !!user?.id,
+  });
+
   const { data: inventory, isLoading: inventoryLoading } = useQuery({
     queryKey: ["/api/reports/inventory-stock"],
     refetchInterval: 5000,
