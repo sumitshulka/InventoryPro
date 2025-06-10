@@ -8,39 +8,33 @@ import LowStockItems from "@/components/dashboard/low-stock-items";
 import RecentActivity from "@/components/dashboard/recent-activity";
 import { Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
+import EmployeeDashboard from "./employee-dashboard";
 
 export default function DashboardPage() {
   const { user } = useAuth();
   
-  // Role-based data fetching
-  const { data: dashboardData, isLoading } = useQuery({
-    queryKey: ["/api/dashboard/summary"],
-    enabled: user?.role === 'admin' || user?.role === 'manager',
-  });
-
-  const { data: warehouseStats, isLoading: warehouseStatsLoading } = useQuery({
-    queryKey: ["/api/warehouses/stats"],
-    enabled: user?.role === 'admin' || user?.role === 'manager',
-  });
-
-  // Employee-specific data - filter existing requests by user
-  const { data: allRequests } = useQuery({
-    queryKey: ["/api/requests"],
-    enabled: user?.role === 'employee',
-  });
-  
-  const userRequests = allRequests?.filter((request: any) => request.userId === user?.id) || [];
-
   const { data: userOperatedWarehouses = [] } = useQuery<number[]>({
     queryKey: ["/api/users", user?.id, "operated-warehouses"],
     enabled: !!user?.id,
   });
 
   const isEmployeeOnly = user?.role === 'employee' && userOperatedWarehouses.length === 0;
-  const isWarehouseOperator = userOperatedWarehouses.length > 0;
   
-  if ((user?.role !== 'employee' && (isLoading || warehouseStatsLoading)) || 
-      (user?.role === 'employee' && userRequestsLoading)) {
+  // For employees only, redirect to simplified dashboard
+  if (isEmployeeOnly) {
+    return <EmployeeDashboard />;
+  }
+  
+  // Role-based data fetching for managers and admins
+  const { data: dashboardData, isLoading } = useQuery({
+    queryKey: ["/api/dashboard/summary"],
+  });
+
+  const { data: warehouseStats, isLoading: warehouseStatsLoading } = useQuery({
+    queryKey: ["/api/warehouses/stats"],
+  });
+  
+  if (isLoading || warehouseStatsLoading) {
     return (
       <AppLayout>
         <div className="flex items-center justify-center h-[calc(100vh-200px)]">
