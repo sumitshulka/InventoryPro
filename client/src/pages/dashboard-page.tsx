@@ -7,17 +7,40 @@ import PendingRequests from "@/components/dashboard/pending-requests";
 import LowStockItems from "@/components/dashboard/low-stock-items";
 import RecentActivity from "@/components/dashboard/recent-activity";
 import { Loader2 } from "lucide-react";
+import { useAuth } from "@/hooks/use-auth";
 
 export default function DashboardPage() {
+  const { user } = useAuth();
+  
+  // Role-based data fetching
   const { data: dashboardData, isLoading } = useQuery({
     queryKey: ["/api/dashboard/summary"],
+    enabled: user?.role === 'admin' || user?.role === 'manager',
   });
 
   const { data: warehouseStats, isLoading: warehouseStatsLoading } = useQuery({
     queryKey: ["/api/warehouses/stats"],
+    enabled: user?.role === 'admin' || user?.role === 'manager',
   });
 
-  if (isLoading || warehouseStatsLoading) {
+  // Employee-specific data - filter existing requests by user
+  const { data: allRequests } = useQuery({
+    queryKey: ["/api/requests"],
+    enabled: user?.role === 'employee',
+  });
+  
+  const userRequests = allRequests?.filter((request: any) => request.userId === user?.id) || [];
+
+  const { data: userOperatedWarehouses = [] } = useQuery<number[]>({
+    queryKey: ["/api/users", user?.id, "operated-warehouses"],
+    enabled: !!user?.id,
+  });
+
+  const isEmployeeOnly = user?.role === 'employee' && userOperatedWarehouses.length === 0;
+  const isWarehouseOperator = userOperatedWarehouses.length > 0;
+  
+  if ((user?.role !== 'employee' && (isLoading || warehouseStatsLoading)) || 
+      (user?.role === 'employee' && userRequestsLoading)) {
     return (
       <AppLayout>
         <div className="flex items-center justify-center h-[calc(100vh-200px)]">
@@ -32,19 +55,28 @@ export default function DashboardPage() {
       {/* Page Title */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-medium text-gray-800">Dashboard</h1>
-          <p className="text-gray-600">Welcome back! Here's what's happening with your inventory today.</p>
+          <h1 className="text-2xl font-medium text-gray-800">
+            {isEmployeeOnly ? 'My Workspace' : 'Dashboard'}
+          </h1>
+          <p className="text-gray-600">
+            {isEmployeeOnly 
+              ? `Welcome back, ${user?.name}! View your requests and activity.`
+              : "Welcome back! Here's what's happening with your inventory today."
+            }
+          </p>
         </div>
-        <div className="flex space-x-2">
-          <button className="bg-white border border-gray-300 text-gray-700 rounded-md px-4 py-2 text-sm font-medium flex items-center hover:bg-gray-50">
-            <span className="material-icons mr-1 text-sm">date_range</span>
-            Last 30 days
-          </button>
-          <button className="bg-primary text-white rounded-md px-4 py-2 text-sm font-medium flex items-center hover:bg-primary/90">
-            <span className="material-icons mr-1 text-sm">refresh</span>
-            Refresh
-          </button>
-        </div>
+        {!isEmployeeOnly && (
+          <div className="flex space-x-2">
+            <button className="bg-white border border-gray-300 text-gray-700 rounded-md px-4 py-2 text-sm font-medium flex items-center hover:bg-gray-50">
+              <span className="material-icons mr-1 text-sm">date_range</span>
+              Last 30 days
+            </button>
+            <button className="bg-primary text-white rounded-md px-4 py-2 text-sm font-medium flex items-center hover:bg-primary/90">
+              <span className="material-icons mr-1 text-sm">refresh</span>
+              Refresh
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Dashboard Cards */}

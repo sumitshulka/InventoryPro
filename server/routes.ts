@@ -615,6 +615,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/requests/:id", async (req, res) => {
     const requestId = parseInt(req.params.id, 10);
     
+    if (isNaN(requestId)) {
+      return res.status(400).json({ message: "Invalid request ID" });
+    }
+    
     const request = await storage.getRequest(requestId);
     if (!request) {
       return res.status(404).json({ message: "Request not found" });
