@@ -200,7 +200,7 @@ export default function IssuesPage() {
     onError: (error: any) => {
       toast({
         title: "Error",
-        description: error.message || "Failed to report issue",
+        description: error.message || "Failed to send notification",
         variant: "destructive",
       });
     },
@@ -379,6 +379,22 @@ export default function IssuesPage() {
                 {unreadCount} unread
               </Badge>
             )}
+            <Dialog open={showNewNotificationDialog} onOpenChange={setShowNewNotificationDialog}>
+              <DialogTrigger asChild>
+                <Button>
+                  <Mail className="h-4 w-4 mr-2" />
+                  Send Message
+                </Button>
+              </DialogTrigger>
+            </Dialog>
+            <Dialog open={showNewIssueDialog} onOpenChange={setShowNewIssueDialog}>
+              <DialogTrigger asChild>
+                <Button variant="outline">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Report Issue
+                </Button>
+              </DialogTrigger>
+            </Dialog>
             <Button
               variant="outline"
               size="sm"
@@ -874,6 +890,336 @@ export default function IssuesPage() {
                 </div>
               </div>
             )}
+          </DialogContent>
+        </Dialog>
+
+        {/* Create Notification Dialog */}
+        <Dialog open={showNewNotificationDialog} onOpenChange={setShowNewNotificationDialog}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Send Message</DialogTitle>
+            </DialogHeader>
+            <Form {...notificationForm}>
+              <form onSubmit={notificationForm.handleSubmit((data) => createNotificationMutation.mutate(data))} className="space-y-4">
+                <FormField
+                  control={notificationForm.control}
+                  name="subject"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Subject</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Enter message subject" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={notificationForm.control}
+                  name="message"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Message</FormLabel>
+                      <FormControl>
+                        <Textarea 
+                          placeholder="Enter your message"
+                          className="min-h-[120px]"
+                          {...field} 
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={notificationForm.control}
+                    name="category"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Category</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select category" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="general">General</SelectItem>
+                            <SelectItem value="inventory">Inventory</SelectItem>
+                            <SelectItem value="request">Request</SelectItem>
+                            <SelectItem value="transfer">Transfer</SelectItem>
+                            <SelectItem value="approval">Approval</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={notificationForm.control}
+                    name="priority"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Priority</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select priority" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="low">Low</SelectItem>
+                            <SelectItem value="normal">Normal</SelectItem>
+                            <SelectItem value="high">High</SelectItem>
+                            <SelectItem value="urgent">Urgent</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <FormField
+                  control={notificationForm.control}
+                  name="recipientType"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Send To</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select recipients" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="admins">All Admins</SelectItem>
+                          <SelectItem value="managers">All Managers</SelectItem>
+                          <SelectItem value="specific">Specific Users</SelectItem>
+                          <SelectItem value="all">All Users (Admin Only)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {notificationForm.watch("recipientType") === "specific" && (
+                  <FormField
+                    control={notificationForm.control}
+                    name="recipientIds"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Select Users</FormLabel>
+                        <div className="max-h-32 overflow-y-auto border rounded-md p-2 space-y-2">
+                          {recipients.map((user: any) => (
+                            <label key={user.id} className="flex items-center space-x-2 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={field.value?.includes(user.id) || false}
+                                onChange={(e) => {
+                                  const currentIds = field.value || [];
+                                  if (e.target.checked) {
+                                    field.onChange([...currentIds, user.id]);
+                                  } else {
+                                    field.onChange(currentIds.filter((id: number) => id !== user.id));
+                                  }
+                                }}
+                                className="rounded"
+                              />
+                              <span className="text-sm">
+                                {user.name} ({user.role})
+                              </span>
+                            </label>
+                          ))}
+                        </div>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
+
+                <div className="flex justify-end gap-3 pt-4">
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={() => setShowNewNotificationDialog(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button type="submit" disabled={createNotificationMutation.isPending}>
+                    {createNotificationMutation.isPending ? "Sending..." : "Send Message"}
+                  </Button>
+                </div>
+              </form>
+            </Form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Create Issue Dialog */}
+        <Dialog open={showNewIssueDialog} onOpenChange={setShowNewIssueDialog}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Report New Issue</DialogTitle>
+            </DialogHeader>
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="title"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Issue Title</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Brief description of the issue" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="description"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Description</FormLabel>
+                      <FormControl>
+                        <Textarea 
+                          placeholder="Detailed description of the issue"
+                          className="min-h-[120px]"
+                          {...field} 
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="category"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Category</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select category" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="inventory">Inventory</SelectItem>
+                            <SelectItem value="equipment">Equipment</SelectItem>
+                            <SelectItem value="safety">Safety</SelectItem>
+                            <SelectItem value="quality">Quality</SelectItem>
+                            <SelectItem value="process">Process</SelectItem>
+                            <SelectItem value="other">Other</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="priority"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Priority</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select priority" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="low">Low</SelectItem>
+                            <SelectItem value="medium">Medium</SelectItem>
+                            <SelectItem value="high">High</SelectItem>
+                            <SelectItem value="critical">Critical</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="warehouseId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Related Warehouse (Optional)</FormLabel>
+                        <Select onValueChange={(value) => field.onChange(value ? parseInt(value) : undefined)}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select warehouse" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="">None</SelectItem>
+                            {Array.isArray(warehouses) && warehouses.map((warehouse: any) => (
+                              <SelectItem key={warehouse.id} value={warehouse.id.toString()}>
+                                {warehouse.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="itemId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Related Item (Optional)</FormLabel>
+                        <Select onValueChange={(value) => field.onChange(value ? parseInt(value) : undefined)}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select item" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="">None</SelectItem>
+                            {Array.isArray(items) && items.map((item: any) => (
+                              <SelectItem key={item.id} value={item.id.toString()}>
+                                {item.name} ({item.sku})
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <div className="flex justify-end gap-3 pt-4">
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={() => setShowNewIssueDialog(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button type="submit" disabled={createIssueMutation.isPending}>
+                    {createIssueMutation.isPending ? "Creating..." : "Report Issue"}
+                  </Button>
+                </div>
+              </form>
+            </Form>
           </DialogContent>
         </Dialog>
       </div>
