@@ -2748,6 +2748,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get audit logs
+  app.get("/api/audit-logs", async (req, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      // For now, return empty array since audit logging isn't fully implemented
+      // In a real system, this would fetch from an audit_logs table
+      const auditLogs = [];
+
+      res.json(auditLogs);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
