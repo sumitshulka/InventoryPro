@@ -33,10 +33,21 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { apiRequest, queryClient, invalidateRelatedQueries } from "@/lib/queryClient";
-import { Loader2, Plus, Edit, MapPin } from "lucide-react";
+import { Loader2, Plus, Edit, MapPin, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { formatCapacity } from "@/lib/formatters";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 const formSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters" }),
@@ -116,6 +127,29 @@ export default function WarehousesPage() {
       toast({
         title: "Error",
         description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteWarehouseMutation = useMutation({
+    mutationFn: async (warehouseId: number) => {
+      return apiRequest(`/api/warehouses/${warehouseId}`, {
+        method: "DELETE",
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/warehouses"] });
+      invalidateRelatedQueries();
+      toast({
+        title: "Success",
+        description: "Warehouse has been archived successfully",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to archive warehouse",
         variant: "destructive",
       });
     },
@@ -257,8 +291,13 @@ export default function WarehousesPage() {
                   </TableRow>
                 ) : (
                   warehouses?.map((warehouse: any) => (
-                    <TableRow key={warehouse.id}>
-                      <TableCell className="font-medium">{warehouse.name}</TableCell>
+                    <TableRow key={warehouse.id} className={warehouse.status === 'deleted' ? 'opacity-60' : ''}>
+                      <TableCell className="font-medium">
+                        {warehouse.name}
+                        {warehouse.status === 'deleted' && (
+                          <span className="text-red-500 text-xs ml-1 font-bold">✗</span>
+                        )}
+                      </TableCell>
                       <TableCell>{warehouse.location}</TableCell>
                       <TableCell>
                         {warehouse.managerId ? 
@@ -268,19 +307,59 @@ export default function WarehousesPage() {
                       </TableCell>
                       <TableCell>{formatCapacity(warehouse.capacity)}</TableCell>
                       <TableCell>
-                        <span className={`${warehouse.isActive ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"} text-xs px-2 py-1 rounded-full`}>
-                          {warehouse.isActive ? "Active" : "Inactive"}
-                        </span>
+                        {warehouse.status === 'deleted' ? (
+                          <span className="bg-red-100 text-red-800 text-xs px-2 py-1 rounded-full">
+                            Archived
+                          </span>
+                        ) : (
+                          <span className={`${warehouse.isActive ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"} text-xs px-2 py-1 rounded-full`}>
+                            {warehouse.isActive ? "Active" : "Inactive"}
+                          </span>
+                        )}
                       </TableCell>
                       {isAdmin && (
                         <TableCell>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleEditWarehouse(warehouse)}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
+                          <div className="flex gap-1">
+                            {warehouse.status !== 'deleted' && (
+                              <>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleEditWarehouse(warehouse)}
+                                >
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="text-red-600 hover:text-red-700"
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>Archive Warehouse</AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        Are you sure you want to archive "{warehouse.name}"? This will preserve all transaction history but mark the warehouse as deleted. This action cannot be undone.
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                      <AlertDialogAction
+                                        onClick={() => deleteWarehouseMutation.mutate(warehouse.id)}
+                                        className="bg-red-600 hover:bg-red-700"
+                                      >
+                                        Archive Warehouse
+                                      </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
+                              </>
+                            )}
+                          </div>
                         </TableCell>
                       )}
                     </TableRow>

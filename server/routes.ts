@@ -323,14 +323,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Delete warehouse (admin only)
+  // Archive warehouse (admin only) - soft delete to preserve transaction history
   app.delete("/api/warehouses/:id", checkRole("admin"), async (req, res) => {
     const warehouseId = parseInt(req.params.id, 10);
-    const success = await storage.deleteWarehouse(warehouseId);
-    if (!success) {
+    const archivedWarehouse = await storage.archiveWarehouse(warehouseId);
+    if (!archivedWarehouse) {
       return res.status(404).json({ message: "Warehouse not found" });
     }
-    res.status(204).send();
+    res.json(archivedWarehouse);
   });
 
   // ==== Item Routes ====

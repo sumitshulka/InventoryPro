@@ -705,6 +705,19 @@ export class MemStorage implements IStorage {
     return this.warehouses.delete(id);
   }
 
+  async archiveWarehouse(id: number): Promise<Warehouse | undefined> {
+    const warehouse = await this.getWarehouse(id);
+    if (!warehouse) return undefined;
+
+    const archivedWarehouse = { 
+      ...warehouse, 
+      status: 'deleted' as const,
+      deletedAt: new Date()
+    };
+    this.warehouses.set(id, archivedWarehouse);
+    return archivedWarehouse;
+  }
+
   // Item operations
   async getItem(id: number): Promise<Item | undefined> {
     return this.items.get(id);
@@ -1396,6 +1409,17 @@ export class DatabaseStorage implements IStorage {
       .where(eq(warehouses.id, id))
       .returning();
     return !!deletedWarehouse;
+  }
+
+  async archiveWarehouse(id: number): Promise<Warehouse | undefined> {
+    const [archivedWarehouse] = await db.update(warehouses)
+      .set({ 
+        status: 'deleted',
+        deletedAt: new Date()
+      })
+      .where(eq(warehouses.id, id))
+      .returning();
+    return archivedWarehouse || undefined;
   }
 
   // Item operations
