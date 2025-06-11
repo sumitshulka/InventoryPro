@@ -53,7 +53,8 @@ import {
   User,
   MapPin,
   Phone,
-  FileText
+  FileText,
+  Warehouse
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
@@ -369,15 +370,21 @@ export default function EnhancedTransfersPage() {
     }
   });
 
+  // Check if there are enough warehouses for transfers
+  const activeWarehouses = warehouses?.filter((w: any) => w.isActive) || [];
+  const hasEnoughWarehouses = activeWarehouses.length >= 2;
+
   return (
     <AppLayout>
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <h1 className="text-3xl font-bold">Transfer Management</h1>
-          <Button onClick={() => setIsDialogOpen(true)}>
-            <Plus className="mr-2 h-4 w-4" />
-            Create Transfer
-          </Button>
+          {hasEnoughWarehouses ? (
+            <Button onClick={() => setIsDialogOpen(true)}>
+              <Plus className="mr-2 h-4 w-4" />
+              Create Transfer
+            </Button>
+          ) : null}
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -556,12 +563,42 @@ export default function EnhancedTransfersPage() {
             <DialogHeader>
               <DialogTitle>Create New Transfer</DialogTitle>
               <DialogDescription>
-                Create a new inventory transfer between warehouses
+                {hasEnoughWarehouses 
+                  ? "Create a new inventory transfer between warehouses"
+                  : "Transfer functionality requires multiple warehouses"
+                }
               </DialogDescription>
             </DialogHeader>
 
-            <form onSubmit={form.handleSubmit(handleSubmit)}>
-              <div className="space-y-6 py-4">
+            {!hasEnoughWarehouses ? (
+              <div className="py-8 text-center space-y-6">
+                <div className="mx-auto w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center">
+                  <Warehouse className="w-12 h-12 text-gray-400" />
+                </div>
+                <div className="space-y-2">
+                  <h3 className="text-lg font-medium text-gray-900">
+                    Multiple Warehouses Required
+                  </h3>
+                  <p className="text-gray-600 max-w-md mx-auto">
+                    Transfers are only possible in systems with more than one warehouse. 
+                    You currently have {activeWarehouses.length} active warehouse{activeWarehouses.length === 1 ? '' : 's'}.
+                  </p>
+                </div>
+                <Button 
+                  onClick={() => {
+                    setIsDialogOpen(false);
+                    // Navigate to warehouses page
+                    window.location.href = '/warehouses';
+                  }}
+                  className="mx-auto"
+                >
+                  <Plus className="mr-2 h-4 w-4" />
+                  Create More Warehouses
+                </Button>
+              </div>
+            ) : (
+              <form onSubmit={form.handleSubmit(handleSubmit)}>
+                <div className="space-y-6 py-4">
                 {/* Warehouse Selection */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
