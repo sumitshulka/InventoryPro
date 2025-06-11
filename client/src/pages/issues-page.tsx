@@ -519,78 +519,80 @@ export default function IssuesPage() {
                   </CardContent>
                 </Card>
               ) : (
-                <ScrollArea className="h-[600px]">
-                  <div className="space-y-3">
-                    {filteredNotifications.map((notification: Notification) => (
-                      <Card 
-                        key={notification.id} 
-                        className={`cursor-pointer transition-all hover:shadow-md ${
-                          notification.status === 'unread' ? 'border-l-4 border-l-primary bg-primary/5' : ''
-                        } ${getNotificationPriorityColor(notification.priority)}`}
-                        onClick={() => handleNotificationClick(notification)}
-                      >
-                        <CardContent className="p-4">
-                          <div className="flex items-start justify-between">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2 mb-2">
+                <DataTablePagination data={filteredNotifications}>
+                  {(paginatedNotifications) => (
+                    <div className="space-y-3">
+                      {paginatedNotifications.map((notification: Notification) => (
+                        <Card 
+                          key={notification.id} 
+                          className={`cursor-pointer transition-all hover:shadow-md ${
+                            notification.status === 'unread' ? 'border-l-4 border-l-primary bg-primary/5' : ''
+                          } ${getNotificationPriorityColor(notification.priority)}`}
+                          onClick={() => handleNotificationClick(notification)}
+                        >
+                          <CardContent className="p-4">
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-2">
+                                  {notification.status === 'unread' && (
+                                    <div className="w-2 h-2 bg-primary rounded-full"></div>
+                                  )}
+                                  <h4 className="font-semibold text-gray-900">{notification.subject}</h4>
+                                  <Badge variant="outline" className="text-xs">
+                                    {notification.priority}
+                                  </Badge>
+                                  <Badge variant="secondary" className="text-xs">
+                                    {notification.category}
+                                  </Badge>
+                                </div>
+                                <p className="text-gray-600 text-sm mb-2 line-clamp-2">{notification.message}</p>
+                                <div className="flex items-center gap-3 text-xs text-gray-500">
+                                  <span>From: {notification.sender?.name || 'System'}</span>
+                                  <span>•</span>
+                                  <span>{formatDistanceToNow(new Date(notification.createdAt), { addSuffix: true })}</span>
+                                </div>
+                              </div>
+                              <div className="flex gap-1 ml-4">
                                 {notification.status === 'unread' && (
-                                  <div className="w-2 h-2 bg-primary rounded-full"></div>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      markAsReadMutation.mutate(notification.id);
+                                    }}
+                                  >
+                                    <Mail className="h-3 w-3" />
+                                  </Button>
                                 )}
-                                <h4 className="font-semibold text-gray-900">{notification.subject}</h4>
-                                <Badge variant="outline" className="text-xs">
-                                  {notification.priority}
-                                </Badge>
-                                <Badge variant="secondary" className="text-xs">
-                                  {notification.category}
-                                </Badge>
-                              </div>
-                              <p className="text-gray-600 text-sm mb-2 line-clamp-2">{notification.message}</p>
-                              <div className="flex items-center gap-3 text-xs text-gray-500">
-                                <span>From: {notification.sender?.name || 'System'}</span>
-                                <span>•</span>
-                                <span>{formatDistanceToNow(new Date(notification.createdAt), { addSuffix: true })}</span>
-                              </div>
-                            </div>
-                            <div className="flex gap-1 ml-4">
-                              {notification.status === 'unread' && (
                                 <Button
                                   variant="ghost"
                                   size="sm"
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    markAsReadMutation.mutate(notification.id);
+                                    archiveNotificationMutation.mutate(notification.id);
                                   }}
                                 >
-                                  <Mail className="h-3 w-3" />
+                                  <Archive className="h-3 w-3" />
                                 </Button>
-                              )}
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  archiveNotificationMutation.mutate(notification.id);
-                                }}
-                              >
-                                <Archive className="h-3 w-3" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setSelectedNotification(notification);
-                                }}
-                              >
-                                <Reply className="h-3 w-3" />
-                              </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedNotification(notification);
+                                  }}
+                                >
+                                  <Reply className="h-3 w-3" />
+                                </Button>
+                              </div>
                             </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                </ScrollArea>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  )}
+                </DataTablePagination>
               )}
             </div>
           </TabsContent>
