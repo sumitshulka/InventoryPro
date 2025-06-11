@@ -134,12 +134,20 @@ export default function WarehousesPage() {
 
   const deleteWarehouseMutation = useMutation({
     mutationFn: async (warehouseId: number) => {
-      return apiRequest(`/api/warehouses/${warehouseId}`, {
+      const response = await fetch(`/api/warehouses/${warehouseId}`, {
         method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
       });
+      if (!response.ok) {
+        throw new Error("Failed to archive warehouse");
+      }
+      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/warehouses"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/warehouses/stats"] });
       invalidateRelatedQueries();
       toast({
         title: "Success",

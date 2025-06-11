@@ -56,7 +56,7 @@ import session from "express-session";
 import connectPg from "connect-pg-simple";
 import createMemoryStore from "memorystore";
 import { db, pool } from "./db";
-import { eq, and, desc, or } from "drizzle-orm";
+import { eq, and, desc, or, ne } from "drizzle-orm";
 
 const MemoryStore = createMemoryStore(session);
 const PostgresSessionStore = connectPg(session);
@@ -99,6 +99,7 @@ export interface IStorage {
   getWarehouseByName(name: string): Promise<Warehouse | undefined>;
   createWarehouse(warehouse: InsertWarehouse): Promise<Warehouse>;
   getAllWarehouses(): Promise<Warehouse[]>;
+  getActiveWarehouses(): Promise<Warehouse[]>;
   updateWarehouse(id: number, warehouseData: Partial<InsertWarehouse>): Promise<Warehouse | undefined>;
   deleteWarehouse(id: number): Promise<boolean>;
   archiveWarehouse(id: number): Promise<Warehouse | undefined>;
@@ -690,6 +691,12 @@ export class MemStorage implements IStorage {
 
   async getAllWarehouses(): Promise<Warehouse[]> {
     return Array.from(this.warehouses.values());
+  }
+
+  async getActiveWarehouses(): Promise<Warehouse[]> {
+    return Array.from(this.warehouses.values()).filter(
+      warehouse => warehouse.status !== 'deleted'
+    );
   }
 
   async updateWarehouse(id: number, warehouseData: Partial<InsertWarehouse>): Promise<Warehouse | undefined> {
@@ -1394,6 +1401,10 @@ export class DatabaseStorage implements IStorage {
 
   async getAllWarehouses(): Promise<Warehouse[]> {
     return await db.select().from(warehouses);
+  }
+
+  async getActiveWarehouses(): Promise<Warehouse[]> {
+    return await db.select().from(warehouses).where(ne(warehouses.status, 'deleted'));
   }
 
   async updateWarehouse(id: number, warehouseData: Partial<InsertWarehouse>): Promise<Warehouse | undefined> {

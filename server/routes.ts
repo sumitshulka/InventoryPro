@@ -242,7 +242,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ==== Warehouse Routes ====
-  // Get all warehouses with manager information
+  // Get all warehouses with manager information (including archived)
   app.get("/api/warehouses", async (req, res) => {
     try {
       const warehouses = await storage.getAllWarehouses();
