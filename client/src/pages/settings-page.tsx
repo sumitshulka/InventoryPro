@@ -107,7 +107,7 @@ export default function SettingsPage() {
       orgForm.reset({
         organizationName: (organizationSettings as any).organizationName || "My Organization",
         currency: (organizationSettings as any).currency || "USD",
-        currencySymbol: (organizationSettings as any).currencySymbol || "$",
+        currencySymbol: (organizationSettings as any).currencySymbol || "₹",
         timezone: (organizationSettings as any).timezone || "UTC",
         defaultUnits: (organizationSettings as any).defaultUnits || ["pcs", "boxes", "reams", "kg", "liters"],
         allowedCategories: (organizationSettings as any).allowedCategories || ["Electronics", "Office Supplies", "Furniture"],
@@ -445,7 +445,7 @@ export default function SettingsPage() {
                               CNY: "¥",
                               INR: "₹"
                             };
-                            orgForm.setValue("currencySymbol", symbols[value] || "$");
+                            orgForm.setValue("currencySymbol", symbols[value] || "₹");
                           }}
                           defaultValue={orgForm.getValues("currency")}
                         >

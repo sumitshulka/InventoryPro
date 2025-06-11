@@ -11,6 +11,7 @@ import {
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useLocation } from "wouter";
+import { useCurrency } from "@/hooks/use-currency";
 import { formatDateTime, getStatusColor, getTransactionTypeColor } from "@/lib/utils";
 
 type RecentTransactionsProps = {
@@ -19,6 +20,7 @@ type RecentTransactionsProps = {
 
 export default function RecentTransactions({ transactions }: RecentTransactionsProps) {
   const [_, navigate] = useLocation();
+  const { formatCurrencyFull } = useCurrency();
 
   const { data: items } = useQuery({
     queryKey: ["/api/items"],

@@ -578,7 +578,7 @@ export default function CheckInPage() {
                               <TableCell>{transaction.quantity}</TableCell>
                               <TableCell>
                                 {transaction.cost ? 
-                                  `${organizationSettings?.currencySymbol || "$"}${Number(transaction.cost).toFixed(2)}` : 
+                                  formatCurrencyFull(Number(transaction.cost)) : 
                                   "-"
                                 }
                               </TableCell>
