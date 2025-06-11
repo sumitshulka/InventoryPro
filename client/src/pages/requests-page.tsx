@@ -88,7 +88,7 @@ export default function RequestsPage() {
     queryKey: ["/api/users"],
   });
 
-  const { data: inventory, isLoading: inventoryLoading } = useQuery({
+  const { data: inventory, isLoading: inventoryLoading, refetch: refetchInventory } = useQuery({
     queryKey: ["/api/reports/inventory-stock"],
   });
 
@@ -279,8 +279,11 @@ export default function RequestsPage() {
               variant="outline"
               size="sm"
               onClick={async () => {
-                await queryClient.refetchQueries({ queryKey: ['/api/requests'] });
-                await queryClient.refetchQueries({ queryKey: ['/api/reports/inventory-stock'] });
+                await refetchRequests();
+                await refetchInventory();
+                await refetchUsers();
+                await refetchWarehouses();
+                await refetchItems();
               }}
               className="ml-2"
             >
