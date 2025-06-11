@@ -436,11 +436,17 @@ export default function RequestsPage() {
                           <SelectValue placeholder="Select an item" />
                         </SelectTrigger>
                         <SelectContent>
-                          {items?.map((item: any) => (
-                            <SelectItem key={item.id} value={item.id.toString()}>
-                              {item.name} ({item.sku})
-                            </SelectItem>
-                          ))}
+                          {items?.length > 0 ? (
+                            items.map((item: any) => (
+                              <SelectItem key={item.id} value={item.id.toString()}>
+                                {item.name} ({item.sku})
+                              </SelectItem>
+                            ))
+                          ) : (
+                            <div className="p-2 text-sm text-gray-500">
+                              No items available. Create items in Item Master first.
+                            </div>
+                          )}
                         </SelectContent>
                       </Select>
                       {form.formState.errors.items?.[index]?.itemId && (

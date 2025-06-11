@@ -383,11 +383,19 @@ export default function UsersManagementPage() {
                       <SelectItem value="none">No Manager</SelectItem>
                       {(users as any[])?.filter((u: any) => 
                         (u.role === 'admin' || u.role === 'manager') && u.id !== editUserId
-                      ).map((manager: any) => (
-                        <SelectItem key={manager.id} value={manager.id.toString()}>
-                          {manager.name} ({manager.role})
-                        </SelectItem>
-                      ))}
+                      ).length > 0 ? (
+                        (users as any[])?.filter((u: any) => 
+                          (u.role === 'admin' || u.role === 'manager') && u.id !== editUserId
+                        ).map((manager: any) => (
+                          <SelectItem key={manager.id} value={manager.id.toString()}>
+                            {manager.name} ({manager.role})
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <div className="p-2 text-sm text-gray-500">
+                          No managers available
+                        </div>
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
@@ -403,11 +411,17 @@ export default function UsersManagementPage() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">No Default Warehouse</SelectItem>
-                      {(warehouses as any[])?.map((warehouse: any) => (
-                        <SelectItem key={warehouse.id} value={warehouse.id.toString()}>
-                          {warehouse.name}
-                        </SelectItem>
-                      ))}
+                      {(warehouses as any[])?.length > 0 ? (
+                        (warehouses as any[])?.map((warehouse: any) => (
+                          <SelectItem key={warehouse.id} value={warehouse.id.toString()}>
+                            {warehouse.name}
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <div className="p-2 text-sm text-gray-500">
+                          No warehouses available
+                        </div>
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
@@ -423,11 +437,17 @@ export default function UsersManagementPage() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">No Department</SelectItem>
-                      {(departments as any[])?.map((department: any) => (
-                        <SelectItem key={department.id} value={department.id.toString()}>
-                          {department.name}
-                        </SelectItem>
-                      ))}
+                      {(departments as any[])?.length > 0 ? (
+                        (departments as any[])?.map((department: any) => (
+                          <SelectItem key={department.id} value={department.id.toString()}>
+                            {department.name}
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <div className="p-2 text-sm text-gray-500">
+                          No departments available
+                        </div>
+                      )}
                     </SelectContent>
                   </Select>
                 </div>

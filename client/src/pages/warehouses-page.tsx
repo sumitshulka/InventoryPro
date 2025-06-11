@@ -357,11 +357,19 @@ export default function WarehousesPage() {
                     <SelectItem value="none">No Manager</SelectItem>
                     {(users as any[])?.filter((u: any) => 
                       u.role === 'admin' || u.role === 'manager'
-                    ).map((manager: any) => (
-                      <SelectItem key={manager.id} value={manager.id.toString()}>
-                        {manager.name} ({manager.role})
-                      </SelectItem>
-                    ))}
+                    ).length > 0 ? (
+                      (users as any[])?.filter((u: any) => 
+                        u.role === 'admin' || u.role === 'manager'
+                      ).map((manager: any) => (
+                        <SelectItem key={manager.id} value={manager.id.toString()}>
+                          {manager.name} ({manager.role})
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <div className="p-2 text-sm text-gray-500">
+                        No managers available
+                      </div>
+                    )}
                   </SelectContent>
                 </Select>
                 {form.formState.errors.managerId && (
