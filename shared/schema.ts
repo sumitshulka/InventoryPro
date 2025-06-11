@@ -43,6 +43,29 @@ export const insertUserSchema = createInsertSchema(users).pick({
   departmentId: true,
 });
 
+// Office Locations
+export const locations = pgTable("locations", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull().unique(),
+  address: text("address").notNull(),
+  city: text("city").notNull(),
+  state: text("state").notNull(),
+  zipCode: text("zip_code").notNull(),
+  country: text("country").notNull().default("India"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertLocationSchema = createInsertSchema(locations).pick({
+  name: true,
+  address: true,
+  city: true,
+  state: true,
+  zipCode: true,
+  country: true,
+  isActive: true,
+});
+
 // Categories for items
 export const categories = pgTable("categories", {
   id: serial("id").primaryKey(),
@@ -59,7 +82,7 @@ export const insertCategorySchema = createInsertSchema(categories).pick({
 export const warehouses = pgTable("warehouses", {
   id: serial("id").primaryKey(),
   name: text("name").notNull().unique(),
-  location: text("location").notNull(),
+  locationId: integer("location_id").notNull().references(() => locations.id),
   managerId: integer("manager_id").references(() => users.id),
   capacity: integer("capacity").notNull(),
   isActive: boolean("is_active").notNull().default(true),
@@ -67,7 +90,7 @@ export const warehouses = pgTable("warehouses", {
 
 export const insertWarehouseSchema = createInsertSchema(warehouses).pick({
   name: true,
-  location: true,
+  locationId: true,
   managerId: true,
   capacity: true,
   isActive: true,
@@ -429,3 +452,6 @@ export const insertRejectedGoodsSchema = createInsertSchema(rejectedGoods).pick(
 
 export type RejectedGoods = typeof rejectedGoods.$inferSelect;
 export type InsertRejectedGoods = z.infer<typeof insertRejectedGoodsSchema>;
+
+export type Location = typeof locations.$inferSelect;
+export type InsertLocation = z.infer<typeof insertLocationSchema>;

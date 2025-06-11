@@ -1,6 +1,8 @@
 import { 
   User, 
   InsertUser, 
+  Location,
+  InsertLocation,
   Category, 
   InsertCategory, 
   Warehouse, 
@@ -33,6 +35,7 @@ import {
   RejectedGoods,
   InsertRejectedGoods,
   users,
+  locations,
   categories,
   warehouses,
   items,
@@ -66,6 +69,14 @@ export interface IStorage {
   getAllUsers(): Promise<User[]>;
   updateUser(id: number, userData: Partial<InsertUser>): Promise<User | undefined>;
   deleteUser(id: number): Promise<boolean>;
+
+  // Location operations
+  getLocation(id: number): Promise<Location | undefined>;
+  getLocationByName(name: string): Promise<Location | undefined>;
+  createLocation(location: InsertLocation): Promise<Location>;
+  getAllLocations(): Promise<Location[]>;
+  updateLocation(id: number, locationData: Partial<InsertLocation>): Promise<Location | undefined>;
+  deleteLocation(id: number): Promise<boolean>;
 
   // Category operations
   getCategory(id: number): Promise<Category | undefined>;
