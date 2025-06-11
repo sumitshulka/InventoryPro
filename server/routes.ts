@@ -2850,6 +2850,152 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get inventory valuation report
+  app.get("/api/reports/inventory-valuation", async (req, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      // Get organization settings to determine valuation method
+      const orgSettings = await db.select().from(organizationSettings).limit(1);
+      const valuationMethod = orgSettings[0]?.inventoryValuationMethod || 'Last Value';
+
+      // Get all inventory with item details
+      const inventoryData = await db.select({
+        inventoryId: inventory.id,
+        itemId: inventory.itemId,
+        warehouseId: inventory.warehouseId,
+        quantity: inventory.quantity,
+        itemName: items.name,
+        itemSku: items.sku,
+        itemCategoryId: items.categoryId,
+        itemUnit: items.unit,
+        warehouseName: warehouses.name,
+      })
+      .from(inventory)
+      .leftJoin(items, eq(inventory.itemId, items.id))
+      .leftJoin(warehouses, eq(inventory.warehouseId, warehouses.id));
+
+      const valuationReport = [];
+
+      for (const invItem of inventoryData) {
+        if (!invItem.itemId || invItem.quantity <= 0) continue;
+
+        // Get check-in transactions for this item to calculate valuation
+        const checkInTransactions = await db.select({
+          id: transactions.id,
+          cost: transactions.cost,
+          quantity: transactions.quantity,
+          createdAt: transactions.createdAt,
+        })
+        .from(transactions)
+        .where(
+          and(
+            eq(transactions.itemId, invItem.itemId),
+            eq(transactions.transactionType, 'check-in')
+          )
+        )
+        .orderBy(transactions.createdAt);
+
+        if (checkInTransactions.length === 0) {
+          // No check-in transactions, skip this item
+          continue;
+        }
+
+        let unitValue = 0;
+        let lastCheckInDate = null;
+        let firstCheckInDate = null;
+
+        if (checkInTransactions.length > 0) {
+          firstCheckInDate = checkInTransactions[0].createdAt;
+          lastCheckInDate = checkInTransactions[checkInTransactions.length - 1].createdAt;
+        }
+
+        // Calculate unit value based on valuation method
+        switch (valuationMethod) {
+          case 'Last Value':
+            // Use the cost from the most recent check-in
+            const lastTransaction = checkInTransactions[checkInTransactions.length - 1];
+            unitValue = parseFloat(lastTransaction.cost || '0');
+            break;
+
+          case 'Earliest Value':
+            // Use the cost from the first check-in
+            const firstTransaction = checkInTransactions[0];
+            unitValue = parseFloat(firstTransaction.cost || '0');
+            break;
+
+          case 'Average Value':
+            // Calculate weighted average: total cost / total quantity
+            let totalCost = 0;
+            let totalQuantity = 0;
+            
+            for (const transaction of checkInTransactions) {
+              const cost = parseFloat(transaction.cost || '0');
+              if (cost && transaction.quantity) {
+                totalCost += cost * transaction.quantity;
+                totalQuantity += transaction.quantity;
+              }
+            }
+            
+            unitValue = totalQuantity > 0 ? totalCost / totalQuantity : 0;
+            break;
+
+          default:
+            unitValue = 0;
+        }
+
+        const totalValue = unitValue * invItem.quantity;
+
+        // Get category name if categoryId exists
+        let categoryName = 'Uncategorized';
+        if (invItem.itemCategoryId) {
+          const categoryResult = await db.select({
+            name: categories.name
+          })
+          .from(categories)
+          .where(eq(categories.id, invItem.itemCategoryId))
+          .limit(1);
+          
+          categoryName = categoryResult[0]?.name || 'Uncategorized';
+        }
+
+        valuationReport.push({
+          id: invItem.inventoryId,
+          name: invItem.itemName || 'Unknown Item',
+          sku: invItem.itemSku || 'N/A',
+          category: categoryName,
+          warehouse: invItem.warehouseName || 'Unknown Warehouse',
+          currentStock: invItem.quantity,
+          unit: invItem.itemUnit || 'pcs',
+          unitValue: unitValue,
+          totalValue: totalValue,
+          valuationMethod: valuationMethod,
+          lastCheckInDate: lastCheckInDate,
+          firstCheckInDate: firstCheckInDate,
+        });
+      }
+
+      // Log audit event
+      await logAuditEvent(
+        req.user.id,
+        'VIEW',
+        'report',
+        null,
+        `Generated inventory valuation report using ${valuationMethod} method`,
+        null,
+        null,
+        req
+      );
+
+      res.json(valuationReport);
+    } catch (error: any) {
+      console.error('Error generating inventory valuation report:', error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Create new issue
   app.post("/api/issues", async (req, res) => {
     try {

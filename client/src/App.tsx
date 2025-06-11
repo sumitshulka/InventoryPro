@@ -15,6 +15,7 @@ import RejectedGoodsPage from "@/pages/rejected-goods-page";
 import MyRequestsPage from "@/pages/my-requests-page";
 import StockReportPage from "@/pages/stock-report-page";
 import MovementReportPage from "@/pages/movement-report-page";
+import InventoryValuationReportPage from "@/pages/inventory-valuation-report-page";
 import UserManagementPage from "@/pages/user-management-page";
 import UsersManagementPage from "@/pages/users-management-page";
 import CategoriesPage from "@/pages/categories-page";
