@@ -3,7 +3,6 @@ import { useQuery } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { getUserInitials } from "@/lib/utils";
 import { User } from "@shared/schema";
-import { useMobile } from "@/hooks/use-mobile";
 
 type SidebarProps = {
   user: User;
@@ -13,7 +12,7 @@ type SidebarProps = {
 
 export default function Sidebar({ user, isOpen, onClose }: SidebarProps) {
   const [location] = useLocation();
-  const isMobile = useMobile();
+
   
   const { data: userOperatedWarehouses = [] } = useQuery<number[]>({
     queryKey: ["/api/users", user?.id, "operated-warehouses"],
@@ -27,13 +26,7 @@ export default function Sidebar({ user, isOpen, onClose }: SidebarProps) {
     return location === path;
   };
 
-  const handleNavClick = () => {
-    // Only close sidebar on mobile after navigation
-    if (isMobile) {
-      onClose();
-    }
-    // On desktop, sidebar remains open
-  };
+
 
   return (
     <>
@@ -79,7 +72,6 @@ export default function Sidebar({ user, isOpen, onClose }: SidebarProps) {
               <li>
                 <Link 
                   href="/"
-                  onClick={handleNavClick}
                   className={cn(
                     "flex items-center px-3 py-2 rounded-md",
                     isActive("/") 
@@ -94,7 +86,6 @@ export default function Sidebar({ user, isOpen, onClose }: SidebarProps) {
               <li>
                 <Link 
                   href="/inventory"
-                  onClick={handleNavClick}
                   className={cn(
                     "flex items-center px-3 py-2 rounded-md",
                     isActive("/inventory") 
@@ -356,7 +347,6 @@ export default function Sidebar({ user, isOpen, onClose }: SidebarProps) {
                 <li>
                   <Link 
                     href="/notifications"
-                    onClick={handleNavClick}
                     className={cn(
                       "flex items-center px-3 py-2 rounded-md",
                       isActive("/notifications") 
