@@ -16,9 +16,13 @@ export default function AppLayout({ children }: AppLayoutProps) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(!isMobile); // Open on desktop, closed on mobile
   const [location, setLocation] = useLocation();
 
-  // Update sidebar state when screen size changes
+  // Update sidebar state when screen size changes - but preserve user preference on desktop
   useEffect(() => {
-    setIsSidebarOpen(!isMobile);
+    if (isMobile) {
+      setIsSidebarOpen(false); // Close on mobile
+    } else {
+      setIsSidebarOpen(true); // Always open on desktop
+    }
   }, [isMobile]);
 
 
@@ -80,7 +84,12 @@ export default function AppLayout({ children }: AppLayoutProps) {
       <Sidebar 
         user={user} 
         isOpen={isSidebarOpen} 
-        onClose={() => setIsSidebarOpen(false)}
+        onClose={() => {
+          // Only allow closing on mobile
+          if (isMobile) {
+            setIsSidebarOpen(false);
+          }
+        }}
       />
       
       {/* Overlay for mobile sidebar */}

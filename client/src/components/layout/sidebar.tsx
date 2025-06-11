@@ -28,14 +28,11 @@ export default function Sidebar({ user, isOpen, onClose }: SidebarProps) {
   };
 
   const handleNavClick = () => {
-    // Debug: Force sidebar to stay open on desktop
-    console.log('Navigation clicked, isMobile:', isMobile, 'screen width:', window.innerWidth);
-    if (isMobile && window.innerWidth < 768) {
-      console.log('Closing sidebar on mobile');
+    // Only close sidebar on mobile after navigation
+    if (isMobile) {
       onClose();
-    } else {
-      console.log('Keeping sidebar open on desktop');
     }
+    // On desktop, sidebar remains open
   };
 
   return (
