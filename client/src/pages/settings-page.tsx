@@ -433,6 +433,14 @@ export default function SettingsPage() {
     }
   };
 
+  const onDepartmentSubmit = (data: DepartmentFormValues) => {
+    if (editingDepartment) {
+      updateDepartmentMutation.mutate({ ...data, id: editingDepartment.id });
+    } else {
+      createDepartmentMutation.mutate(data);
+    }
+  };
+
   const onOrgSubmit = (data: OrganizationSettingsFormValues) => {
     updateOrgSettingsMutation.mutate(data);
   };
@@ -452,6 +460,23 @@ export default function SettingsPage() {
   const handleDelete = (id: number) => {
     if (confirm("Are you sure you want to delete this approval setting?")) {
       deleteMutation.mutate(id);
+    }
+  };
+
+  const handleEditDepartment = (department: any) => {
+    setEditingDepartment(department);
+    departmentForm.reset({
+      name: department.name,
+      description: department.description || "",
+      managerId: department.managerId || undefined,
+      isActive: department.isActive,
+    });
+    setIsDepartmentDialogOpen(true);
+  };
+
+  const handleDeleteDepartment = (id: number) => {
+    if (confirm("Are you sure you want to delete this department?")) {
+      deleteDepartmentMutation.mutate(id);
     }
   };
 
@@ -584,6 +609,101 @@ export default function SettingsPage() {
                         <TableRow>
                           <TableCell colSpan={6} className="text-center py-8 text-gray-500">
                             No approval settings configured
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="departments" className="space-y-4">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+                <div>
+                  <CardTitle>Department Management</CardTitle>
+                  <p className="text-sm text-muted-foreground">
+                    Manage organizational departments and assign users
+                  </p>
+                </div>
+                <Button onClick={() => {
+                  setEditingDepartment(null);
+                  departmentForm.reset();
+                  setIsDepartmentDialogOpen(true);
+                }}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Department
+                </Button>
+              </CardHeader>
+              <CardContent>
+                {departmentsLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-6 w-6 animate-spin" />
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Department Name</TableHead>
+                        <TableHead>Description</TableHead>
+                        <TableHead>Manager</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {departments && Array.isArray(departments) && departments.length > 0 ? (
+                        departments.map((department: any) => {
+                          const manager = users && Array.isArray(users) ? users.find((u: any) => u.id === department.managerId) : null;
+                          return (
+                            <TableRow key={department.id}>
+                              <TableCell className="font-medium">
+                                {department.name}
+                              </TableCell>
+                              <TableCell>
+                                {department.description || "No description"}
+                              </TableCell>
+                              <TableCell>
+                                {manager ? manager.name : "No manager assigned"}
+                              </TableCell>
+                              <TableCell>
+                                <span
+                                  className={`px-2 py-1 text-xs rounded-full ${
+                                    department.isActive
+                                      ? "bg-green-100 text-green-800"
+                                      : "bg-gray-100 text-gray-800"
+                                  }`}
+                                >
+                                  {department.isActive ? "Active" : "Inactive"}
+                                </span>
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex space-x-2">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleEditDepartment(department)}
+                                  >
+                                    <Edit className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleDeleteDepartment(department.id)}
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })
+                      ) : (
+                        <TableRow>
+                          <TableCell colSpan={5} className="text-center py-8 text-gray-500">
+                            No departments configured
                           </TableCell>
                         </TableRow>
                       )}
@@ -1209,6 +1329,104 @@ export default function SettingsPage() {
                   </>
                 ) : (
                   editingLocation ? "Update Location" : "Create Location"
+                )}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Department Form Dialog */}
+      <Dialog open={isDepartmentDialogOpen} onOpenChange={setIsDepartmentDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>
+              {editingDepartment ? "Edit Department" : "Add New Department"}
+            </DialogTitle>
+            <DialogDescription>
+              {editingDepartment 
+                ? "Update the department information below." 
+                : "Create a new department for your organization."}
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={departmentForm.handleSubmit(onDepartmentSubmit)} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="dept-name">Department Name</Label>
+              <Input
+                id="dept-name"
+                {...departmentForm.register("name")}
+                placeholder="Enter department name"
+              />
+              {departmentForm.formState.errors.name && (
+                <p className="text-sm text-destructive">
+                  {departmentForm.formState.errors.name.message}
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="dept-description">Description</Label>
+              <Input
+                id="dept-description"
+                {...departmentForm.register("description")}
+                placeholder="Enter department description (optional)"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="dept-manager">Department Manager</Label>
+              <Select
+                value={departmentForm.watch("managerId")?.toString() || ""}
+                onValueChange={(value) => 
+                  departmentForm.setValue("managerId", value ? parseInt(value) : undefined)
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a manager (optional)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">No manager assigned</SelectItem>
+                  {users && Array.isArray(users) && users.map((user: any) => (
+                    <SelectItem key={user.id} value={user.id.toString()}>
+                      {user.name} ({user.role})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <Switch
+                id="dept-isActive"
+                checked={departmentForm.watch("isActive")}
+                onCheckedChange={(checked) => departmentForm.setValue("isActive", checked)}
+              />
+              <Label htmlFor="dept-isActive">Active Department</Label>
+            </div>
+
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setIsDepartmentDialogOpen(false);
+                  setEditingDepartment(null);
+                  departmentForm.reset();
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={createDepartmentMutation.isPending || updateDepartmentMutation.isPending}
+              >
+                {createDepartmentMutation.isPending || updateDepartmentMutation.isPending ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    {editingDepartment ? "Updating..." : "Creating..."}
+                  </>
+                ) : (
+                  editingDepartment ? "Update Department" : "Create Department"
                 )}
               </Button>
             </DialogFooter>
