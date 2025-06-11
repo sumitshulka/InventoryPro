@@ -42,7 +42,7 @@ import {
   notifications
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, and, lte, exists, isNotNull } from "drizzle-orm";
+import { eq, desc, and, lte, exists, isNotNull, or } from "drizzle-orm";
 
 // Utility function to check required role
 const checkRole = (requiredRole: string) => {
@@ -2803,7 +2803,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Not authenticated" });
       }
 
-      const logs = await db.select({
+      let whereConditions;
+
+      if (req.user.role === 'admin') {
+        // Admins can view all audit logs
+        whereConditions = undefined;
+      } else if (req.user.role === 'manager') {
+        // Managers can view their own logs and logs of their subordinates
+        whereConditions = or(
+          eq(auditLogs.userId, req.user.id),
+          exists(
+            db.select()
+              .from(users)
+              .where(and(
+                eq(users.id, auditLogs.userId),
+                eq(users.managerId, req.user.id)
+              ))
+          )
+        );
+      } else {
+        // Regular users can only view their own audit logs
+        whereConditions = eq(auditLogs.userId, req.user.id);
+      }
+
+      const query = db.select({
         id: auditLogs.id,
         userId: auditLogs.userId,
         action: auditLogs.action,
@@ -2826,6 +2849,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       .leftJoin(users, eq(auditLogs.userId, users.id))
       .orderBy(desc(auditLogs.createdAt))
       .limit(100);
+
+      const logs = whereConditions ? await query.where(whereConditions) : await query;
 
       res.json(logs);
     } catch (error: any) {
