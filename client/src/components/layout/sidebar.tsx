@@ -42,7 +42,8 @@ export default function Sidebar({ user, isOpen, onClose }: SidebarProps) {
         className={cn(
           "bg-white shrink-0 shadow-md overflow-y-auto transition-all duration-300 z-30",
           "w-64",
-          isOpen ? "block" : "hidden md:block",
+          "md:block", // Always show on desktop
+          isOpen ? "block" : "hidden", // Mobile visibility based on isOpen
           "md:static fixed inset-y-0 left-0"
         )}
       >
