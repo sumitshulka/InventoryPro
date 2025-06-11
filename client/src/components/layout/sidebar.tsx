@@ -25,11 +25,12 @@ export default function Sidebar({ user, isOpen, onClose }: SidebarProps) {
     return location === path;
   };
 
-  const handleNavClick = () => {
-    // Close sidebar on mobile after navigation
+  const handleNavClick = (e: React.MouseEvent) => {
+    // Only close sidebar on mobile after navigation
     if (window.innerWidth < 768) {
       onClose();
     }
+    // On desktop, sidebar should remain open - no action needed
   };
 
   return (
@@ -37,8 +38,10 @@ export default function Sidebar({ user, isOpen, onClose }: SidebarProps) {
       <aside 
         id="sidebar"
         className={cn(
-          "bg-white shrink-0 shadow-md overflow-y-auto transition-all duration-300 z-30 md:static",
-          "w-64 block"
+          "bg-white shrink-0 shadow-md overflow-y-auto transition-all duration-300 z-30",
+          "w-64",
+          isOpen ? "block" : "hidden md:block",
+          "md:static fixed inset-y-0 left-0"
         )}
       >
         <div className="flex items-center justify-between p-4 border-b">

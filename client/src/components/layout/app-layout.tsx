@@ -13,8 +13,13 @@ type AppLayoutProps = {
 export default function AppLayout({ children }: AppLayoutProps) {
   const { user } = useAuth();
   const isMobile = useMobile();
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(!isMobile); // Open on desktop, closed on mobile
   const [location, setLocation] = useLocation();
+
+  // Update sidebar state when screen size changes
+  useEffect(() => {
+    setIsSidebarOpen(!isMobile);
+  }, [isMobile]);
 
 
 
@@ -74,7 +79,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
       {/* Sidebar */}
       <Sidebar 
         user={user} 
-        isOpen={true} 
+        isOpen={isSidebarOpen} 
         onClose={() => {
           if (isMobile) {
             setIsSidebarOpen(false);
