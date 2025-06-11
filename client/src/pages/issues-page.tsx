@@ -85,6 +85,15 @@ const issueSchema = z.object({
   itemId: z.number().optional(),
 });
 
+const notificationSchema = z.object({
+  subject: z.string().min(1, "Subject is required").max(200, "Subject too long"),
+  message: z.string().min(1, "Message is required").max(2000, "Message too long"),
+  category: z.enum(['general', 'inventory', 'request', 'transfer', 'approval']),
+  priority: z.enum(['low', 'normal', 'high', 'urgent']),
+  recipientType: z.enum(['specific', 'admins', 'managers', 'all']),
+  recipientIds: z.array(z.number()).optional(),
+});
+
 export default function IssuesPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -93,6 +102,7 @@ export default function IssuesPage() {
   const [priorityFilter, setPriorityFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [showNewIssueDialog, setShowNewIssueDialog] = useState(false);
+  const [showNewNotificationDialog, setShowNewNotificationDialog] = useState(false);
   const [activeTab, setActiveTab] = useState("issues");
   const [notificationFilter, setNotificationFilter] = useState("all");
   const [selectedNotification, setSelectedNotification] = useState<Notification | null>(null);
@@ -112,6 +122,11 @@ export default function IssuesPage() {
 
   const { data: users = [] } = useQuery({
     queryKey: ['/api/users'],
+  });
+
+  const { data: recipients = [] } = useQuery({
+    queryKey: ['/api/notifications/recipients'],
+    queryFn: () => fetch('/api/notifications/recipients').then(res => res.json()).catch(() => [])
   });
 
   // Notification queries
@@ -136,6 +151,18 @@ export default function IssuesPage() {
     },
   });
 
+  const notificationForm = useForm<z.infer<typeof notificationSchema>>({
+    resolver: zodResolver(notificationSchema),
+    defaultValues: {
+      subject: "",
+      message: "",
+      category: "general",
+      priority: "normal",
+      recipientType: "admins",
+      recipientIds: [],
+    },
+  });
+
   const createIssueMutation = useMutation({
     mutationFn: (data: z.infer<typeof issueSchema>) =>
       apiRequest('/api/issues', 'POST', data),
@@ -146,6 +173,28 @@ export default function IssuesPage() {
       toast({
         title: "Success",
         description: "Issue reported successfully",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create issue",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const createNotificationMutation = useMutation({
+    mutationFn: (data: z.infer<typeof notificationSchema>) =>
+      apiRequest('/api/notifications', 'POST', data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/notifications'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/notifications/unread-count'] });
+      setShowNewNotificationDialog(false);
+      notificationForm.reset();
+      toast({
+        title: "Success",
+        description: "Notification sent successfully",
       });
     },
     onError: (error: any) => {

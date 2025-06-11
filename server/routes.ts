@@ -2609,20 +2609,71 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Create a new notification
+  // Create a new notification (supports multiple recipients)
   app.post("/api/notifications", async (req, res) => {
     try {
       if (!req.user) {
         return res.status(401).json({ message: "Not authenticated" });
       }
       
-      const notificationData = insertNotificationSchema.parse({
-        ...req.body,
-        senderId: req.user.id
+      const { recipientIds, recipientType, ...notificationData } = req.body;
+      
+      let targetRecipients = [];
+      
+      if (recipientType === 'specific' && recipientIds) {
+        // Send to specific users
+        targetRecipients = recipientIds;
+      } else if (recipientType === 'admins') {
+        // Send to all admins
+        const adminUsers = await db.select({ id: users.id })
+          .from(users)
+          .where(eq(users.role, 'admin'));
+        targetRecipients = adminUsers.map(u => u.id);
+      } else if (recipientType === 'managers') {
+        // Send to all managers
+        const managerUsers = await db.select({ id: users.id })
+          .from(users)
+          .where(eq(users.role, 'manager'));
+        targetRecipients = managerUsers.map(u => u.id);
+      } else if (recipientType === 'all') {
+        // Send to all users (admin only)
+        if (req.user.role !== 'admin') {
+          return res.status(403).json({ message: "Only admins can send to all users" });
+        }
+        const allUsers = await db.select({ id: users.id })
+          .from(users);
+        targetRecipients = allUsers.map(u => u.id).filter(id => id !== req.user.id);
+      } else if (notificationData.recipientId) {
+        // Single recipient (backward compatibility)
+        targetRecipients = [notificationData.recipientId];
+      }
+      
+      const createdNotifications = [];
+      
+      for (const recipientId of targetRecipients) {
+        const validatedData = insertNotificationSchema.parse({
+          ...notificationData,
+          senderId: req.user.id,
+          recipientId: recipientId
+        });
+        
+        const notification = await storage.createNotification(validatedData);
+        createdNotifications.push(notification);
+      }
+      
+      // Log notification creation
+      await storage.createAuditLog({
+        userId: req.user.id,
+        action: "CREATE",
+        entity: "notification",
+        entityId: createdNotifications[0]?.id || 0,
+        details: `Created notification to ${targetRecipients.length} recipients: ${notificationData.subject}`
       });
       
-      const notification = await storage.createNotification(notificationData);
-      res.status(201).json(notification);
+      res.status(201).json({ 
+        message: `Notification sent to ${targetRecipients.length} recipients`,
+        notifications: createdNotifications 
+      });
     } catch (error: any) {
       res.status(400).json({ message: error.message });
     }
