@@ -60,6 +60,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { formatDateTime, getStatusColor } from "@/lib/utils";
+import { DataTablePagination } from "@/components/ui/data-table-pagination";
 
 const transferItemSchema = z.object({
   itemId: z.string().min(1, { message: "Item is required" }),
@@ -421,35 +422,37 @@ export default function EnhancedTransfersPage() {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Transfer Code</TableHead>
-                        <TableHead>Source</TableHead>
-                        <TableHead>Destination</TableHead>
-                        <TableHead>Mode</TableHead>
-                        <TableHead>Items</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Expected Shipment</TableHead>
-                        <TableHead>Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {transfersLoading ? (
-                        <TableRow>
-                          <TableCell colSpan={8} className="text-center py-8">
-                            <Loader2 className="h-6 w-6 animate-spin mx-auto" />
-                          </TableCell>
-                        </TableRow>
-                      ) : filteredTransfers.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={8} className="text-center py-8 text-gray-500">
-                            No transfers found
-                          </TableCell>
-                        </TableRow>
-                      ) : (
-                        filteredTransfers.map((transfer: any) => (
+                <DataTablePagination data={filteredTransfers}>
+                  {(paginatedTransfers) => (
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Transfer Code</TableHead>
+                            <TableHead>Source</TableHead>
+                            <TableHead>Destination</TableHead>
+                            <TableHead>Mode</TableHead>
+                            <TableHead>Items</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead>Expected Shipment</TableHead>
+                            <TableHead>Actions</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {transfersLoading ? (
+                            <TableRow>
+                              <TableCell colSpan={8} className="text-center py-8">
+                                <Loader2 className="h-6 w-6 animate-spin mx-auto" />
+                              </TableCell>
+                            </TableRow>
+                          ) : paginatedTransfers.length === 0 ? (
+                            <TableRow>
+                              <TableCell colSpan={8} className="text-center py-8 text-gray-500">
+                                No transfers found
+                              </TableCell>
+                            </TableRow>
+                          ) : (
+                            paginatedTransfers.map((transfer: any) => (
                           <TableRow key={transfer.id}>
                             <TableCell className="font-medium">
                               {transfer.transferCode}
@@ -567,7 +570,9 @@ export default function EnhancedTransfersPage() {
                     </TableBody>
                   </Table>
                 </div>
-              </CardContent>
+              )}
+            </DataTablePagination>
+          </CardContent>
             </Card>
 
             {/* Warehouse Requirement Message */}
