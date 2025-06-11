@@ -42,7 +42,7 @@ import {
   notifications
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, and, lte } from "drizzle-orm";
+import { eq, desc, and, lte, exists, isNotNull } from "drizzle-orm";
 
 // Utility function to check required role
 const checkRole = (requiredRole: string) => {
@@ -2887,9 +2887,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const valuationReport = [];
 
       for (const invItem of inventoryData) {
-        if (!invItem.itemId || invItem.quantity <= 0) continue;
+        if (!invItem.itemId) continue;
 
-        // Get check-in transactions for this item up to the "as of" date
+        // Get all transactions for this item and warehouse up to the "as of" date
         const allTransactions = await db.select()
         .from(transactions)
         .where(and(
@@ -2898,16 +2898,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ))
         .orderBy(transactions.createdAt);
 
-        // Filter for check-in transactions only
-        const checkInTransactions = allTransactions.filter(t => t.transactionType === 'check-in');
-
-        // Also calculate inventory position as of the date by processing all transactions
+        // Calculate inventory position as of the date by processing all transactions for this warehouse
         let inventoryAsOfDate = 0;
         for (const transaction of allTransactions) {
-          if (transaction.transactionType === 'check-in') {
+          if (transaction.transactionType === 'check-in' && transaction.destinationWarehouseId === invItem.warehouseId) {
             inventoryAsOfDate += transaction.quantity;
-          } else if (transaction.transactionType === 'issue') {
+          } else if (transaction.transactionType === 'issue' && transaction.sourceWarehouseId === invItem.warehouseId) {
             inventoryAsOfDate -= transaction.quantity;
+          } else if (transaction.transactionType === 'transfer') {
+            if (transaction.sourceWarehouseId === invItem.warehouseId) {
+              inventoryAsOfDate -= transaction.quantity;
+            }
+            if (transaction.destinationWarehouseId === invItem.warehouseId && transaction.status === 'completed') {
+              inventoryAsOfDate += transaction.quantity;
+            }
           }
         }
 
@@ -2915,6 +2919,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (inventoryAsOfDate <= 0) {
           continue;
         }
+
+        // Filter for check-in transactions only for this warehouse
+        const checkInTransactions = allTransactions.filter(t => 
+          t.transactionType === 'check-in' && 
+          t.destinationWarehouseId === invItem.warehouseId
+        );
 
         if (checkInTransactions.length === 0) {
           // No check-in transactions, skip this item
