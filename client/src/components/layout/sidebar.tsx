@@ -157,7 +157,7 @@ export default function Sidebar({ user, isOpen, onClose }: SidebarProps) {
                       )}
                     >
                       <span className="material-icons mr-3">receipt_long</span>
-                      <span className="whitespace-nowrap">My Requests</span>
+                      <span className="whitespace-nowrap">Check Out Request</span>
                     </Link>
                   </li>
                   <li>
@@ -170,8 +170,8 @@ export default function Sidebar({ user, isOpen, onClose }: SidebarProps) {
                           : "text-gray-700 hover:text-primary hover:bg-primary/5"
                       )}
                     >
-                      <span className="material-icons mr-3">error_outline</span>
-                      <span className="whitespace-nowrap">Issues</span>
+                      <span className="material-icons mr-3">notifications</span>
+                      <span className="whitespace-nowrap">Notification Center</span>
                     </Link>
                   </li>
                   <li>
@@ -198,7 +198,7 @@ export default function Sidebar({ user, isOpen, onClose }: SidebarProps) {
                           : "text-gray-700 hover:text-primary hover:bg-primary/5"
                       )}
                     >
-                      <span className="material-icons mr-3">error_outline</span>
+                      <span className="material-icons mr-3">block</span>
                       <span className="whitespace-nowrap">Rejected Goods</span>
                     </Link>
                   </li>
@@ -235,7 +235,7 @@ export default function Sidebar({ user, isOpen, onClose }: SidebarProps) {
                           : "text-gray-700 hover:text-primary hover:bg-primary/5"
                       )}
                     >
-                      <span className="material-icons mr-3">inventory</span>
+                      <span className="material-icons mr-3">assessment</span>
                       <span className="whitespace-nowrap">Stock Report</span>
                     </Link>
                   </li>
@@ -326,24 +326,7 @@ export default function Sidebar({ user, isOpen, onClose }: SidebarProps) {
                         <span className="whitespace-nowrap">Departments</span>
                       </Link>
                     </li>
-                    <li>
-                      <Link 
-                        href="/notifications"
-                        className={cn(
-                          "flex items-center px-3 py-2 rounded-md",
-                          isActive("/notifications") 
-                            ? "bg-primary/10 border-l-4 border-primary text-primary" 
-                            : "text-gray-700 hover:text-primary hover:bg-primary/5"
-                        )}
-                        onClick={(e) => {
-                          // Prevent sidebar from closing on mobile/tablet for notification center
-                          e.stopPropagation();
-                        }}
-                      >
-                        <span className="material-icons mr-3">notifications</span>
-                        <span className="whitespace-nowrap">Notification Center</span>
-                      </Link>
-                    </li>
+
                     <li>
                       <Link 
                         href="/settings"
