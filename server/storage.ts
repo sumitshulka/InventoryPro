@@ -86,6 +86,14 @@ export interface IStorage {
   updateCategory(id: number, categoryData: Partial<InsertCategory>): Promise<Category | undefined>;
   deleteCategory(id: number): Promise<boolean>;
 
+  // Location operations
+  getLocation(id: number): Promise<Location | undefined>;
+  getLocationByName(name: string): Promise<Location | undefined>;
+  createLocation(location: InsertLocation): Promise<Location>;
+  getAllLocations(): Promise<Location[]>;
+  updateLocation(id: number, locationData: Partial<InsertLocation>): Promise<Location | undefined>;
+  deleteLocation(id: number): Promise<boolean>;
+
   // Warehouse operations
   getWarehouse(id: number): Promise<Warehouse | undefined>;
   getWarehouseByName(name: string): Promise<Warehouse | undefined>;
@@ -2016,6 +2024,47 @@ export class DatabaseStorage implements IStorage {
       .where(eq(rejectedGoods.id, id))
       .returning();
     return !!deletedRejectedGoods;
+  }
+
+  // Location operations
+  async getLocation(id: number): Promise<Location | undefined> {
+    const [location] = await db.select().from(locations).where(eq(locations.id, id));
+    return location || undefined;
+  }
+
+  async getLocationByName(name: string): Promise<Location | undefined> {
+    const [location] = await db.select().from(locations).where(eq(locations.name, name));
+    return location || undefined;
+  }
+
+  async createLocation(location: InsertLocation): Promise<Location> {
+    const [newLocation] = await db.insert(locations).values({
+      ...location,
+      createdAt: new Date()
+    }).returning();
+    return newLocation;
+  }
+
+  async getAllLocations(): Promise<Location[]> {
+    return await db.select().from(locations).orderBy(locations.name);
+  }
+
+  async updateLocation(id: number, locationData: Partial<InsertLocation>): Promise<Location | undefined> {
+    const [updatedLocation] = await db.update(locations)
+      .set({
+        ...locationData,
+        updatedAt: new Date()
+      })
+      .where(eq(locations.id, id))
+      .returning();
+    return updatedLocation || undefined;
+  }
+
+  async deleteLocation(id: number): Promise<boolean> {
+    const [deletedLocation] = await db.delete(locations)
+      .where(eq(locations.id, id))
+      .returning();
+    return !!deletedLocation;
   }
 
   // Inventory quantity update method for transfers

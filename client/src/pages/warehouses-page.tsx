@@ -33,7 +33,7 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Loader2, Plus, Edit } from "lucide-react";
+import { Loader2, Plus, Edit, MapPin } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { formatCapacity } from "@/lib/formatters";
