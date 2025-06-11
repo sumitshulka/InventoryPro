@@ -59,6 +59,8 @@ export default function UsersManagementPage() {
   const [editUserId, setEditUserId] = useState<number | null>(null);
 
   const isAdmin = user?.role === "admin";
+  const isManager = user?.role === "manager";
+  const canEdit = isAdmin; // Only admins can edit users
 
   const { data: users, isLoading, refetch: refetchUsers } = useQuery({
     queryKey: ["/api/users"],
@@ -194,9 +196,14 @@ export default function UsersManagementPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">User Management</h1>
-            <p className="text-muted-foreground">Manage system users and their permissions</p>
+            <p className="text-muted-foreground">
+              {isAdmin 
+                ? "Manage system users and their permissions" 
+                : "View users you manage"
+              }
+            </p>
           </div>
-          {isAdmin && (
+          {canEdit && (
             <Button onClick={() => setIsDialogOpen(true)}>
               <Plus className="mr-2 h-4 w-4" />
               Add User

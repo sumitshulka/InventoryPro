@@ -104,9 +104,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ==== User Management Routes ====
-  // Get all users (admin only)
-  app.get("/api/users", checkRole("admin"), async (req, res) => {
-    const users = await storage.getAllUsers();
+  // Get users (admin sees all, managers see their subordinates)
+  app.get("/api/users", async (req, res) => {
+    if (!req.user) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    let users;
+    if (req.user.role === 'admin') {
+      // Admins can see all users
+      users = await storage.getAllUsers();
+    } else if (req.user.role === 'manager') {
+      // Managers can see their subordinates
+      const allUsers = await storage.getAllUsers();
+      users = allUsers.filter(u => u.managerId === req.user!.id);
+    } else {
+      // Regular users cannot access user management
+      return res.status(403).json({ message: "Forbidden" });
+    }
+
     res.json(users);
   });
 
