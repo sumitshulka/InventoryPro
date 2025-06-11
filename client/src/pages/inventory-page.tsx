@@ -247,60 +247,64 @@ export default function InventoryPage() {
           </div>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>SKU</TableHead>
-                  <TableHead>Item Name</TableHead>
-                  <TableHead>Warehouse</TableHead>
-                  <TableHead>Quantity</TableHead>
-                  <TableHead>Min Stock</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Last Updated</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredInventory.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8 text-gray-500">
-                      No inventory items found
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filteredInventory.map((inv: any) => (
-                    <TableRow 
-                      key={inv.id} 
-                      className="cursor-pointer hover:bg-gray-50"
-                      onClick={() => {
-                        setSelectedSku(inv.item.sku);
-                        setSelectedItemId(inv.item.id);
-                        setIsSheetOpen(true);
-                      }}
-                    >
-                      <TableCell className="font-medium">{inv.item.sku}</TableCell>
-                      <TableCell>{inv.item.name}</TableCell>
-                      <TableCell>{inv.warehouse.name}</TableCell>
-                      <TableCell>{inv.quantity}</TableCell>
-                      <TableCell>{inv.item.minStockLevel}</TableCell>
-                      <TableCell>
-                        {inv.isLowStock ? (
-                          <span className="px-2 py-1 bg-red-100 text-red-800 rounded-full text-xs font-medium">
-                            Low Stock
-                          </span>
-                        ) : (
-                          <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">
-                            In Stock
-                          </span>
-                        )}
-                      </TableCell>
-                      <TableCell>{new Date(inv.lastUpdated).toLocaleDateString()}</TableCell>
+          <DataTablePagination data={filteredInventory}>
+            {(paginatedInventory) => (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>SKU</TableHead>
+                      <TableHead>Item Name</TableHead>
+                      <TableHead>Warehouse</TableHead>
+                      <TableHead>Quantity</TableHead>
+                      <TableHead>Min Stock</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Last Updated</TableHead>
                     </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
+                  </TableHeader>
+                  <TableBody>
+                    {paginatedInventory.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={7} className="text-center py-8 text-gray-500">
+                          No inventory items found
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      paginatedInventory.map((inv: any) => (
+                        <TableRow 
+                          key={inv.id} 
+                          className="cursor-pointer hover:bg-gray-50"
+                          onClick={() => {
+                            setSelectedSku(inv.item.sku);
+                            setSelectedItemId(inv.item.id);
+                            setIsSheetOpen(true);
+                          }}
+                        >
+                          <TableCell className="font-medium">{inv.item.sku}</TableCell>
+                          <TableCell>{inv.item.name}</TableCell>
+                          <TableCell>{inv.warehouse.name}</TableCell>
+                          <TableCell>{inv.quantity}</TableCell>
+                          <TableCell>{inv.item.minStockLevel}</TableCell>
+                          <TableCell>
+                            {inv.isLowStock ? (
+                              <span className="px-2 py-1 bg-red-100 text-red-800 rounded-full text-xs font-medium">
+                                Low Stock
+                              </span>
+                            ) : (
+                              <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">
+                                In Stock
+                              </span>
+                            )}
+                          </TableCell>
+                          <TableCell>{new Date(inv.lastUpdated).toLocaleDateString()}</TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </DataTablePagination>
         </CardContent>
       </Card>
 

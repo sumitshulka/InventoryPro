@@ -37,6 +37,7 @@ import { Loader2, Plus, Edit, MapPin, Trash2, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { formatCapacity } from "@/lib/formatters";
+import { DataTablePagination } from "@/components/ui/data-table-pagination";
 import {
   AlertDialog,
   AlertDialogAction,
