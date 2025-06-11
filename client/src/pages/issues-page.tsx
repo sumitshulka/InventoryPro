@@ -160,7 +160,7 @@ export default function IssuesPage() {
   // Notification mutations
   const markAsReadMutation = useMutation({
     mutationFn: async (notificationId: number) => {
-      return apiRequest(`/api/notifications/${notificationId}/read`, 'PATCH');
+      return apiRequest('PATCH', `/api/notifications/${notificationId}/read`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/notifications'] });
@@ -177,7 +177,7 @@ export default function IssuesPage() {
 
   const archiveNotificationMutation = useMutation({
     mutationFn: async (notificationId: number) => {
-      return apiRequest(`/api/notifications/${notificationId}/archive`, 'PATCH');
+      return apiRequest('PATCH', `/api/notifications/${notificationId}/archive`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/notifications'] });
@@ -197,7 +197,7 @@ export default function IssuesPage() {
 
   const replyToNotificationMutation = useMutation({
     mutationFn: async ({ id, message }: { id: number; message: string }) => {
-      return apiRequest(`/api/notifications/${id}/reply`, 'POST', { message });
+      return apiRequest('POST', `/api/notifications/${id}/reply`, { message });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/notifications'] });
