@@ -333,6 +333,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(archivedWarehouse);
   });
 
+  // Get active warehouses only (excludes archived)
+  app.get("/api/warehouses/active", async (req, res) => {
+    try {
+      const warehouses = await storage.getActiveWarehouses();
+      
+      // Enrich warehouses with manager information
+      const enrichedWarehouses = await Promise.all(warehouses.map(async (warehouse) => {
+        let manager = null;
+        if (warehouse.managerId) {
+          manager = await storage.getUser(warehouse.managerId);
+        }
+
+        let location = null;
+        if (warehouse.locationId) {
+          location = await storage.getLocation(warehouse.locationId);
+        }
+        
+        return {
+          ...warehouse,
+          manager: manager?.name || null,
+          location: location?.name || null
+        };
+      }));
+
+      res.json(enrichedWarehouses);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // ==== Item Routes ====
   // Get all items
   app.get("/api/items", async (req, res) => {
