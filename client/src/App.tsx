@@ -57,7 +57,7 @@ function Router() {
       <ProtectedRoute path="/my-requests" component={MyRequestsPage} />
       <ProtectedRoute path="/stock-report" component={StockReportPage} />
       <ProtectedRoute path="/movement-report" component={MovementReportPage} />
-      <ProtectedRoute path="/inventory-valuation-report" component={InventoryValuationReportPage} />
+      <ProtectedRoute path="/reports/inventory-valuation" component={InventoryValuationReportPage} />
       <ProtectedRoute path="/users" component={UserManagementPage} />
       <ProtectedRoute path="/users-management" component={UsersManagementPage} />
       <ProtectedRoute path="/categories" component={CategoriesPage} />

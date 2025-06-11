@@ -149,9 +149,10 @@ export default function InventoryValuationReportPage() {
         <div className="flex justify-between items-center">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Inventory Valuation Report</h1>
-            <p className="text-gray-600">
-              As of {format(asOfDate, 'MMMM dd, yyyy')} • Valuation method: <Badge variant="secondary">{valuationMethod}</Badge>
-            </p>
+            <div className="text-gray-600 flex items-center gap-2">
+              <span>As of {format(asOfDate, 'MMMM dd, yyyy')} • Valuation method:</span>
+              <Badge variant="secondary">{valuationMethod}</Badge>
+            </div>
           </div>
           <Button onClick={exportToCSV} className="flex items-center gap-2">
             <Download className="h-4 w-4" />
