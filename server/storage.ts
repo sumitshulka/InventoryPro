@@ -1240,6 +1240,41 @@ export class DatabaseStorage implements IStorage {
     return !!deletedUser;
   }
 
+  // Location operations
+  async getLocation(id: number): Promise<Location | undefined> {
+    const [location] = await db.select().from(locations).where(eq(locations.id, id));
+    return location || undefined;
+  }
+
+  async getLocationByName(name: string): Promise<Location | undefined> {
+    const [location] = await db.select().from(locations).where(eq(locations.name, name));
+    return location || undefined;
+  }
+
+  async createLocation(location: InsertLocation): Promise<Location> {
+    const [newLocation] = await db.insert(locations).values(location).returning();
+    return newLocation;
+  }
+
+  async getAllLocations(): Promise<Location[]> {
+    return await db.select().from(locations);
+  }
+
+  async updateLocation(id: number, locationData: Partial<InsertLocation>): Promise<Location | undefined> {
+    const [updatedLocation] = await db.update(locations)
+      .set(locationData)
+      .where(eq(locations.id, id))
+      .returning();
+    return updatedLocation || undefined;
+  }
+
+  async deleteLocation(id: number): Promise<boolean> {
+    const [deletedLocation] = await db.delete(locations)
+      .where(eq(locations.id, id))
+      .returning();
+    return !!deletedLocation;
+  }
+
   // Category operations
   async getCategory(id: number): Promise<Category | undefined> {
     const [category] = await db.select().from(categories).where(eq(categories.id, id));

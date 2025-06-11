@@ -7,6 +7,7 @@ import {
   insertItemSchema, 
   insertWarehouseSchema, 
   insertCategorySchema, 
+  insertLocationSchema,
   insertInventorySchema, 
   insertTransactionSchema, 
   insertRequestSchema, 
@@ -188,6 +189,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const success = await storage.deleteCategory(categoryId);
     if (!success) {
       return res.status(404).json({ message: "Category not found" });
+    }
+    res.status(204).send();
+  });
+
+  // ==== Location Routes ====
+  // Get all locations
+  app.get("/api/locations", async (req, res) => {
+    const locations = await storage.getAllLocations();
+    res.json(locations);
+  });
+
+  // Create location (admin only)
+  app.post("/api/locations", checkRole("admin"), async (req, res) => {
+    try {
+      const locationData = insertLocationSchema.parse(req.body);
+      const existingLocation = await storage.getLocationByName(locationData.name);
+      if (existingLocation) {
+        return res.status(400).json({ message: "Location already exists" });
+      }
+
+      const location = await storage.createLocation(locationData);
+      res.status(201).json(location);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Update location (admin only)
+  app.put("/api/locations/:id", checkRole("admin"), async (req, res) => {
+    const locationId = parseInt(req.params.id, 10);
+    try {
+      const locationData = insertLocationSchema.partial().parse(req.body);
+      const updatedLocation = await storage.updateLocation(locationId, locationData);
+      if (!updatedLocation) {
+        return res.status(404).json({ message: "Location not found" });
+      }
+      res.json(updatedLocation);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Delete location (admin only)
+  app.delete("/api/locations/:id", checkRole("admin"), async (req, res) => {
+    const locationId = parseInt(req.params.id, 10);
+    const success = await storage.deleteLocation(locationId);
+    if (!success) {
+      return res.status(404).json({ message: "Location not found" });
     }
     res.status(204).send();
   });
