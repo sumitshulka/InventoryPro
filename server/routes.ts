@@ -1325,11 +1325,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const warehouses = await storage.getAllWarehouses();
       const allInventory = await storage.getAllInventory();
       const allItems = await storage.getAllItems();
+      const allUsers = await storage.getAllUsers();
+      const allLocations = await storage.getAllLocations();
       
-      // Create a map of item details by ID
+      // Create maps for lookups
       const itemMap = new Map();
       allItems.forEach(item => {
         itemMap.set(item.id, item);
+      });
+      
+      const userMap = new Map();
+      allUsers.forEach(user => {
+        userMap.set(user.id, user);
+      });
+      
+      const locationMap = new Map();
+      allLocations.forEach(location => {
+        locationMap.set(location.id, location);
       });
       
       // Calculate statistics for each warehouse
@@ -1348,8 +1360,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Calculate capacity usage (rough estimation)
         const capacityUsed = Math.round((totalItems / warehouse.capacity) * 100);
         
+        // Get manager details
+        const manager = warehouse.managerId ? userMap.get(warehouse.managerId) : null;
+        
+        // Get location details
+        const location = warehouse.locationId ? locationMap.get(warehouse.locationId) : null;
+        
         return {
           ...warehouse,
+          manager: manager ? { id: manager.id, name: manager.name, role: manager.role } : null,
+          location: location ? location.name : 'Unknown Location',
           totalItems,
           lowStockItems: lowStockItems.length,
           capacityUsed
