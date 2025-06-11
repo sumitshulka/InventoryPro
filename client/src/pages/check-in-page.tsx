@@ -296,11 +296,17 @@ export default function CheckInPage() {
                                 </SelectTrigger>
                               </FormControl>
                               <SelectContent>
-                                {availableWarehouses.map((warehouse) => (
-                                  <SelectItem key={warehouse.id} value={warehouse.id.toString()}>
-                                    {warehouse.name}
-                                  </SelectItem>
-                                ))}
+                                {availableWarehouses.length > 0 ? (
+                                  availableWarehouses.map((warehouse) => (
+                                    <SelectItem key={warehouse.id} value={warehouse.id.toString()}>
+                                      {warehouse.name}
+                                    </SelectItem>
+                                  ))
+                                ) : (
+                                  <div className="p-2 text-sm text-gray-500">
+                                    No warehouses available for check-in
+                                  </div>
+                                )}
                               </SelectContent>
                             </Select>
                             <FormMessage />
@@ -425,11 +431,17 @@ export default function CheckInPage() {
                                       </SelectTrigger>
                                     </FormControl>
                                     <SelectContent>
-                                      {items.map((item) => (
-                                        <SelectItem key={item.id} value={item.id.toString()}>
-                                          {item.name} ({item.sku})
-                                        </SelectItem>
-                                      ))}
+                                      {items.length > 0 ? (
+                                        items.map((item) => (
+                                          <SelectItem key={item.id} value={item.id.toString()}>
+                                            {item.name} ({item.sku})
+                                          </SelectItem>
+                                        ))
+                                      ) : (
+                                        <div className="p-2 text-sm text-gray-500">
+                                          No items available. Create items in Item Master first.
+                                        </div>
+                                      )}
                                     </SelectContent>
                                   </Select>
                                   <FormMessage />

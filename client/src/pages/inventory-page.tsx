@@ -221,7 +221,11 @@ export default function InventoryPage() {
                     <SelectItem key={warehouse.id} value={warehouse.id.toString()}>
                       {warehouse.name}
                     </SelectItem>
-                  )) : null}
+                  )) : (
+                    <div className="p-2 text-sm text-gray-500">
+                      No warehouses available
+                    </div>
+                  )}
                 </SelectContent>
               </Select>
             </div>
@@ -337,6 +341,11 @@ export default function InventoryPage() {
                 </Select>
                 {form.formState.errors.warehouseId && (
                   <p className="text-sm text-red-500">{form.formState.errors.warehouseId.message}</p>
+                )}
+                {(!warehouses || warehouses.length === 0) && (
+                  <p className="text-sm text-amber-600">
+                    No warehouses available. Create warehouses first to manage inventory.
+                  </p>
                 )}
               </div>
 

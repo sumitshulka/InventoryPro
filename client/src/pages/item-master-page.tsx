@@ -409,6 +409,11 @@ export default function ItemMasterPage() {
                       ))}
                     </SelectContent>
                   </Select>
+                  {(!categories || categories.length === 0) && (
+                    <p className="text-sm text-amber-600">
+                      No categories available. Create categories in Settings to organize items.
+                    </p>
+                  )}
                 </div>
 
                 <div className="space-y-2">
