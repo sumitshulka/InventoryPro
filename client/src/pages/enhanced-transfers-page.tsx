@@ -554,6 +554,33 @@ export default function EnhancedTransfersPage() {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Warehouse Requirement Message */}
+            {!hasEnoughWarehouses && (
+              <Card className="mt-4">
+                <CardContent className="py-8 text-center">
+                  <div className="space-y-4">
+                    <div className="mx-auto w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center">
+                      <Warehouse className="w-8 h-8 text-gray-400" />
+                    </div>
+                    <div className="space-y-2">
+                      <p className="text-gray-600">
+                        You cannot create Transfers due to non-availability of multiple warehouses in the system
+                      </p>
+                      <Button 
+                        onClick={() => {
+                          window.location.href = '/warehouses';
+                        }}
+                        variant="outline"
+                      >
+                        <Plus className="mr-2 h-4 w-4" />
+                        Create More Warehouses
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
         </Tabs>
 
