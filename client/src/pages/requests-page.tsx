@@ -43,6 +43,7 @@ import { Loader2, Plus, CheckCircle, X, Eye, Download, RefreshCw } from "lucide-
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { formatDateTime, getStatusColor } from "@/lib/utils";
+import { DataTablePagination } from "@/components/ui/data-table-pagination";
 
 const requestItemSchema = z.object({
   itemId: z.string().min(1, { message: "Item is required" }),
@@ -301,76 +302,80 @@ export default function RequestsPage() {
           </Tabs>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Request ID</TableHead>
-                  <TableHead>Requested By</TableHead>
-                  <TableHead>Warehouse</TableHead>
-                  <TableHead>Notes</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredRequests.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8 text-gray-500">
-                      No requests found
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filteredRequests.map((request: any) => (
-                    <TableRow key={request.id}>
-                      <TableCell className="font-medium">{request.requestCode}</TableCell>
-                      <TableCell>{getUserName(request.userId)}</TableCell>
-                      <TableCell>{getWarehouseName(request.warehouseId)}</TableCell>
-                      <TableCell className="max-w-[200px] truncate">{request.notes || "—"}</TableCell>
-                      <TableCell>{formatDateTime(request.createdAt)}</TableCell>
-                      <TableCell>
-                        <span className={`px-2 py-1 text-xs rounded-full ${getStatusColor(request.status)}`}>
-                          {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center space-x-1">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleViewRequest(request.id)}
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                          {isManager && request.status === "pending" && (
-                            <>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="text-green-600"
-                                onClick={() => handleUpdateStatus(request.id, "approved")}
-                              >
-                                <CheckCircle className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="text-red-600"
-                                onClick={() => handleUpdateStatus(request.id, "rejected")}
-                              >
-                                <X className="h-4 w-4" />
-                              </Button>
-                            </>
-                          )}
-                        </div>
-                      </TableCell>
+          <DataTablePagination data={filteredRequests}>
+            {(paginatedRequests) => (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Request ID</TableHead>
+                      <TableHead>Requested By</TableHead>
+                      <TableHead>Warehouse</TableHead>
+                      <TableHead>Notes</TableHead>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Actions</TableHead>
                     </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
+                  </TableHeader>
+                  <TableBody>
+                    {paginatedRequests.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={7} className="text-center py-8 text-gray-500">
+                          No requests found
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      paginatedRequests.map((request: any) => (
+                        <TableRow key={request.id}>
+                          <TableCell className="font-medium">{request.requestCode}</TableCell>
+                          <TableCell>{getUserName(request.userId)}</TableCell>
+                          <TableCell>{getWarehouseName(request.warehouseId)}</TableCell>
+                          <TableCell className="max-w-[200px] truncate">{request.notes || "—"}</TableCell>
+                          <TableCell>{formatDateTime(request.createdAt)}</TableCell>
+                          <TableCell>
+                            <span className={`px-2 py-1 text-xs rounded-full ${getStatusColor(request.status)}`}>
+                              {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center space-x-1">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleViewRequest(request.id)}
+                              >
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                              {isManager && request.status === "pending" && (
+                                <>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="text-green-600"
+                                    onClick={() => handleUpdateStatus(request.id, "approved")}
+                                  >
+                                    <CheckCircle className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="text-red-600"
+                                    onClick={() => handleUpdateStatus(request.id, "rejected")}
+                                  >
+                                    <X className="h-4 w-4" />
+                                  </Button>
+                                </>
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </DataTablePagination>
         </CardContent>
       </Card>
 

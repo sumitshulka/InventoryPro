@@ -38,6 +38,7 @@ import { Loader2, Search, Plus, Download, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { downloadCSV } from "@/lib/utils";
+import { DataTablePagination } from "@/components/ui/data-table-pagination";
 
 const formSchema = z.object({
   itemId: z.string().min(1, { message: "Item is required" }),
