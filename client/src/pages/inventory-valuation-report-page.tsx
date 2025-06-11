@@ -7,8 +7,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Download, Filter, BarChart3, DollarSign } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { Download, Filter, BarChart3, DollarSign, CalendarIcon } from "lucide-react";
 import { format } from "date-fns";
+import { cn } from "@/lib/utils";
 
 interface InventoryValuationItem {
   id: number;
@@ -31,9 +34,17 @@ export default function InventoryValuationReportPage() {
   const [warehouseFilter, setWarehouseFilter] = useState("all");
   const [sortBy, setSortBy] = useState("name");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
+  const [asOfDate, setAsOfDate] = useState<Date>(new Date());
 
   const { data: inventoryValuation = [], isLoading } = useQuery({
-    queryKey: ['/api/reports/inventory-valuation'],
+    queryKey: ['/api/reports/inventory-valuation', asOfDate?.toISOString()],
+    queryFn: () => {
+      const params = new URLSearchParams();
+      if (asOfDate) {
+        params.append('asOfDate', asOfDate.toISOString().split('T')[0]);
+      }
+      return fetch(`/api/reports/inventory-valuation?${params}`).then(res => res.json());
+    },
   });
 
   const { data: organizationSettings } = useQuery({
@@ -139,7 +150,7 @@ export default function InventoryValuationReportPage() {
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Inventory Valuation Report</h1>
             <p className="text-gray-600">
-              Current valuation method: <Badge variant="secondary">{valuationMethod}</Badge>
+              As of {format(asOfDate, 'MMMM dd, yyyy')} • Valuation method: <Badge variant="secondary">{valuationMethod}</Badge>
             </p>
           </div>
           <Button onClick={exportToCSV} className="flex items-center gap-2">
@@ -203,7 +214,33 @@ export default function InventoryValuationReportPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">As of Date</label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !asOfDate && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {asOfDate ? format(asOfDate, "PPP") : <span>Pick a date</span>}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={asOfDate}
+                      onSelect={(date) => date && setAsOfDate(date)}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+              
               <div className="space-y-2">
                 <label className="text-sm font-medium">Search Items</label>
                 <Input

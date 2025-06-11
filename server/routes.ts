@@ -42,7 +42,7 @@ import {
   notifications
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, and } from "drizzle-orm";
+import { eq, desc, and, lte } from "drizzle-orm";
 
 // Utility function to check required role
 const checkRole = (requiredRole: string) => {
@@ -2857,6 +2857,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Not authenticated" });
       }
 
+      // Get the "as of" date from query parameters, default to current date
+      const asOfDateParam = req.query.asOfDate as string;
+      const asOfDate = asOfDateParam ? new Date(asOfDateParam) : new Date();
+      
+      // Set the end of day for the as of date to include all transactions from that day
+      asOfDate.setHours(23, 59, 59, 999);
+
       // Get organization settings to determine valuation method
       const orgSettings = await db.select().from(organizationSettings).limit(1);
       const valuationMethod = orgSettings[0]?.inventoryValuationMethod || 'Last Value';
@@ -2882,14 +2889,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
       for (const invItem of inventoryData) {
         if (!invItem.itemId || invItem.quantity <= 0) continue;
 
-        // Get check-in transactions for this item to calculate valuation
+        // Get check-in transactions for this item up to the "as of" date
         const allTransactions = await db.select()
         .from(transactions)
-        .where(eq(transactions.itemId, invItem.itemId))
+        .where(and(
+          eq(transactions.itemId, invItem.itemId),
+          lte(transactions.createdAt, asOfDate)
+        ))
         .orderBy(transactions.createdAt);
 
         // Filter for check-in transactions only
         const checkInTransactions = allTransactions.filter(t => t.transactionType === 'check-in');
+
+        // Also calculate inventory position as of the date by processing all transactions
+        let inventoryAsOfDate = 0;
+        for (const transaction of allTransactions) {
+          if (transaction.transactionType === 'check-in') {
+            inventoryAsOfDate += transaction.quantity;
+          } else if (transaction.transactionType === 'issue') {
+            inventoryAsOfDate -= transaction.quantity;
+          }
+        }
+
+        // Skip if no inventory as of the selected date
+        if (inventoryAsOfDate <= 0) {
+          continue;
+        }
 
         if (checkInTransactions.length === 0) {
           // No check-in transactions, skip this item
@@ -2939,7 +2964,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             unitValue = 0;
         }
 
-        const totalValue = unitValue * invItem.quantity;
+        const totalValue = unitValue * inventoryAsOfDate;
 
         // Get category name if categoryId exists
         let categoryName = 'Uncategorized';
@@ -2960,7 +2985,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           sku: invItem.itemSku || 'N/A',
           category: categoryName,
           warehouse: invItem.warehouseName || 'Unknown Warehouse',
-          currentStock: invItem.quantity,
+          currentStock: inventoryAsOfDate,
           unit: invItem.itemUnit || 'pcs',
           unitValue: unitValue,
           totalValue: totalValue,
