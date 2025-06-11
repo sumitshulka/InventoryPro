@@ -88,6 +88,8 @@ export const warehouses = pgTable("warehouses", {
   managerId: integer("manager_id").references(() => users.id),
   capacity: integer("capacity").notNull(),
   isActive: boolean("is_active").notNull().default(true),
+  status: text("status").notNull().default("active"), // active, suspended, deleted
+  deletedAt: timestamp("deleted_at"),
 });
 
 export const insertWarehouseSchema = createInsertSchema(warehouses).pick({
@@ -96,6 +98,7 @@ export const insertWarehouseSchema = createInsertSchema(warehouses).pick({
   managerId: true,
   capacity: true,
   isActive: true,
+  status: true,
 });
 
 // Warehouse Operators - maps users to warehouses as operators

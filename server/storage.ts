@@ -101,6 +101,7 @@ export interface IStorage {
   getAllWarehouses(): Promise<Warehouse[]>;
   updateWarehouse(id: number, warehouseData: Partial<InsertWarehouse>): Promise<Warehouse | undefined>;
   deleteWarehouse(id: number): Promise<boolean>;
+  archiveWarehouse(id: number): Promise<Warehouse | undefined>;
 
   // Item operations
   getItem(id: number): Promise<Item | undefined>;
@@ -679,7 +680,9 @@ export class MemStorage implements IStorage {
       ...warehouse, 
       id,
       managerId: warehouse.managerId || null,
-      isActive: warehouse.isActive !== undefined ? warehouse.isActive : true
+      isActive: warehouse.isActive !== undefined ? warehouse.isActive : true,
+      status: warehouse.status || 'active',
+      deletedAt: null
     };
     this.warehouses.set(id, newWarehouse);
     return newWarehouse;
