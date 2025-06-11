@@ -67,16 +67,26 @@ const locationSchema = z.object({
   isActive: z.boolean(),
 });
 
+const departmentSchema = z.object({
+  name: z.string().min(1, "Department name is required"),
+  description: z.string().optional(),
+  managerId: z.number().optional(),
+  isActive: z.boolean().default(true),
+});
+
 type ApprovalSettingsFormValues = z.infer<typeof approvalSettingsSchema>;
 type OrganizationSettingsFormValues = z.infer<typeof organizationSettingsSchema>;
 type LocationFormValues = z.infer<typeof locationSchema>;
+type DepartmentFormValues = z.infer<typeof departmentSchema>;
 
 export default function SettingsPage() {
   const { toast } = useToast();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isLocationDialogOpen, setIsLocationDialogOpen] = useState(false);
+  const [isDepartmentDialogOpen, setIsDepartmentDialogOpen] = useState(false);
   const [editingSettings, setEditingSettings] = useState<any>(null);
   const [editingLocation, setEditingLocation] = useState<any>(null);
+  const [editingDepartment, setEditingDepartment] = useState<any>(null);
 
   const { data: approvalSettings, isLoading } = useQuery({
     queryKey: ["/api/approval-settings"],
@@ -88,6 +98,10 @@ export default function SettingsPage() {
 
   const { data: locations, isLoading: locationsLoading } = useQuery({
     queryKey: ["/api/locations"],
+  });
+
+  const { data: departments, isLoading: departmentsLoading } = useQuery({
+    queryKey: ["/api/departments"],
   });
 
   const { data: user } = useQuery({
@@ -138,6 +152,16 @@ export default function SettingsPage() {
       state: "",
       zipCode: "",
       country: "India",
+      isActive: true,
+    },
+  });
+
+  const departmentForm = useForm<DepartmentFormValues>({
+    resolver: zodResolver(departmentSchema),
+    defaultValues: {
+      name: "",
+      description: "",
+      managerId: undefined,
       isActive: true,
     },
   });
@@ -323,6 +347,76 @@ export default function SettingsPage() {
     },
   });
 
+  // Department mutations
+  const createDepartmentMutation = useMutation({
+    mutationFn: async (data: DepartmentFormValues) => {
+      const res = await apiRequest("POST", "/api/departments", data);
+      return res.json();
+    },
+    onSuccess: async () => {
+      await invalidateRelatedQueries('department', 'create');
+      toast({
+        title: "Department created",
+        description: "The department has been created successfully.",
+      });
+      departmentForm.reset();
+      setIsDepartmentDialogOpen(false);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to create department",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updateDepartmentMutation = useMutation({
+    mutationFn: async (data: DepartmentFormValues & { id: number }) => {
+      const { id, ...updateData } = data;
+      const res = await apiRequest("PUT", `/api/departments/${id}`, updateData);
+      return res.json();
+    },
+    onSuccess: async () => {
+      await invalidateRelatedQueries('department', 'update');
+      toast({
+        title: "Department updated",
+        description: "The department has been updated successfully.",
+      });
+      departmentForm.reset();
+      setIsDepartmentDialogOpen(false);
+      setEditingDepartment(null);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to update department",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteDepartmentMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await apiRequest("DELETE", `/api/departments/${id}`);
+      return res.json();
+    },
+    onSuccess: async () => {
+      await invalidateRelatedQueries('department', 'delete');
+      toast({
+        title: "Department deleted",
+        description: "The department has been deleted successfully.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to delete department",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const onSubmit = (data: ApprovalSettingsFormValues) => {
     if (editingSettings) {
       updateMutation.mutate(data);
@@ -402,6 +496,7 @@ export default function SettingsPage() {
         <Tabs defaultValue="approval-hierarchy" className="space-y-4">
           <TabsList>
             <TabsTrigger value="approval-hierarchy">Approval Hierarchy</TabsTrigger>
+            <TabsTrigger value="departments">Departments</TabsTrigger>
             <TabsTrigger value="office-locations">Office Locations</TabsTrigger>
             <TabsTrigger value="organization">Organization</TabsTrigger>
             <TabsTrigger value="system-config">System Configuration</TabsTrigger>
