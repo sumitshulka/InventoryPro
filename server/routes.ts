@@ -20,10 +20,29 @@ import {
   insertTransferUpdateSchema,
   insertNotificationSchema,
   departments,
-  organizationSettings
+  organizationSettings,
+  users,
+  auditLogs,
+  items,
+  warehouses,
+  categories,
+  locations,
+  inventory,
+  transactions,
+  requests,
+  requestItems,
+  approvalSettings,
+  requestApprovals,
+  warehouseOperators,
+  transferNotifications,
+  transfers,
+  transferItems,
+  transferUpdates,
+  rejectedGoods,
+  notifications
 } from "@shared/schema";
 import { db } from "./db";
-import { eq } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 
 // Utility function to check required role
 const checkRole = (requiredRole: string) => {
@@ -42,6 +61,34 @@ const checkRole = (requiredRole: string) => {
 
     next();
   };
+};
+
+// Utility function to log audit events
+const logAuditEvent = async (
+  userId: number,
+  action: string,
+  entityType: string,
+  entityId: number | null,
+  details: string,
+  oldValues?: any,
+  newValues?: any,
+  req?: Request
+) => {
+  try {
+    await db.insert(auditLogs).values({
+      userId,
+      action,
+      entityType,
+      entityId,
+      details,
+      oldValues: oldValues ? JSON.stringify(oldValues) : null,
+      newValues: newValues ? JSON.stringify(newValues) : null,
+      ipAddress: req?.ip || '127.0.0.1',
+      userAgent: req?.get('User-Agent') || null,
+    });
+  } catch (error) {
+    console.error('Failed to log audit event:', error);
+  }
 };
 
 export async function registerRoutes(app: Express): Promise<Server> {
