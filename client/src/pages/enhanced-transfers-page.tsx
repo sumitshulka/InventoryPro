@@ -574,11 +574,17 @@ export default function EnhancedTransfersPage() {
                         <SelectValue placeholder="Select source warehouse" />
                       </SelectTrigger>
                       <SelectContent>
-                        {warehouses?.filter((w: any) => w.isActive).map((warehouse: any) => (
-                          <SelectItem key={warehouse.id} value={warehouse.id.toString()}>
-                            {warehouse.name} - {warehouse.location}
-                          </SelectItem>
-                        ))}
+                        {warehouses?.filter((w: any) => w.isActive).length > 0 ? (
+                          warehouses?.filter((w: any) => w.isActive).map((warehouse: any) => (
+                            <SelectItem key={warehouse.id} value={warehouse.id.toString()}>
+                              {warehouse.name} - {warehouse.location}
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <div className="p-2 text-sm text-gray-500">
+                            No active warehouses available
+                          </div>
+                        )}
                       </SelectContent>
                     </Select>
                     {form.formState.errors.sourceWarehouseId && (
@@ -596,11 +602,17 @@ export default function EnhancedTransfersPage() {
                         <SelectValue placeholder="Select destination warehouse" />
                       </SelectTrigger>
                       <SelectContent>
-                        {warehouses?.filter((w: any) => w.isActive && w.id.toString() !== form.getValues("sourceWarehouseId")).map((warehouse: any) => (
-                          <SelectItem key={warehouse.id} value={warehouse.id.toString()}>
-                            {warehouse.name} - {warehouse.location}
-                          </SelectItem>
-                        ))}
+                        {warehouses?.filter((w: any) => w.isActive && w.id.toString() !== form.getValues("sourceWarehouseId")).length > 0 ? (
+                          warehouses?.filter((w: any) => w.isActive && w.id.toString() !== form.getValues("sourceWarehouseId")).map((warehouse: any) => (
+                            <SelectItem key={warehouse.id} value={warehouse.id.toString()}>
+                              {warehouse.name} - {warehouse.location}
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <div className="p-2 text-sm text-gray-500">
+                            No available destination warehouses
+                          </div>
+                        )}
                       </SelectContent>
                     </Select>
                     {form.formState.errors.destinationWarehouseId && (
@@ -710,20 +722,26 @@ export default function EnhancedTransfersPage() {
                               <SelectValue placeholder="Select an item" />
                             </SelectTrigger>
                             <SelectContent>
-                              {(items && Array.isArray(items) ? items : []).map((item: any) => {
-                                const sourceWarehouseId = parseInt(form.watch("sourceWarehouseId") || "0");
-                                const availableQty = getItemQuantity(item.id, sourceWarehouseId);
-                                return (
-                                  <SelectItem key={item.id} value={item.id.toString()}>
-                                    <div className="flex justify-between items-center w-full">
-                                      <span>{item.name} ({item.sku})</span>
-                                      <span className={`ml-2 text-sm ${availableQty > 0 ? 'text-green-600' : 'text-red-500'}`}>
-                                        Available: {availableQty}
-                                      </span>
-                                    </div>
-                                  </SelectItem>
-                                );
-                              })}
+                              {(items && Array.isArray(items) ? items : []).length > 0 ? (
+                                (items && Array.isArray(items) ? items : []).map((item: any) => {
+                                  const sourceWarehouseId = parseInt(form.watch("sourceWarehouseId") || "0");
+                                  const availableQty = getItemQuantity(item.id, sourceWarehouseId);
+                                  return (
+                                    <SelectItem key={item.id} value={item.id.toString()}>
+                                      <div className="flex justify-between items-center w-full">
+                                        <span>{item.name} ({item.sku})</span>
+                                        <span className={`ml-2 text-sm ${availableQty > 0 ? 'text-green-600' : 'text-red-500'}`}>
+                                          Available: {availableQty}
+                                        </span>
+                                      </div>
+                                    </SelectItem>
+                                  );
+                                })
+                              ) : (
+                                <div className="p-2 text-sm text-gray-500">
+                                  No items available for transfer
+                                </div>
+                              )}
                             </SelectContent>
                           </Select>
                         </div>
