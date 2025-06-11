@@ -196,11 +196,7 @@ export default function IssuesPage() {
 
   const replyToNotificationMutation = useMutation({
     mutationFn: async ({ id, message }: { id: number; message: string }) => {
-      return apiRequest(`/api/notifications/${id}/reply`, {
-        method: 'POST',
-        body: JSON.stringify({ message }),
-        headers: { 'Content-Type': 'application/json' },
-      });
+      return apiRequest(`/api/notifications/${id}/reply`, 'POST', { message });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/notifications'] });
