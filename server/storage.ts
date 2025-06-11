@@ -1533,6 +1533,7 @@ export class DatabaseStorage implements IStorage {
     if (!inventoryItem) {
       return undefined;
     }
+    // Use absolute quantity value as provided (not relative change)
     return await this.updateInventory(inventoryItem.id, { quantity });
   }
 
