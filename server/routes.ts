@@ -1073,6 +1073,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Count pending requests
       const pendingRequests = await storage.getRequestsByStatus('pending');
       
+      // Get request items for pending requests to display correct item counts
+      const pendingRequestsWithItems = await Promise.all(
+        pendingRequests.slice(0, 3).map(async (request) => {
+          const requestItems = await storage.getRequestItemsByRequest(request.id);
+          console.log(`Request ${request.id} has ${requestItems.length} items:`, requestItems);
+          return {
+            ...request,
+            items: requestItems
+          };
+        })
+      );
+      
       // Count active transfers
       const activeTransfers = (await storage.getAllTransactions())
         .filter(t => t.transactionType === 'transfer' && t.status === 'in-transit');
@@ -1092,7 +1104,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ...inv,
           item: itemMap.get(inv.itemId)
         })),
-        pendingRequests: pendingRequests.slice(0, 3)
+        pendingRequests: pendingRequestsWithItems
       });
     } catch (error: any) {
       res.status(400).json({ message: error.message });
