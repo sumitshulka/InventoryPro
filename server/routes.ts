@@ -1018,11 +1018,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   status: "in-transit"
                 });
                 
-                // Update source warehouse inventory
+                // Update source warehouse inventory by subtracting the transferred quantity
                 await storage.updateInventoryQuantity(
                   requestItem.itemId,
                   warehouse.id,
-                  otherInventory.quantity - requestItem.quantity
+                  -requestItem.quantity
                 );
                 
                 foundInOtherWarehouse = true;
