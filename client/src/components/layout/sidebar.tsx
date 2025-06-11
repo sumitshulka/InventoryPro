@@ -33,8 +33,9 @@ export default function Sidebar({ user, isOpen, onClose }: SidebarProps) {
     <>
       <aside 
         className={cn(
-          "fixed top-0 left-0 z-40 w-64 h-screen transition-transform bg-white border-r border-gray-200 md:block",
-          isOpen ? "translate-x-0" : "-translate-x-full"
+          "fixed top-0 left-0 z-40 w-64 h-screen transition-transform bg-white border-r border-gray-200",
+          "md:relative md:translate-x-0",
+          isOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
         )}
       >
         <div className="h-full px-3 py-4 overflow-y-auto flex flex-col">

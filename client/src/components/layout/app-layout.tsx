@@ -5,6 +5,7 @@ import Header from "./header";
 import Footer from "./footer";
 import { useAuth } from "@/hooks/use-auth";
 import { useMobile } from "@/hooks/use-mobile";
+import { cn } from "@/lib/utils";
 
 type AppLayoutProps = {
   children: ReactNode;
@@ -57,7 +58,12 @@ export default function AppLayout({ children }: AppLayoutProps) {
     }
   }, [isMobile, isSidebarOpen]);
 
-  // Remove the problematic route change effect completely
+  // Close sidebar on route change - ONLY on mobile
+  useEffect(() => {
+    if (isMobile && isSidebarOpen) {
+      setIsSidebarOpen(false);
+    }
+  }, [location, isMobile]);
 
   // Prevent scrolling when sidebar is open on mobile
   useEffect(() => {
