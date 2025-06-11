@@ -19,6 +19,7 @@ import { z } from "zod";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { formatDistanceToNow, format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
+import { DataTablePagination } from "@/components/ui/data-table-pagination";
 
 interface Notification {
   id: number;

@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { format } from "date-fns";
 import { RefreshCw } from "lucide-react";
 import { queryClient } from "@/lib/queryClient";
+import { DataTablePagination } from "@/components/ui/data-table-pagination";
 
 export default function AuditTrailPage() {
   const [searchTerm, setSearchTerm] = useState("");
