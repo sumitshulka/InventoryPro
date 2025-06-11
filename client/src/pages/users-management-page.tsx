@@ -31,6 +31,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Loader2, Plus, Edit, Users } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -141,6 +142,7 @@ export default function UsersManagementPage() {
       managerId: "none",
       warehouseId: "none",
       departmentId: "none",
+      isWarehouseOperator: false,
     });
     setIsEditMode(false);
     setEditUserId(null);
@@ -157,6 +159,7 @@ export default function UsersManagementPage() {
       managerId: userData.managerId?.toString() || "none",
       warehouseId: userData.warehouseId?.toString() || "none",
       departmentId: userData.departmentId?.toString() || "none",
+      isWarehouseOperator: userData.isWarehouseOperator || false,
     });
     setIsEditMode(true);
     setEditUserId(userData.id);
@@ -211,13 +214,14 @@ export default function UsersManagementPage() {
                     <TableHead>Role</TableHead>
                     <TableHead>Manager</TableHead>
                     <TableHead>Warehouse</TableHead>
+                    <TableHead>Warehouse Operator</TableHead>
                     {isAdmin && <TableHead className="w-[100px]">Actions</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {(users as any[])?.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={isAdmin ? 7 : 6} className="text-center py-8 text-gray-500">
+                      <TableCell colSpan={isAdmin ? 8 : 7} className="text-center py-8 text-gray-500">
                         No users found
                       </TableCell>
                     </TableRow>
@@ -247,6 +251,15 @@ export default function UsersManagementPage() {
                             (warehouses as any[])?.find((w: any) => w.id === userData.warehouseId)?.name || "Unknown Warehouse" 
                             : "—"
                           }
+                        </TableCell>
+                        <TableCell>
+                          <span className={`px-2 py-1 rounded-full text-xs ${
+                            userData.isWarehouseOperator 
+                              ? 'bg-green-100 text-green-800' 
+                              : 'bg-gray-100 text-gray-800'
+                          }`}>
+                            {userData.isWarehouseOperator ? 'Yes' : 'No'}
+                          </span>
                         </TableCell>
                         {isAdmin && (
                           <TableCell>
@@ -418,6 +431,22 @@ export default function UsersManagementPage() {
                       ))}
                     </SelectContent>
                   </Select>
+                </div>
+              </div>
+
+              <div className="space-y-4 pt-4 border-t">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-1">
+                    <Label htmlFor="isWarehouseOperator">Warehouse Operator</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Grant access to inventory operations (check-in, transfers, reports)
+                    </p>
+                  </div>
+                  <Switch
+                    id="isWarehouseOperator"
+                    checked={form.watch("isWarehouseOperator")}
+                    onCheckedChange={(checked) => form.setValue("isWarehouseOperator", checked)}
+                  />
                 </div>
               </div>
 
