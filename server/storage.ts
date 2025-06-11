@@ -34,6 +34,8 @@ import {
   TransactionType,
   RejectedGoods,
   InsertRejectedGoods,
+  Notification,
+  InsertNotification,
   users,
   locations,
   categories,
@@ -50,7 +52,8 @@ import {
   transfers,
   transferItems,
   transferUpdates,
-  rejectedGoods
+  rejectedGoods,
+  notifications
 } from "@shared/schema";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
@@ -215,6 +218,24 @@ export interface IStorage {
   createRejectedGoods(rejectedGoods: InsertRejectedGoods): Promise<RejectedGoods>;
   updateRejectedGoods(id: number, rejectedGoodsData: Partial<InsertRejectedGoods>): Promise<RejectedGoods | undefined>;
   deleteRejectedGoods(id: number): Promise<boolean>;
+
+  // Notification operations
+  getNotification(id: number): Promise<Notification | undefined>;
+  getAllNotifications(): Promise<Notification[]>;
+  getNotificationsByRecipient(recipientId: number): Promise<Notification[]>;
+  getNotificationsBySender(senderId: number): Promise<Notification[]>;
+  getUnreadNotifications(recipientId: number): Promise<Notification[]>;
+  getNotificationsByCategory(recipientId: number, category: string): Promise<Notification[]>;
+  getNotificationThread(parentId: number): Promise<Notification[]>;
+  createNotification(notification: InsertNotification): Promise<Notification>;
+  updateNotification(id: number, notificationData: Partial<InsertNotification>): Promise<Notification | undefined>;
+  markNotificationAsRead(id: number): Promise<Notification | undefined>;
+  markNotificationAsReplied(id: number): Promise<Notification | undefined>;
+  markNotificationAsClosed(id: number): Promise<Notification | undefined>;
+  archiveNotification(id: number): Promise<Notification | undefined>;
+  deleteNotification(id: number): Promise<boolean>;
+  getUnreadNotificationCount(recipientId: number): Promise<number>;
+  cleanupArchivedNotifications(): Promise<number>;
 
   // Hierarchy and Approval Workflow helpers
   getUserManager(userId: number): Promise<User | undefined>;
@@ -2132,6 +2153,146 @@ export class DatabaseStorage implements IStorage {
       });
     }
     // If quantityChange is negative and no existing inventory, do nothing
+  }
+
+  // Notification operations
+  async getNotification(id: number): Promise<Notification | undefined> {
+    const [notification] = await db.select().from(notifications).where(eq(notifications.id, id));
+    return notification || undefined;
+  }
+
+  async getAllNotifications(): Promise<Notification[]> {
+    return await db.select().from(notifications).orderBy(desc(notifications.createdAt));
+  }
+
+  async getNotificationsByRecipient(recipientId: number): Promise<Notification[]> {
+    return await db.select().from(notifications)
+      .where(eq(notifications.recipientId, recipientId))
+      .orderBy(desc(notifications.createdAt));
+  }
+
+  async getNotificationsBySender(senderId: number): Promise<Notification[]> {
+    return await db.select().from(notifications)
+      .where(eq(notifications.senderId, senderId))
+      .orderBy(desc(notifications.createdAt));
+  }
+
+  async getUnreadNotifications(recipientId: number): Promise<Notification[]> {
+    return await db.select().from(notifications)
+      .where(and(
+        eq(notifications.recipientId, recipientId),
+        eq(notifications.status, 'unread'),
+        eq(notifications.isArchived, false)
+      ))
+      .orderBy(desc(notifications.createdAt));
+  }
+
+  async getNotificationsByCategory(recipientId: number, category: string): Promise<Notification[]> {
+    return await db.select().from(notifications)
+      .where(and(
+        eq(notifications.recipientId, recipientId),
+        eq(notifications.category, category),
+        eq(notifications.isArchived, false)
+      ))
+      .orderBy(desc(notifications.createdAt));
+  }
+
+  async getNotificationThread(parentId: number): Promise<Notification[]> {
+    return await db.select().from(notifications)
+      .where(or(
+        eq(notifications.id, parentId),
+        eq(notifications.parentId, parentId)
+      ))
+      .orderBy(notifications.createdAt);
+  }
+
+  async createNotification(notification: InsertNotification): Promise<Notification> {
+    const [newNotification] = await db.insert(notifications)
+      .values({
+        ...notification,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      })
+      .returning();
+    return newNotification;
+  }
+
+  async updateNotification(id: number, notificationData: Partial<InsertNotification>): Promise<Notification | undefined> {
+    const [updatedNotification] = await db.update(notifications)
+      .set({
+        ...notificationData,
+        updatedAt: new Date()
+      })
+      .where(eq(notifications.id, id))
+      .returning();
+    return updatedNotification || undefined;
+  }
+
+  async markNotificationAsRead(id: number): Promise<Notification | undefined> {
+    return await this.updateNotification(id, { status: 'read' });
+  }
+
+  async markNotificationAsReplied(id: number): Promise<Notification | undefined> {
+    return await this.updateNotification(id, { status: 'replied' });
+  }
+
+  async markNotificationAsClosed(id: number): Promise<Notification | undefined> {
+    return await this.updateNotification(id, { status: 'closed' });
+  }
+
+  async archiveNotification(id: number): Promise<Notification | undefined> {
+    return await this.updateNotification(id, { 
+      isArchived: true,
+      archivedAt: new Date()
+    });
+  }
+
+  async deleteNotification(id: number): Promise<boolean> {
+    const [deletedNotification] = await db.delete(notifications)
+      .where(eq(notifications.id, id))
+      .returning();
+    return !!deletedNotification;
+  }
+
+  async getUnreadNotificationCount(recipientId: number): Promise<number> {
+    const result = await db.select({ count: eq(notifications.id, notifications.id) })
+      .from(notifications)
+      .where(and(
+        eq(notifications.recipientId, recipientId),
+        eq(notifications.status, 'unread'),
+        eq(notifications.isArchived, false)
+      ));
+    return result.length;
+  }
+
+  async cleanupArchivedNotifications(): Promise<number> {
+    const threeMonthsAgo = new Date();
+    threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+    
+    const sixMonthsAgo = new Date();
+    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+
+    // Delete closed/replied notifications older than 3 months
+    const closedResult = await db.delete(notifications)
+      .where(and(
+        or(eq(notifications.status, 'closed'), eq(notifications.status, 'replied')),
+        eq(notifications.isArchived, true),
+        // Use a type assertion here since we're comparing dates
+        eq(notifications.archivedAt as any, threeMonthsAgo)
+      ))
+      .returning();
+
+    // Delete open notifications older than 6 months
+    const openResult = await db.delete(notifications)
+      .where(and(
+        eq(notifications.status, 'unread'),
+        eq(notifications.isArchived, false),
+        // Use a type assertion here since we're comparing dates
+        eq(notifications.createdAt as any, sixMonthsAgo)
+      ))
+      .returning();
+
+    return closedResult.length + openResult.length;
   }
 }
 

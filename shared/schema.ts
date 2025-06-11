@@ -458,5 +458,46 @@ export const insertRejectedGoodsSchema = createInsertSchema(rejectedGoods).pick(
 export type RejectedGoods = typeof rejectedGoods.$inferSelect;
 export type InsertRejectedGoods = z.infer<typeof insertRejectedGoodsSchema>;
 
+// Notifications table
+export const notifications = pgTable("notifications", {
+  id: serial("id").primaryKey(),
+  senderId: integer("sender_id").notNull().references(() => users.id),
+  recipientId: integer("recipient_id").notNull().references(() => users.id),
+  subject: text("subject").notNull(),
+  message: text("message").notNull(),
+  category: text("category").notNull().default("general"), // general, inventory, request, transfer, approval
+  priority: text("priority").notNull().default("normal"), // low, normal, high, urgent
+  status: text("status").notNull().default("unread"), // unread, read, replied, closed
+  parentId: integer("parent_id").references(() => notifications.id), // for replies
+  relatedEntityType: text("related_entity_type"), // item, warehouse, request, transfer
+  relatedEntityId: integer("related_entity_id"),
+  isArchived: boolean("is_archived").notNull().default(false),
+  archivedAt: timestamp("archived_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  senderIdx: index("notifications_sender_idx").on(table.senderId),
+  recipientIdx: index("notifications_recipient_idx").on(table.recipientId),
+  statusIdx: index("notifications_status_idx").on(table.status),
+  categoryIdx: index("notifications_category_idx").on(table.category),
+  createdAtIdx: index("notifications_created_at_idx").on(table.createdAt),
+}));
+
+export const insertNotificationSchema = createInsertSchema(notifications).pick({
+  senderId: true,
+  recipientId: true,
+  subject: true,
+  message: true,
+  category: true,
+  priority: true,
+  status: true,
+  parentId: true,
+  relatedEntityType: true,
+  relatedEntityId: true,
+});
+
+export type Notification = typeof notifications.$inferSelect;
+export type InsertNotification = z.infer<typeof insertNotificationSchema>;
+
 export type Location = typeof locations.$inferSelect;
 export type InsertLocation = z.infer<typeof insertLocationSchema>;
