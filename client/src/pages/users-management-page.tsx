@@ -211,11 +211,29 @@ export default function UsersManagementPage() {
           )}
         </div>
 
+        {isManager && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+            <div className="flex items-start gap-3">
+              <div className="text-blue-600 mt-0.5">
+                <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div>
+                <h3 className="text-sm font-medium text-blue-800">Manager View</h3>
+                <p className="text-sm text-blue-700 mt-1">
+                  You can view users assigned to you as their manager. Only administrators can create or edit users.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Users className="h-5 w-5" />
-              All Users
+              {isManager ? "Your Team Members" : "All Users"}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -230,14 +248,14 @@ export default function UsersManagementPage() {
                     <TableHead>Manager</TableHead>
                     <TableHead>Warehouse</TableHead>
                     <TableHead>Warehouse Operator</TableHead>
-                    {isAdmin && <TableHead className="w-[100px]">Actions</TableHead>}
+                    {canEdit && <TableHead className="w-[100px]">Actions</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {(users as any[])?.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={isAdmin ? 8 : 7} className="text-center py-8 text-gray-500">
-                        No users found
+                      <TableCell colSpan={canEdit ? 8 : 7} className="text-center py-8 text-gray-500">
+                        {isManager ? "No subordinates assigned to you" : "No users found"}
                       </TableCell>
                     </TableRow>
                   ) : (
@@ -276,7 +294,7 @@ export default function UsersManagementPage() {
                             {userData.isWarehouseOperator ? 'Yes' : 'No'}
                           </span>
                         </TableCell>
-                        {isAdmin && (
+                        {canEdit && (
                           <TableCell>
                             <Button
                               variant="ghost"
