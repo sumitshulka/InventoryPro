@@ -1077,7 +1077,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const pendingRequestsWithItems = await Promise.all(
         pendingRequests.slice(0, 3).map(async (request) => {
           const requestItems = await storage.getRequestItemsByRequest(request.id);
-          console.log(`Request ${request.id} has ${requestItems.length} items:`, requestItems);
           return {
             ...request,
             items: requestItems
