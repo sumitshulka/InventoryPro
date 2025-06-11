@@ -328,12 +328,12 @@ export default function IssuesPage() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => {
-                queryClient.invalidateQueries({ queryKey: ['/api/issues'] });
-                queryClient.invalidateQueries({ queryKey: ['/api/notifications'] });
-                queryClient.invalidateQueries({ queryKey: ['/api/users'] });
-                queryClient.invalidateQueries({ queryKey: ['/api/warehouses'] });
-                queryClient.invalidateQueries({ queryKey: ['/api/items'] });
+              onClick={async () => {
+                await queryClient.refetchQueries({ queryKey: ['/api/issues'] });
+                await queryClient.refetchQueries({ queryKey: ['/api/notifications'] });
+                await queryClient.refetchQueries({ queryKey: ['/api/users'] });
+                await queryClient.refetchQueries({ queryKey: ['/api/warehouses'] });
+                await queryClient.refetchQueries({ queryKey: ['/api/items'] });
               }}
             >
               <RefreshCw className="h-4 w-4" />

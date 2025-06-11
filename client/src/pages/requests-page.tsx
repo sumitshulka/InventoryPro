@@ -278,9 +278,9 @@ export default function RequestsPage() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => {
-                queryClient.invalidateQueries({ queryKey: ['/api/requests'] });
-                queryClient.invalidateQueries({ queryKey: ['/api/reports/inventory-stock'] });
+              onClick={async () => {
+                await queryClient.refetchQueries({ queryKey: ['/api/requests'] });
+                await queryClient.refetchQueries({ queryKey: ['/api/reports/inventory-stock'] });
               }}
               className="ml-2"
             >
