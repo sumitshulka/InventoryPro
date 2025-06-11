@@ -40,13 +40,19 @@ import { formatCapacity } from "@/lib/formatters";
 
 const formSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters" }),
-  locationId: z.string().min(1, { message: "Location is required" }).transform(val => parseInt(val)),
-  managerId: z.string().optional().transform(val => val === "" || val === "none" || !val ? null : parseInt(val)),
+  locationId: z.string().min(1, { message: "Location is required" }),
+  managerId: z.string().optional(),
   capacity: z.number().min(1, { message: "Capacity is required" }),
   isActive: z.boolean().default(true),
 });
 
-type FormValues = z.infer<typeof formSchema>;
+type FormValues = {
+  name: string;
+  locationId: string;
+  managerId?: string;
+  capacity: number;
+  isActive: boolean;
+};
 
 export default function WarehousesPage() {
   const { toast } = useToast();
@@ -82,8 +88,8 @@ export default function WarehousesPage() {
     mutationFn: async (data: FormValues) => {
       const payload = {
         name: data.name,
-        locationId: data.locationId,
-        managerId: data.managerId,
+        locationId: parseInt(data.locationId),
+        managerId: data.managerId === "none" || !data.managerId ? null : parseInt(data.managerId),
         capacity: data.capacity,
         isActive: data.isActive,
       };
@@ -183,8 +189,8 @@ export default function WarehousesPage() {
                 </span>
               </div>
               <div className="flex items-center text-sm text-gray-600 mb-2">
-                <span className="material-icons text-gray-500 text-sm mr-1">location_on</span>
-                {warehouse.location}
+                <MapPin className="h-4 w-4 text-gray-500 mr-1" />
+                {(locations as any[])?.find((loc: any) => loc.id === warehouse.locationId)?.name || 'Location not found'}
               </div>
               <div className="flex items-center text-sm text-gray-600 mb-4">
                 <span className="material-icons text-gray-500 text-sm mr-1">person</span>
@@ -314,8 +320,8 @@ export default function WarehousesPage() {
               <div className="space-y-2">
                 <Label htmlFor="locationId">Office Location</Label>
                 <Select
-                  value={form.watch("locationId")?.toString() || ""}
-                  onValueChange={(value) => form.setValue("locationId", parseInt(value))}
+                  value={form.watch("locationId") || ""}
+                  onValueChange={(value) => form.setValue("locationId", value)}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select an office location" />
