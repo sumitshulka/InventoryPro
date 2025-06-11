@@ -1048,12 +1048,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
               status: "completed"
             });
             
-            // Update inventory
-            await storage.updateInventoryQuantity(
-              requestItem.itemId,
-              request.warehouseId,
-              inventory.quantity - requestItem.quantity
-            );
+            // Inventory is automatically updated by the transaction creation logic
+            // No need for duplicate inventory update here
           }
         }
       }
