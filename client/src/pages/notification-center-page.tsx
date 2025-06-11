@@ -140,11 +140,7 @@ export default function NotificationCenterPage() {
   // Create notification mutation
   const createNotificationMutation = useMutation({
     mutationFn: (data: z.infer<typeof newNotificationSchema>) =>
-      apiRequest('/api/notifications', {
-        method: 'POST',
-        body: JSON.stringify(data),
-        headers: { 'Content-Type': 'application/json' },
-      }),
+      apiRequest('/api/notifications', 'POST', data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/notifications'] });
       queryClient.invalidateQueries({ queryKey: ['/api/notifications/unread-count'] });
@@ -167,11 +163,7 @@ export default function NotificationCenterPage() {
   // Reply mutation
   const replyMutation = useMutation({
     mutationFn: ({ notificationId, data }: { notificationId: number; data: z.infer<typeof replySchema> }) =>
-      apiRequest(`/api/notifications/${notificationId}/reply`, {
-        method: 'POST',
-        body: JSON.stringify(data),
-        headers: { 'Content-Type': 'application/json' },
-      }),
+      apiRequest(`/api/notifications/${notificationId}/reply`, 'POST', data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/notifications'] });
       queryClient.invalidateQueries({ queryKey: ['/api/notifications/unread-count'] });
@@ -194,9 +186,7 @@ export default function NotificationCenterPage() {
   // Mark as read mutation
   const markAsReadMutation = useMutation({
     mutationFn: (notificationId: number) =>
-      apiRequest(`/api/notifications/${notificationId}/read`, {
-        method: 'PATCH',
-      }),
+      apiRequest(`/api/notifications/${notificationId}/read`, 'PATCH'),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/notifications'] });
       queryClient.invalidateQueries({ queryKey: ['/api/notifications/unread-count'] });
@@ -206,9 +196,7 @@ export default function NotificationCenterPage() {
   // Close notification mutation
   const closeNotificationMutation = useMutation({
     mutationFn: (notificationId: number) =>
-      apiRequest(`/api/notifications/${notificationId}/close`, {
-        method: 'PATCH',
-      }),
+      apiRequest(`/api/notifications/${notificationId}/close`, 'PATCH'),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/notifications'] });
       setSelectedNotification(null);
@@ -222,9 +210,7 @@ export default function NotificationCenterPage() {
   // Archive notification mutation
   const archiveNotificationMutation = useMutation({
     mutationFn: (notificationId: number) =>
-      apiRequest(`/api/notifications/${notificationId}/archive`, {
-        method: 'PATCH',
-      }),
+      apiRequest(`/api/notifications/${notificationId}/archive`, 'PATCH'),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/notifications'] });
       setSelectedNotification(null);
@@ -237,8 +223,10 @@ export default function NotificationCenterPage() {
 
   // Get thread mutation
   const getThreadMutation = useMutation({
-    mutationFn: (notificationId: number) =>
-      apiRequest(`/api/notifications/${notificationId}/thread`),
+    mutationFn: async (notificationId: number) => {
+      const response = await fetch(`/api/notifications/${notificationId}/thread`);
+      return response.json();
+    },
     onSuccess: (data) => {
       setThreadNotifications(data);
       setShowThreadDialog(true);
