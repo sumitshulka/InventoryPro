@@ -32,7 +32,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest, queryClient, invalidateRelatedQueries } from "@/lib/queryClient";
 import { Loader2, Plus, Edit, Users } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
@@ -113,8 +113,7 @@ export default function UsersManagementPage() {
     },
     onSuccess: async () => {
       // Force immediate cache invalidation and refetch
-      await queryClient.invalidateQueries({ queryKey: ["/api/users"] });
-      await refetchUsers();
+      await invalidateRelatedQueries('user', isEditMode ? 'update' : 'create');
       toast({
         title: isEditMode ? "User updated" : "User created",
         description: isEditMode

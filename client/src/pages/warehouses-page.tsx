@@ -32,7 +32,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest, queryClient, invalidateRelatedQueries } from "@/lib/queryClient";
 import { Loader2, Plus, Edit, MapPin } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
@@ -102,8 +102,8 @@ export default function WarehousesPage() {
         return res.json();
       }
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/warehouses"] });
+    onSuccess: async () => {
+      await invalidateRelatedQueries('warehouse', isEditMode ? 'update' : 'create');
       toast({
         title: isEditMode ? "Warehouse updated" : "Warehouse created",
         description: isEditMode
