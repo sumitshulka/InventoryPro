@@ -58,12 +58,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
     }
   }, [isMobile, isSidebarOpen]);
 
-  // Close sidebar on route change - ONLY on mobile
-  useEffect(() => {
-    if (isMobile && isSidebarOpen) {
-      setIsSidebarOpen(false);
-    }
-  }, [location, isMobile]);
+  // No automatic sidebar closing on route changes
 
   // Prevent scrolling when sidebar is open on mobile
   useEffect(() => {

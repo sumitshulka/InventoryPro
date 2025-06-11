@@ -85,10 +85,10 @@ export default function Sidebar({ user, isOpen, onClose }: SidebarProps) {
                   </li>
                   <li>
                     <Link 
-                      href="/inventory"
+                      href="/items"
                       className={cn(
                         "flex items-center px-3 py-2 rounded-md",
-                        isActive("/inventory") 
+                        isActive("/items") 
                           ? "bg-primary/10 border-l-4 border-primary text-primary" 
                           : "text-gray-700 hover:text-primary hover:bg-primary/5"
                       )}
@@ -134,16 +134,16 @@ export default function Sidebar({ user, isOpen, onClose }: SidebarProps) {
                   </li>
                   <li>
                     <Link 
-                      href="/transactions"
+                      href="/my-requests"
                       className={cn(
                         "flex items-center px-3 py-2 rounded-md",
-                        isActive("/transactions") 
+                        isActive("/my-requests") 
                           ? "bg-primary/10 border-l-4 border-primary text-primary" 
                           : "text-gray-700 hover:text-primary hover:bg-primary/5"
                       )}
                     >
                       <span className="material-icons mr-3">receipt_long</span>
-                      <span className="whitespace-nowrap">Transactions</span>
+                      <span className="whitespace-nowrap">My Requests</span>
                     </Link>
                   </li>
                   <li>
@@ -199,10 +199,10 @@ export default function Sidebar({ user, isOpen, onClose }: SidebarProps) {
                 <ul>
                   <li>
                     <Link 
-                      href="/reports"
+                      href="/stock-report"
                       className={cn(
                         "flex items-center px-3 py-2 rounded-md",
-                        isActive("/reports") 
+                        isActive("/stock-report") 
                           ? "bg-primary/10 border-l-4 border-primary text-primary" 
                           : "text-gray-700 hover:text-primary hover:bg-primary/5"
                       )}
@@ -221,10 +221,10 @@ export default function Sidebar({ user, isOpen, onClose }: SidebarProps) {
                   <ul>
                     <li>
                       <Link 
-                        href="/users"
+                        href="/users-management"
                         className={cn(
                           "flex items-center px-3 py-2 rounded-md",
-                          isActive("/users") 
+                          isActive("/users-management") 
                             ? "bg-primary/10 border-l-4 border-primary text-primary" 
                             : "text-gray-700 hover:text-primary hover:bg-primary/5"
                         )}
