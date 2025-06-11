@@ -18,6 +18,7 @@ import {
   insertTransferSchema,
   insertTransferItemSchema,
   insertTransferUpdateSchema,
+  insertNotificationSchema,
   departments,
   organizationSettings
 } from "@shared/schema";
@@ -2481,6 +2482,269 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(updatedItem);
     } catch (error: any) {
       res.status(400).json({ message: error.message });
+    }
+  });
+
+  // ==== Notification Routes ====
+  // Get notifications for the current user
+  app.get("/api/notifications", async (req, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      const { category, status, page = 1, limit = 20 } = req.query;
+      let notifications;
+      
+      if (category) {
+        notifications = await storage.getNotificationsByCategory(req.user.id, category as string);
+      } else {
+        notifications = await storage.getNotificationsByRecipient(req.user.id);
+      }
+      
+      // Filter by status if provided
+      if (status) {
+        notifications = notifications.filter(n => n.status === status);
+      }
+      
+      // Add sender information
+      const enrichedNotifications = await Promise.all(notifications.map(async (notification) => {
+        const sender = await storage.getUser(notification.senderId);
+        return {
+          ...notification,
+          sender: sender ? { id: sender.id, name: sender.name, role: sender.role } : null
+        };
+      }));
+      
+      res.json(enrichedNotifications);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get unread notification count
+  app.get("/api/notifications/unread-count", async (req, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      const count = await storage.getUnreadNotificationCount(req.user.id);
+      res.json({ count });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get notification thread
+  app.get("/api/notifications/:id/thread", async (req, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      const notificationId = parseInt(req.params.id);
+      const thread = await storage.getNotificationThread(notificationId);
+      
+      // Add sender information to each notification
+      const enrichedThread = await Promise.all(thread.map(async (notification) => {
+        const sender = await storage.getUser(notification.senderId);
+        return {
+          ...notification,
+          sender: sender ? { id: sender.id, name: sender.name, role: sender.role } : null
+        };
+      }));
+      
+      res.json(enrichedThread);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Create a new notification
+  app.post("/api/notifications", async (req, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      const notificationData = insertNotificationSchema.parse({
+        ...req.body,
+        senderId: req.user.id
+      });
+      
+      const notification = await storage.createNotification(notificationData);
+      res.status(201).json(notification);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Reply to a notification
+  app.post("/api/notifications/:id/reply", async (req, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      const parentId = parseInt(req.params.id);
+      const parentNotification = await storage.getNotification(parentId);
+      
+      if (!parentNotification) {
+        return res.status(404).json({ message: "Notification not found" });
+      }
+      
+      // Create reply notification
+      const replyData = insertNotificationSchema.parse({
+        senderId: req.user.id,
+        recipientId: parentNotification.senderId,
+        subject: `Re: ${parentNotification.subject}`,
+        message: req.body.message,
+        category: parentNotification.category,
+        priority: req.body.priority || 'normal',
+        parentId: parentId,
+        relatedEntityType: parentNotification.relatedEntityType,
+        relatedEntityId: parentNotification.relatedEntityId
+      });
+      
+      const reply = await storage.createNotification(replyData);
+      
+      // Mark original notification as replied
+      await storage.markNotificationAsReplied(parentId);
+      
+      res.status(201).json(reply);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Mark notification as read
+  app.patch("/api/notifications/:id/read", async (req, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      const notificationId = parseInt(req.params.id);
+      const notification = await storage.getNotification(notificationId);
+      
+      if (!notification) {
+        return res.status(404).json({ message: "Notification not found" });
+      }
+      
+      // Only the recipient can mark as read
+      if (notification.recipientId !== req.user.id) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      const updatedNotification = await storage.markNotificationAsRead(notificationId);
+      res.json(updatedNotification);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Close notification (no reply needed)
+  app.patch("/api/notifications/:id/close", async (req, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      const notificationId = parseInt(req.params.id);
+      const notification = await storage.getNotification(notificationId);
+      
+      if (!notification) {
+        return res.status(404).json({ message: "Notification not found" });
+      }
+      
+      // Only the recipient can close
+      if (notification.recipientId !== req.user.id) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      const updatedNotification = await storage.markNotificationAsClosed(notificationId);
+      res.json(updatedNotification);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Archive notification
+  app.patch("/api/notifications/:id/archive", async (req, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      const notificationId = parseInt(req.params.id);
+      const notification = await storage.getNotification(notificationId);
+      
+      if (!notification) {
+        return res.status(404).json({ message: "Notification not found" });
+      }
+      
+      // Only the recipient can archive
+      if (notification.recipientId !== req.user.id) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      const updatedNotification = await storage.archiveNotification(notificationId);
+      res.json(updatedNotification);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Get users for notification recipients (managers, admins, etc.)
+  app.get("/api/notifications/recipients", async (req, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      const allUsers = await storage.getAllUsers();
+      
+      // Filter based on user role - users can send to managers and admins
+      let availableRecipients = [];
+      
+      if (req.user.role === 'admin') {
+        // Admins can send to anyone
+        availableRecipients = allUsers.filter(u => u.id !== req.user.id);
+      } else if (req.user.role === 'manager') {
+        // Managers can send to other managers, admins, and their subordinates
+        availableRecipients = allUsers.filter(u => 
+          u.id !== req.user.id && 
+          (u.role === 'admin' || u.role === 'manager' || u.managerId === req.user.id)
+        );
+      } else {
+        // Regular users can send to managers and admins
+        availableRecipients = allUsers.filter(u => 
+          u.id !== req.user.id && 
+          (u.role === 'admin' || u.role === 'manager')
+        );
+      }
+      
+      const recipients = availableRecipients.map(user => ({
+        id: user.id,
+        name: user.name,
+        role: user.role,
+        email: user.email
+      }));
+      
+      res.json(recipients);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Cleanup archived notifications (maintenance endpoint)
+  app.post("/api/notifications/cleanup", checkRole("admin"), async (req, res) => {
+    try {
+      const deletedCount = await storage.cleanupArchivedNotifications();
+      res.json({ deletedCount, message: `Cleaned up ${deletedCount} old notifications` });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
     }
   });
 

@@ -21,6 +21,7 @@ import CategoriesPage from "@/pages/categories-page";
 import DepartmentsPage from "@/pages/departments-page";
 import ApprovalManagementPage from "@/pages/approval-management-page";
 import SettingsPage from "@/pages/settings-page";
+import NotificationCenterPage from "@/pages/notification-center-page";
 import { ProtectedRoute } from "./lib/protected-route";
 
 function Router() {
