@@ -122,7 +122,14 @@ export default function RequestsPage() {
       return res.json();
     },
     onSuccess: () => {
+      // Invalidate all related queries to ensure fresh data
       queryClient.invalidateQueries({ queryKey: ["/api/requests"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/summary"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/reports/inventory-stock"] });
+      
+      // Force refetch of requests query
+      queryClient.refetchQueries({ queryKey: ["/api/requests"] });
+      
       toast({
         title: "Request created",
         description: "Your inventory request has been created successfully.",
@@ -149,7 +156,14 @@ export default function RequestsPage() {
       return res.json();
     },
     onSuccess: () => {
+      // Invalidate all related queries to ensure fresh data
       queryClient.invalidateQueries({ queryKey: ["/api/requests"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/summary"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/reports/inventory-stock"] });
+      
+      // Force refetch of requests query
+      queryClient.refetchQueries({ queryKey: ["/api/requests"] });
+      
       toast({
         title: "Request updated",
         description: "The request status has been updated successfully.",
