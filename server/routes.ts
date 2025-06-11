@@ -42,7 +42,7 @@ import {
   notifications
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and } from "drizzle-orm";
 
 // Utility function to check required role
 const checkRole = (requiredRole: string) => {
@@ -2883,20 +2883,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (!invItem.itemId || invItem.quantity <= 0) continue;
 
         // Get check-in transactions for this item to calculate valuation
-        const checkInTransactions = await db.select({
-          id: transactions.id,
-          cost: transactions.cost,
-          quantity: transactions.quantity,
-          createdAt: transactions.createdAt,
-        })
+        const allTransactions = await db.select()
         .from(transactions)
-        .where(
-          and(
-            eq(transactions.itemId, invItem.itemId),
-            eq(transactions.transactionType, 'check-in')
-          )
-        )
+        .where(eq(transactions.itemId, invItem.itemId))
         .orderBy(transactions.createdAt);
+
+        // Filter for check-in transactions only
+        const checkInTransactions = allTransactions.filter(t => t.transactionType === 'check-in');
 
         if (checkInTransactions.length === 0) {
           // No check-in transactions, skip this item
