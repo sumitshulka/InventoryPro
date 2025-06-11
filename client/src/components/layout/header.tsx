@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/hooks/use-auth";
 import { useLocation } from "wouter";
+import HelpSystem from "@/components/help/help-system";
 
 type HeaderProps = {
   user: User;
@@ -21,6 +22,7 @@ export default function Header({ user, onMenuClick }: HeaderProps) {
   const { logoutMutation } = useAuth();
   const [_, navigate] = useLocation();
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
 
   const handleLogout = () => {
     logoutMutation.mutate();
@@ -53,7 +55,10 @@ export default function Header({ user, onMenuClick }: HeaderProps) {
           >
             <span className="material-icons">notifications</span>
           </button>
-          <button className="text-gray-500 hover:text-primary">
+          <button 
+            className="text-gray-500 hover:text-primary"
+            onClick={() => setIsHelpOpen(true)}
+          >
             <span className="material-icons">help_outline</span>
           </button>
           <div className="border-l pl-4">
@@ -110,6 +115,9 @@ export default function Header({ user, onMenuClick }: HeaderProps) {
           </div>
         </div>
       </div>
+      
+      {/* Help System */}
+      <HelpSystem open={isHelpOpen} onOpenChange={setIsHelpOpen} />
     </header>
   );
 }
