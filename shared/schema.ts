@@ -18,6 +18,9 @@ export const insertDepartmentSchema = createInsertSchema(departments).pick({
   isActive: true,
 });
 
+export type Department = typeof departments.$inferSelect;
+export type InsertDepartment = z.infer<typeof insertDepartmentSchema>;
+
 // Users table
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),

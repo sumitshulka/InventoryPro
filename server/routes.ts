@@ -1713,6 +1713,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // User department assignment routes (admin only)
+  app.put("/api/users/:id/department", checkRole("admin"), async (req, res) => {
+    try {
+      const userId = parseInt(req.params.id);
+      const { departmentId } = req.body;
+      
+      const updatedUser = await storage.updateUser(userId, { departmentId });
+      if (!updatedUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      res.json(updatedUser);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
   // Warehouse manager assignment routes
   app.put("/api/warehouses/:id/manager", async (req, res) => {
     try {

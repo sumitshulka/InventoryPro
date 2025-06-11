@@ -1,6 +1,8 @@
 import { 
   User, 
   InsertUser, 
+  Department,
+  InsertDepartment,
   Location,
   InsertLocation,
   Category, 
@@ -37,6 +39,7 @@ import {
   Notification,
   InsertNotification,
   users,
+  departments,
   locations,
   categories,
   warehouses,
@@ -72,6 +75,15 @@ export interface IStorage {
   getAllUsers(): Promise<User[]>;
   updateUser(id: number, userData: Partial<InsertUser>): Promise<User | undefined>;
   deleteUser(id: number): Promise<boolean>;
+
+  // Department operations
+  getDepartment(id: number): Promise<Department | undefined>;
+  getDepartmentByName(name: string): Promise<Department | undefined>;
+  createDepartment(department: InsertDepartment): Promise<Department>;
+  getAllDepartments(): Promise<Department[]>;
+  getActiveDepartments(): Promise<Department[]>;
+  updateDepartment(id: number, departmentData: Partial<InsertDepartment>): Promise<Department | undefined>;
+  deleteDepartment(id: number): Promise<boolean>;
 
   // Location operations
   getLocation(id: number): Promise<Location | undefined>;
@@ -1312,6 +1324,45 @@ export class DatabaseStorage implements IStorage {
       .where(eq(users.id, id))
       .returning();
     return !!deletedUser;
+  }
+
+  // Department operations
+  async getDepartment(id: number): Promise<Department | undefined> {
+    const [department] = await db.select().from(departments).where(eq(departments.id, id));
+    return department || undefined;
+  }
+
+  async getDepartmentByName(name: string): Promise<Department | undefined> {
+    const [department] = await db.select().from(departments).where(eq(departments.name, name));
+    return department || undefined;
+  }
+
+  async createDepartment(department: InsertDepartment): Promise<Department> {
+    const [newDepartment] = await db.insert(departments).values(department).returning();
+    return newDepartment;
+  }
+
+  async getAllDepartments(): Promise<Department[]> {
+    return await db.select().from(departments);
+  }
+
+  async getActiveDepartments(): Promise<Department[]> {
+    return await db.select().from(departments).where(eq(departments.isActive, true));
+  }
+
+  async updateDepartment(id: number, departmentData: Partial<InsertDepartment>): Promise<Department | undefined> {
+    const [updatedDepartment] = await db.update(departments)
+      .set(departmentData)
+      .where(eq(departments.id, id))
+      .returning();
+    return updatedDepartment || undefined;
+  }
+
+  async deleteDepartment(id: number): Promise<boolean> {
+    const [deletedDepartment] = await db.delete(departments)
+      .where(eq(departments.id, id))
+      .returning();
+    return !!deletedDepartment;
   }
 
   // Location operations
