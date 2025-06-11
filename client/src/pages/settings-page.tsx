@@ -1038,6 +1038,148 @@ export default function SettingsPage() {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Location Dialog */}
+      <Dialog open={isLocationDialogOpen} onOpenChange={setIsLocationDialogOpen}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>
+              {editingLocation ? "Edit Office Location" : "Add Office Location"}
+            </DialogTitle>
+            <DialogDescription>
+              {editingLocation 
+                ? "Update the details of this office location."
+                : "Create a new office location for warehouses and operations."
+              }
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={locationForm.handleSubmit(onLocationSubmit)} className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="name">Location Name</Label>
+                <Input
+                  id="name"
+                  placeholder="Enter location name"
+                  {...locationForm.register("name")}
+                />
+                {locationForm.formState.errors.name && (
+                  <p className="text-sm text-red-500">
+                    {locationForm.formState.errors.name.message}
+                  </p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="country">Country</Label>
+                <Input
+                  id="country"
+                  placeholder="Enter country"
+                  {...locationForm.register("country")}
+                />
+                {locationForm.formState.errors.country && (
+                  <p className="text-sm text-red-500">
+                    {locationForm.formState.errors.country.message}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="address">Address</Label>
+              <Input
+                id="address"
+                placeholder="Enter full address"
+                {...locationForm.register("address")}
+              />
+              {locationForm.formState.errors.address && (
+                <p className="text-sm text-red-500">
+                  {locationForm.formState.errors.address.message}
+                </p>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="city">City</Label>
+                <Input
+                  id="city"
+                  placeholder="Enter city"
+                  {...locationForm.register("city")}
+                />
+                {locationForm.formState.errors.city && (
+                  <p className="text-sm text-red-500">
+                    {locationForm.formState.errors.city.message}
+                  </p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="state">State</Label>
+                <Input
+                  id="state"
+                  placeholder="Enter state"
+                  {...locationForm.register("state")}
+                />
+                {locationForm.formState.errors.state && (
+                  <p className="text-sm text-red-500">
+                    {locationForm.formState.errors.state.message}
+                  </p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="zipCode">ZIP Code</Label>
+                <Input
+                  id="zipCode"
+                  placeholder="Enter ZIP code"
+                  {...locationForm.register("zipCode")}
+                />
+                {locationForm.formState.errors.zipCode && (
+                  <p className="text-sm text-red-500">
+                    {locationForm.formState.errors.zipCode.message}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <Switch
+                id="isActive"
+                checked={locationForm.watch("isActive")}
+                onCheckedChange={(checked) => locationForm.setValue("isActive", checked)}
+              />
+              <Label htmlFor="isActive">Active Location</Label>
+            </div>
+
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setIsLocationDialogOpen(false);
+                  setEditingLocation(null);
+                  locationForm.reset();
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={createLocationMutation.isPending || updateLocationMutation.isPending}
+              >
+                {createLocationMutation.isPending || updateLocationMutation.isPending ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    {editingLocation ? "Updating..." : "Creating..."}
+                  </>
+                ) : (
+                  editingLocation ? "Update Location" : "Create Location"
+                )}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </AppLayout>
   );
 }

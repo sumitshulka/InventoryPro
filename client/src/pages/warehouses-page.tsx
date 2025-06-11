@@ -40,7 +40,7 @@ import { formatCapacity } from "@/lib/formatters";
 
 const formSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters" }),
-  location: z.string().min(2, { message: "Location is required" }),
+  locationId: z.number().min(1, { message: "Location is required" }),
   managerId: z.string().optional().transform(val => val === "" || val === "none" || !val ? null : parseInt(val)),
   capacity: z.number().min(1, { message: "Capacity is required" }),
   isActive: z.boolean().default(true),
@@ -59,6 +59,10 @@ export default function WarehousesPage() {
     queryKey: ["/api/warehouses"],
   });
 
+  const { data: locations } = useQuery({
+    queryKey: ["/api/locations"],
+  });
+
   const { data: users } = useQuery({
     queryKey: ["/api/users"],
   });
@@ -67,7 +71,7 @@ export default function WarehousesPage() {
     resolver: zodResolver(formSchema),
     defaultValues: {
       name: "",
-      location: "",
+      locationId: "",
       managerId: "none",
       capacity: 1000,
       isActive: true,
@@ -78,7 +82,7 @@ export default function WarehousesPage() {
     mutationFn: async (data: FormValues) => {
       const payload = {
         name: data.name,
-        location: data.location,
+        locationId: data.locationId,
         managerId: data.managerId,
         capacity: data.capacity,
         isActive: data.isActive,
