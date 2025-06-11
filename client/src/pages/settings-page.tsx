@@ -94,7 +94,7 @@ export default function SettingsPage() {
     defaultValues: {
       organizationName: "My Organization",
       currency: "USD",
-      currencySymbol: "$",
+      currencySymbol: "₹",
       timezone: "UTC",
       defaultUnits: ["pcs", "boxes", "reams", "kg", "liters"],
       allowedCategories: ["Electronics", "Office Supplies", "Furniture"],
