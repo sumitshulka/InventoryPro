@@ -33,7 +33,7 @@ import {
 } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest, queryClient, invalidateRelatedQueries } from "@/lib/queryClient";
 import { Loader2, Plus, Edit, Trash2, Settings } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -154,8 +154,8 @@ export default function SettingsPage() {
       const res = await apiRequest("POST", "/api/approval-settings", payload);
       return res.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/approval-settings"] });
+    onSuccess: async () => {
+      await invalidateRelatedQueries('approval-settings', 'create');
       toast({
         title: "Approval settings created",
         description: "The approval settings have been created successfully.",
@@ -181,8 +181,8 @@ export default function SettingsPage() {
       const res = await apiRequest("PUT", `/api/approval-settings/${editingSettings.id}`, payload);
       return res.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/approval-settings"] });
+    onSuccess: async () => {
+      await invalidateRelatedQueries('approval-settings', 'update');
       toast({
         title: "Approval settings updated",
         description: "The approval settings have been updated successfully.",
@@ -205,8 +205,8 @@ export default function SettingsPage() {
       const res = await apiRequest("DELETE", `/api/approval-settings/${id}`);
       return res.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/approval-settings"] });
+    onSuccess: async () => {
+      await invalidateRelatedQueries('approval-settings', 'delete');
       toast({
         title: "Approval settings deleted",
         description: "The approval settings have been deleted successfully.",
@@ -226,8 +226,8 @@ export default function SettingsPage() {
       const res = await apiRequest("PUT", "/api/organization-settings", data);
       return res.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/organization-settings"] });
+    onSuccess: async () => {
+      await invalidateRelatedQueries('organization-settings', 'update');
       toast({
         title: "Organization settings updated",
         description: "The organization settings have been updated successfully.",
@@ -247,8 +247,8 @@ export default function SettingsPage() {
       const res = await apiRequest("POST", "/api/locations", data);
       return res.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/locations"] });
+    onSuccess: async () => {
+      await invalidateRelatedQueries('location', 'create');
       toast({
         title: "Location created",
         description: "The office location has been created successfully.",
@@ -271,8 +271,8 @@ export default function SettingsPage() {
       const res = await apiRequest("PUT", `/api/locations/${id}`, updateData);
       return res.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/locations"] });
+    onSuccess: async () => {
+      await invalidateRelatedQueries('location', 'update');
       toast({
         title: "Location updated",
         description: "The office location has been updated successfully.",
@@ -295,8 +295,8 @@ export default function SettingsPage() {
       const res = await apiRequest("DELETE", `/api/locations/${id}`);
       return res.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/locations"] });
+    onSuccess: async () => {
+      await invalidateRelatedQueries('location', 'delete');
       toast({
         title: "Location deleted",
         description: "The office location has been deleted successfully.",
