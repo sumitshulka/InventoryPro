@@ -37,9 +37,9 @@ import { Loader2, Plus, Edit, Users } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 
-const createFormSchema = z.object({
+const formSchema = z.object({
   username: z.string().min(3, { message: "Username must be at least 3 characters" }),
-  password: z.string().min(6, { message: "Password must be at least 6 characters" }),
+  password: z.string().optional(),
   name: z.string().min(2, { message: "Name must be at least 2 characters" }),
   email: z.string().email({ message: "Invalid email address" }),
   role: z.enum(["admin", "manager", "employee"], { message: "Role is required" }),
@@ -49,21 +49,7 @@ const createFormSchema = z.object({
   isWarehouseOperator: z.boolean().default(false),
 });
 
-const editFormSchema = z.object({
-  username: z.string().min(3, { message: "Username must be at least 3 characters" }),
-  password: z.string().optional(), // Optional for editing
-  name: z.string().min(2, { message: "Name must be at least 2 characters" }),
-  email: z.string().email({ message: "Invalid email address" }),
-  role: z.enum(["admin", "manager", "employee"], { message: "Role is required" }),
-  managerId: z.string().optional(),
-  warehouseId: z.string().optional(),
-  departmentId: z.string().optional(),
-  isWarehouseOperator: z.boolean().default(false),
-});
-
-type CreateFormValues = z.infer<typeof createFormSchema>;
-type EditFormValues = z.infer<typeof editFormSchema>;
-type FormValues = CreateFormValues | EditFormValues;
+type FormValues = z.infer<typeof formSchema>;
 
 export default function UsersManagementPage() {
   const { toast } = useToast();
@@ -88,8 +74,8 @@ export default function UsersManagementPage() {
     queryKey: ["/api/departments"],
   });
 
-  const form = useForm<any>({
-    resolver: zodResolver(createFormSchema), // Will be updated when editing
+  const form = useForm<FormValues>({
+    resolver: zodResolver(formSchema),
     defaultValues: {
       username: "",
       password: "",
@@ -105,6 +91,11 @@ export default function UsersManagementPage() {
 
   const createUserMutation = useMutation({
     mutationFn: async (data: FormValues) => {
+      // Validate password requirement based on mode
+      if (!isEditMode && (!data.password || data.password.trim() === "")) {
+        throw new Error("Password is required when creating a new user");
+      }
+
       const payload: any = {
         username: data.username,
         name: data.name,
