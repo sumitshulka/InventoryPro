@@ -34,7 +34,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Loader2, Search, Plus, Download } from "lucide-react";
+import { Loader2, Search, Plus, Download, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { downloadCSV } from "@/lib/utils";
@@ -196,7 +196,21 @@ export default function InventoryPage() {
 
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle>Inventory Items</CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle>Inventory Items</CardTitle>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                queryClient.invalidateQueries({ queryKey: ['/api/reports/inventory-stock'] });
+                queryClient.invalidateQueries({ queryKey: ['/api/items'] });
+                queryClient.invalidateQueries({ queryKey: ['/api/warehouses'] });
+              }}
+              className="ml-2"
+            >
+              <RefreshCw className="h-4 w-4" />
+            </Button>
+          </div>
           <div className="flex flex-col md:flex-row justify-between gap-4 mt-4">
             <div className="relative w-full md:w-96">
               <Search className="absolute left-2 top-3 h-4 w-4 text-gray-400" />

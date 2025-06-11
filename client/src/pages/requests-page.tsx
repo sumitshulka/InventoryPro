@@ -39,7 +39,7 @@ import {
   TabsTrigger,
 } from "@/components/ui/tabs";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Loader2, Plus, CheckCircle, X, Eye, Download } from "lucide-react";
+import { Loader2, Plus, CheckCircle, X, Eye, Download, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { formatDateTime, getStatusColor } from "@/lib/utils";
@@ -273,7 +273,20 @@ export default function RequestsPage() {
 
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle>Request List</CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle>Request List</CardTitle>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                queryClient.invalidateQueries({ queryKey: ['/api/requests'] });
+                queryClient.invalidateQueries({ queryKey: ['/api/reports/inventory-stock'] });
+              }}
+              className="ml-2"
+            >
+              <RefreshCw className="h-4 w-4" />
+            </Button>
+          </div>
           <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-4">
             <TabsList>
               <TabsTrigger value="all">All</TabsTrigger>

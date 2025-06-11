@@ -33,7 +33,7 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { apiRequest, queryClient, invalidateRelatedQueries } from "@/lib/queryClient";
-import { Loader2, Plus, Edit, MapPin, Trash2 } from "lucide-react";
+import { Loader2, Plus, Edit, MapPin, Trash2, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { formatCapacity } from "@/lib/formatters";
@@ -275,7 +275,21 @@ export default function WarehousesPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>All Warehouses</CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle>All Warehouses</CardTitle>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                queryClient.invalidateQueries({ queryKey: ['/api/warehouses'] });
+                queryClient.invalidateQueries({ queryKey: ['/api/locations'] });
+                queryClient.invalidateQueries({ queryKey: ['/api/users'] });
+              }}
+              className="ml-2"
+            >
+              <RefreshCw className="h-4 w-4" />
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
