@@ -280,10 +280,10 @@ export default function WarehousesPage() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => {
-                queryClient.invalidateQueries({ queryKey: ['/api/warehouses'] });
-                queryClient.invalidateQueries({ queryKey: ['/api/locations'] });
-                queryClient.invalidateQueries({ queryKey: ['/api/users'] });
+              onClick={async () => {
+                await queryClient.refetchQueries({ queryKey: ['/api/warehouses'] });
+                await queryClient.refetchQueries({ queryKey: ['/api/locations'] });
+                await queryClient.refetchQueries({ queryKey: ['/api/users'] });
               }}
               className="ml-2"
             >

@@ -465,9 +465,9 @@ export default function NotificationCenterPage() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => {
-                      queryClient.invalidateQueries({ queryKey: ['/api/notifications'] });
-                      queryClient.invalidateQueries({ queryKey: ['/api/users'] });
+                    onClick={async () => {
+                      await queryClient.refetchQueries({ queryKey: ['/api/notifications'] });
+                      await queryClient.refetchQueries({ queryKey: ['/api/users'] });
                     }}
                     className="ml-2"
                   >

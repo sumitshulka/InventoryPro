@@ -409,10 +409,10 @@ export default function EnhancedTransfersPage() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => {
-                      queryClient.invalidateQueries({ queryKey: ['/api/transfers'] });
-                      queryClient.invalidateQueries({ queryKey: ['/api/items'] });
-                      queryClient.invalidateQueries({ queryKey: ['/api/warehouses'] });
+                    onClick={async () => {
+                      await queryClient.refetchQueries({ queryKey: ['/api/transfers'] });
+                      await queryClient.refetchQueries({ queryKey: ['/api/items'] });
+                      await queryClient.refetchQueries({ queryKey: ['/api/warehouses'] });
                     }}
                     className="ml-2"
                   >

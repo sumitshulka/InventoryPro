@@ -137,9 +137,9 @@ export default function AuditTrailPage() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => {
-                  queryClient.invalidateQueries({ queryKey: ['/api/audit-logs'] });
-                  queryClient.invalidateQueries({ queryKey: ['/api/users'] });
+                onClick={async () => {
+                  await queryClient.refetchQueries({ queryKey: ['/api/audit-logs'] });
+                  await queryClient.refetchQueries({ queryKey: ['/api/users'] });
                 }}
                 className="ml-2"
               >
