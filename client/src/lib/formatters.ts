@@ -12,6 +12,7 @@ export function formatCapacity(value: number): string {
   return formatNumber(value);
 }
 
+// Note: This function is deprecated. Use useCurrency hook instead for consistent currency formatting
 export function formatCurrency(value: number, symbol: string = '$'): string {
   if (value >= 1000000) {
     return symbol + (value / 1000000).toFixed(1) + 'M';

@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/select";
 import { Loader2, Download, RefreshCw, Calendar, ArrowUpCircle, ArrowDownCircle, ArrowRightLeft, Package, TrendingUp, TrendingDown } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useCurrency } from "@/hooks/use-currency";
 import { getTransactionTypeColor, getStatusColor, formatDateTime } from "@/lib/utils";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
