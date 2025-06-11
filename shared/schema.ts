@@ -262,6 +262,7 @@ export const organizationSettings = pgTable("organization_settings", {
   timezone: text("timezone").notNull().default("UTC"),
   defaultUnits: text("default_units").array().notNull().default(["pcs", "boxes", "reams", "kg", "liters"]),
   allowedCategories: text("allowed_categories").array().notNull().default(["Electronics", "Office Supplies", "Furniture"]),
+  inventoryValuationMethod: text("inventory_valuation_method").notNull().default("Last Value"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at"),
 });

@@ -52,6 +52,9 @@ const organizationSettingsSchema = z.object({
   timezone: z.string().min(1, "Timezone is required"),
   defaultUnits: z.array(z.string()).min(1, "At least one unit is required"),
   allowedCategories: z.array(z.string()).min(1, "At least one category is required"),
+  inventoryValuationMethod: z.enum(["Last Value", "Earliest Value", "Average Value"], {
+    errorMap: () => ({ message: "Please select a valid inventory valuation method" }),
+  }),
 });
 
 const locationSchema = z.object({
@@ -115,6 +118,7 @@ export default function SettingsPage() {
       timezone: "UTC",
       defaultUnits: ["pcs", "boxes", "reams", "kg", "liters"],
       allowedCategories: ["Electronics", "Office Supplies", "Furniture"],
+      inventoryValuationMethod: "Last Value",
     },
   });
 
@@ -141,6 +145,7 @@ export default function SettingsPage() {
         timezone: (organizationSettings as any).timezone || "UTC",
         defaultUnits: (organizationSettings as any).defaultUnits || ["pcs", "boxes", "reams", "kg", "liters"],
         allowedCategories: (organizationSettings as any).allowedCategories || ["Electronics", "Office Supplies", "Furniture"],
+        inventoryValuationMethod: (organizationSettings as any).inventoryValuationMethod || "Last Value",
       });
     }
   }, [organizationSettings, orgForm]);
@@ -696,6 +701,33 @@ export default function SettingsPage() {
                           </p>
                         )}
                       </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="inventoryValuationMethod">Inventory Valuation Method</Label>
+                      <p className="text-sm text-muted-foreground">
+                        Select the method used for valuing inventory items
+                      </p>
+                      <Select
+                        onValueChange={(value) => {
+                          orgForm.setValue("inventoryValuationMethod", value as "Last Value" | "Earliest Value" | "Average Value");
+                        }}
+                        defaultValue={orgForm.getValues("inventoryValuationMethod")}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select valuation method" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Last Value">Last Value</SelectItem>
+                          <SelectItem value="Earliest Value">Earliest Value</SelectItem>
+                          <SelectItem value="Average Value">Average Value</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      {orgForm.formState.errors.inventoryValuationMethod && (
+                        <p className="text-sm text-red-500">
+                          {orgForm.formState.errors.inventoryValuationMethod.message}
+                        </p>
+                      )}
                     </div>
 
                     <div className="space-y-6">

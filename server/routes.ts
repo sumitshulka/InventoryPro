@@ -1557,7 +1557,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           organizationName: "My Organization",
           currency: "USD",
           currencySymbol: "$",
-          timezone: "UTC"
+          timezone: "UTC",
+          inventoryValuationMethod: "Last Value"
         }).returning();
         res.json(defaultSettings[0]);
       } else {
