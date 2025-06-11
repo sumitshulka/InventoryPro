@@ -14,7 +14,7 @@ import { Separator } from "@/components/ui/separator";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { format, formatDistanceToNow } from "date-fns";
 import { AlertTriangle, Plus, Search, Filter, CheckCircle, Clock, X, Flag, Bell, MessageSquare, Archive, Reply, Mail, MailOpen, RefreshCw } from "lucide-react";
@@ -325,6 +325,19 @@ export default function IssuesPage() {
                 {unreadCount} unread
               </Badge>
             )}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                queryClient.invalidateQueries({ queryKey: ['/api/issues'] });
+                queryClient.invalidateQueries({ queryKey: ['/api/notifications'] });
+                queryClient.invalidateQueries({ queryKey: ['/api/users'] });
+                queryClient.invalidateQueries({ queryKey: ['/api/warehouses'] });
+                queryClient.invalidateQueries({ queryKey: ['/api/items'] });
+              }}
+            >
+              <RefreshCw className="h-4 w-4" />
+            </Button>
           </div>
         </div>
 
