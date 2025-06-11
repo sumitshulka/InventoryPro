@@ -90,6 +90,10 @@ export default function SettingsPage() {
     queryKey: ["/api/locations"],
   });
 
+  const { data: user } = useQuery({
+    queryKey: ["/api/user"],
+  });
+
   const { data: users } = useQuery({
     queryKey: ["/api/users"],
   });
@@ -97,6 +101,9 @@ export default function SettingsPage() {
   const { data: warehouses } = useQuery({
     queryKey: ["/api/warehouses"],
   });
+
+  // Check if user is admin
+  const isAdmin = (user as any)?.role === 'admin';
 
   const form = useForm<ApprovalSettingsFormValues>({
     resolver: zodResolver(approvalSettingsSchema),
@@ -353,6 +360,34 @@ export default function SettingsPage() {
       deleteMutation.mutate(id);
     }
   };
+
+  // Show access denied message for non-admin users
+  if (!isAdmin) {
+    return (
+      <AppLayout>
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold">System Settings</h1>
+              <p className="text-muted-foreground">Configure system-wide settings and approval workflows</p>
+            </div>
+          </div>
+
+          <Card>
+            <CardContent className="flex flex-col items-center justify-center py-12">
+              <Settings className="h-16 w-16 text-gray-400 mb-4" />
+              <h2 className="text-xl font-semibold text-gray-900 mb-2">Access Restricted</h2>
+              <p className="text-gray-600 text-center max-w-md">
+                System settings including organization configuration, office locations, and approval workflows 
+                can only be accessed by administrators. Please contact your system administrator if you need 
+                to make changes to these settings.
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      </AppLayout>
+    );
+  }
 
   return (
     <AppLayout>

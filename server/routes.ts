@@ -242,8 +242,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ==== Location Routes ====
-  // Get all locations
-  app.get("/api/locations", async (req, res) => {
+  // Get all locations (Admin only)
+  app.get("/api/locations", checkRole("admin"), async (req, res) => {
     const locations = await storage.getAllLocations();
     res.json(locations);
   });
@@ -1549,8 +1549,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Approval Settings routes
-  app.get("/api/approval-settings", async (req, res) => {
+  // Approval Settings routes (Admin only)
+  app.get("/api/approval-settings", checkRole("admin"), async (req, res) => {
     try {
       const settings = await storage.getAllApprovalSettings();
       res.json(settings);
@@ -1559,7 +1559,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/approval-settings", async (req, res) => {
+  app.post("/api/approval-settings", checkRole("admin"), async (req, res) => {
     try {
       const settings = await storage.createApprovalSettings(req.body);
       res.status(201).json(settings);
@@ -1568,7 +1568,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/approval-settings/:id", async (req, res) => {
+  app.put("/api/approval-settings/:id", checkRole("admin"), async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const settings = await storage.updateApprovalSettings(id, req.body);
@@ -1581,7 +1581,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/approval-settings/:id", async (req, res) => {
+  app.delete("/api/approval-settings/:id", checkRole("admin"), async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const deleted = await storage.deleteApprovalSettings(id);
@@ -1594,8 +1594,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Organization settings routes
-  app.get("/api/organization-settings", async (req, res) => {
+  // Organization settings routes (Admin only)
+  app.get("/api/organization-settings", checkRole("admin"), async (req, res) => {
     try {
       const settings = await db.select().from(organizationSettings).limit(1);
       if (settings.length === 0) {
@@ -1616,7 +1616,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/organization-settings", async (req, res) => {
+  app.put("/api/organization-settings", checkRole("admin"), async (req, res) => {
     try {
       const existing = await db.select().from(organizationSettings).limit(1);
       if (existing.length === 0) {
