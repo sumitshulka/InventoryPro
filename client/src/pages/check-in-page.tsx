@@ -20,6 +20,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Loader2, CalendarIcon, Plus, Trash2, Package } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
+import { useCurrency } from "@/hooks/use-currency";
 import { formatDateTime, cn } from "@/lib/utils";
 
 const getStatusColor = (status: string) => {
@@ -67,6 +68,7 @@ type FormValues = z.infer<typeof multiCheckInSchema>;
 export default function CheckInPage() {
   const { toast } = useToast();
   const { user } = useAuth();
+  const { currencySymbol, formatCurrencyFull } = useCurrency();
 
   const { data: items = [], isLoading: itemsLoading } = useQuery<Array<{
     id: number;
@@ -454,7 +456,7 @@ export default function CheckInPage() {
                               name={`items.${index}.cost`}
                               render={({ field }) => (
                                 <FormItem>
-                                  <FormLabel>Cost ({organizationSettings?.currencySymbol || "$"})</FormLabel>
+                                  <FormLabel>Cost ({currencySymbol})</FormLabel>
                                   <FormControl>
                                     <Input type="number" step="0.01" placeholder="Enter cost" {...field} />
                                   </FormControl>
@@ -541,7 +543,7 @@ export default function CheckInPage() {
                         <TableHead>Transaction Code</TableHead>
                         <TableHead>Item</TableHead>
                         <TableHead>Quantity</TableHead>
-                        <TableHead>Price ({organizationSettings?.currencySymbol || "$"})</TableHead>
+                        <TableHead>Price ({currencySymbol})</TableHead>
                         <TableHead>Warehouse</TableHead>
                         <TableHead>Date</TableHead>
                         <TableHead>Status</TableHead>

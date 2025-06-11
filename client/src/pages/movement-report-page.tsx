@@ -27,6 +27,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function MovementReportPage() {
   const { toast } = useToast();
+  const { formatCurrencyFull } = useCurrency();
   const [warehouseFilter, setWarehouseFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
   const [itemFilter, setItemFilter] = useState("all");
@@ -462,7 +463,7 @@ export default function MovementReportPage() {
                       <TableCell>
                         {transaction.cost ? (
                           <span className="font-medium text-green-600">
-                            ${parseFloat(transaction.cost).toFixed(2)}
+                            {formatCurrencyFull(parseFloat(transaction.cost))}
                           </span>
                         ) : (
                           <span className="text-gray-400">—</span>
