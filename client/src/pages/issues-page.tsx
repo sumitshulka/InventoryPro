@@ -290,11 +290,15 @@ export default function IssuesPage() {
     }
   };
 
-  const handleNotificationClick = (notification: Notification) => {
-    if (notification.status === 'unread') {
-      markAsReadMutation.mutate(notification.id);
+  const handleNotificationClick = async (notification: Notification) => {
+    try {
+      if (notification.status === 'unread') {
+        await markAsReadMutation.mutateAsync(notification.id);
+      }
+      setSelectedNotification(notification);
+    } catch (error) {
+      console.error('Error handling notification click:', error);
     }
-    setSelectedNotification(notification);
   };
 
   const onSubmit = (data: z.infer<typeof issueSchema>) => {
@@ -557,9 +561,13 @@ export default function IssuesPage() {
                                   <Button
                                     variant="ghost"
                                     size="sm"
-                                    onClick={(e) => {
+                                    onClick={async (e) => {
                                       e.stopPropagation();
-                                      markAsReadMutation.mutate(notification.id);
+                                      try {
+                                        await markAsReadMutation.mutateAsync(notification.id);
+                                      } catch (error) {
+                                        console.error('Error marking as read:', error);
+                                      }
                                     }}
                                   >
                                     <Mail className="h-3 w-3" />
@@ -568,9 +576,13 @@ export default function IssuesPage() {
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  onClick={(e) => {
+                                  onClick={async (e) => {
                                     e.stopPropagation();
-                                    archiveNotificationMutation.mutate(notification.id);
+                                    try {
+                                      await archiveNotificationMutation.mutateAsync(notification.id);
+                                    } catch (error) {
+                                      console.error('Error archiving notification:', error);
+                                    }
                                   }}
                                 >
                                   <Archive className="h-3 w-3" />
@@ -600,9 +612,12 @@ export default function IssuesPage() {
 
         {/* Issue Creation Dialog */}
         <Dialog open={showNewIssueDialog} onOpenChange={setShowNewIssueDialog}>
-          <DialogContent className="sm:max-w-md">
+          <DialogContent className="sm:max-w-md" aria-describedby="issue-dialog-description">
             <DialogHeader>
               <DialogTitle>Report New Issue</DialogTitle>
+              <div id="issue-dialog-description" className="text-sm text-gray-600">
+                Fill out the form below to report a new issue.
+              </div>
             </DialogHeader>
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -751,9 +766,12 @@ export default function IssuesPage() {
 
         {/* Notification Detail Dialog */}
         <Dialog open={!!selectedNotification} onOpenChange={() => setSelectedNotification(null)}>
-          <DialogContent className="sm:max-w-2xl">
+          <DialogContent className="sm:max-w-2xl" aria-describedby="notification-dialog-description">
             <DialogHeader>
               <DialogTitle>Notification Details</DialogTitle>
+              <div id="notification-dialog-description" className="text-sm text-gray-600">
+                View and manage notification details.
+              </div>
             </DialogHeader>
             {selectedNotification && (
               <div className="space-y-4">
@@ -776,11 +794,15 @@ export default function IssuesPage() {
                 <div className="flex gap-2">
                   <Button
                     variant="outline"
-                    onClick={() => {
-                      if (selectedNotification.status === 'unread') {
-                        markAsReadMutation.mutate(selectedNotification.id);
+                    onClick={async () => {
+                      try {
+                        if (selectedNotification.status === 'unread') {
+                          await markAsReadMutation.mutateAsync(selectedNotification.id);
+                        }
+                        setSelectedNotification(null);
+                      } catch (error) {
+                        console.error('Error marking notification as read:', error);
                       }
-                      setSelectedNotification(null);
                     }}
                   >
                     <Mail className="h-4 w-4 mr-2" />
@@ -788,9 +810,13 @@ export default function IssuesPage() {
                   </Button>
                   <Button
                     variant="outline"
-                    onClick={() => {
-                      archiveNotificationMutation.mutate(selectedNotification.id);
-                      setSelectedNotification(null);
+                    onClick={async () => {
+                      try {
+                        await archiveNotificationMutation.mutateAsync(selectedNotification.id);
+                        setSelectedNotification(null);
+                      } catch (error) {
+                        console.error('Error archiving notification:', error);
+                      }
                     }}
                   >
                     <Archive className="h-4 w-4 mr-2" />
