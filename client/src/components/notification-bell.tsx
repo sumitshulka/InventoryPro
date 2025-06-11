@@ -74,10 +74,12 @@ export function NotificationBell({ onOpenNotificationCenter }: NotificationBellP
   const queryClient = useQueryClient();
 
   // Get unread count
-  const { data: unreadCount = 0 } = useQuery({
+  const { data: unreadCountData } = useQuery({
     queryKey: ['/api/notifications/unread-count'],
     refetchInterval: 30000, // Refresh every 30 seconds
   });
+  
+  const unreadCount = (unreadCountData as { count: number })?.count || 0;
 
   // Get latest notifications for dropdown
   const { data: notifications = [] } = useQuery<Notification[]>({
@@ -87,10 +89,14 @@ export function NotificationBell({ onOpenNotificationCenter }: NotificationBellP
 
   // Mark as read mutation
   const markAsReadMutation = useMutation({
-    mutationFn: (notificationId: number) =>
-      apiRequest(`/api/notifications/${notificationId}/read`, {
+    mutationFn: async (notificationId: number) => {
+      const response = await fetch(`/api/notifications/${notificationId}/read`, {
         method: 'PATCH',
-      }),
+        headers: { 'Content-Type': 'application/json' },
+      });
+      if (!response.ok) throw new Error('Failed to mark as read');
+      return response.json();
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/notifications'] });
       queryClient.invalidateQueries({ queryKey: ['/api/notifications/unread-count'] });
