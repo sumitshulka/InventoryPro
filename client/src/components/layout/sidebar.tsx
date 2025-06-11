@@ -306,10 +306,10 @@ export default function Sidebar({ user, isOpen, onClose }: SidebarProps) {
                     </li>
                     <li>
                       <Link 
-                        href="/audit"
+                        href="/audit-trail"
                         className={cn(
                           "flex items-center px-3 py-2 rounded-md",
-                          isActive("/audit") 
+                          isActive("/audit-trail") 
                             ? "bg-primary/10 border-l-4 border-primary text-primary" 
                             : "text-gray-700 hover:text-primary hover:bg-primary/5"
                         )}

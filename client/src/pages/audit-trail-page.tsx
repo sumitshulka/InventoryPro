@@ -149,54 +149,60 @@ export default function AuditTrailPage() {
             </div>
           </CardHeader>
           <CardContent>
-            {filteredLogs.length === 0 ? (
-              <div className="text-center py-8">
-                <p className="text-gray-500">No audit logs found matching your criteria.</p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {filteredLogs.map((log: any) => (
-                  <div key={log.id} className="border rounded-lg p-4 hover:bg-gray-50">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-2">
-                          <Badge className={getActionBadgeColor(log.action)}>
-                            {log.action?.toUpperCase()}
-                          </Badge>
-                          <span className="text-sm text-gray-600">
-                            by {log.user?.name || 'Unknown User'}
-                          </span>
-                          <span className="text-sm text-gray-500">
-                            {log.createdAt ? format(new Date(log.createdAt), 'MMM dd, yyyy HH:mm:ss') : 'Unknown time'}
-                          </span>
-                        </div>
-                        
-                        <p className="text-gray-900 mb-1">
-                          {log.details || 'No details available'}
-                        </p>
-                        
-                        {log.metadata && (
-                          <div className="text-sm text-gray-600">
-                            <details className="cursor-pointer">
-                              <summary>Additional Details</summary>
-                              <pre className="mt-2 p-2 bg-gray-100 rounded text-xs overflow-auto">
-                                {JSON.stringify(log.metadata, null, 2)}
-                              </pre>
-                            </details>
-                          </div>
-                        )}
-                        
-                        {log.ipAddress && (
-                          <div className="text-xs text-gray-500 mt-1">
-                            IP: {log.ipAddress}
-                          </div>
-                        )}
-                      </div>
+            <DataTablePagination data={filteredLogs}>
+              {(paginatedLogs) => (
+                <>
+                  {paginatedLogs.length === 0 ? (
+                    <div className="text-center py-8">
+                      <p className="text-gray-500">No audit logs found matching your criteria.</p>
                     </div>
-                  </div>
-                ))}
-              </div>
-            )}
+                  ) : (
+                    <div className="space-y-4">
+                      {paginatedLogs.map((log: any) => (
+                        <div key={log.id} className="border rounded-lg p-4 hover:bg-gray-50">
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-3 mb-2">
+                                <Badge className={getActionBadgeColor(log.action)}>
+                                  {log.action?.toUpperCase()}
+                                </Badge>
+                                <span className="text-sm text-gray-600">
+                                  by {log.user?.name || 'Unknown User'}
+                                </span>
+                                <span className="text-sm text-gray-500">
+                                  {log.createdAt ? format(new Date(log.createdAt), 'MMM dd, yyyy HH:mm:ss') : 'Unknown time'}
+                                </span>
+                              </div>
+                              
+                              <p className="text-gray-900 mb-1">
+                                {log.details || 'No details available'}
+                              </p>
+                              
+                              {log.metadata && (
+                                <div className="text-sm text-gray-600">
+                                  <details className="cursor-pointer">
+                                    <summary>Additional Details</summary>
+                                    <pre className="mt-2 p-2 bg-gray-100 rounded text-xs overflow-auto">
+                                      {JSON.stringify(log.metadata, null, 2)}
+                                    </pre>
+                                  </details>
+                                </div>
+                              )}
+                              
+                              {log.ipAddress && (
+                                <div className="text-xs text-gray-500 mt-1">
+                                  IP: {log.ipAddress}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+            </DataTablePagination>
           </CardContent>
         </Card>
       </div>

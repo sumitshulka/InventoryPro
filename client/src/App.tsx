@@ -63,7 +63,7 @@ function Router() {
       <ProtectedRoute path="/categories" component={CategoriesPage} />
       <ProtectedRoute path="/departments" component={DepartmentsPage} />
       <ProtectedRoute path="/approvals" component={ApprovalManagementPage} />
-      <ProtectedRoute path="/audit" component={AuditTrailPage} />
+      <ProtectedRoute path="/audit-trail" component={AuditTrailPage} />
       <ProtectedRoute path="/notifications" component={NotificationCenterPage} />
       <ProtectedRoute path="/settings" component={SettingsPage} />
       <Route component={NotFound} />

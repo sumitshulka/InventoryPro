@@ -90,7 +90,7 @@ export function DataTablePagination({ data, children, className }: DataTablePagi
                 </SelectContent>
               </Select>
             </div>
-            <div className="flex w-[100px] items-center justify-center text-sm font-medium">
+            <div className="flex items-center justify-center text-xs font-medium whitespace-nowrap">
               Showing {startIndex + 1}-{endIndex} of {totalItems.toLocaleString()}
             </div>
           </div>
