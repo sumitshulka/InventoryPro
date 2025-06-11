@@ -831,27 +831,7 @@ export class MemStorage implements IStorage {
     return updatedInventory;
   }
 
-  async updateInventoryQuantity(itemId: number, warehouseId: number, quantity: number): Promise<Inventory | undefined> {
-    const inventory = await this.getInventoryByItemAndWarehouse(itemId, warehouseId);
-    
-    if (inventory) {
-      // Update existing inventory
-      const updatedInventory = { 
-        ...inventory, 
-        quantity, 
-        lastUpdated: new Date() 
-      };
-      this.inventory.set(inventory.id, updatedInventory);
-      return updatedInventory;
-    } else {
-      // Create new inventory record
-      return this.createInventory({
-        itemId,
-        warehouseId,
-        quantity
-      });
-    }
-  }
+
 
   async deleteInventory(id: number): Promise<boolean> {
     return this.inventory.delete(id);
@@ -1528,14 +1508,7 @@ export class DatabaseStorage implements IStorage {
     return updatedInventory || undefined;
   }
 
-  async updateInventoryQuantity(itemId: number, warehouseId: number, quantity: number): Promise<Inventory | undefined> {
-    const inventoryItem = await this.getInventoryByItemAndWarehouse(itemId, warehouseId);
-    if (!inventoryItem) {
-      return undefined;
-    }
-    // Use absolute quantity value as provided (not relative change)
-    return await this.updateInventory(inventoryItem.id, { quantity });
-  }
+
 
   async deleteInventory(id: number): Promise<boolean> {
     const [deletedInventory] = await db.delete(inventory)
@@ -2087,73 +2060,38 @@ export class DatabaseStorage implements IStorage {
     return !!deletedRejectedGoods;
   }
 
-  // Location operations
-  async getLocation(id: number): Promise<Location | undefined> {
-    const [location] = await db.select().from(locations).where(eq(locations.id, id));
-    return location || undefined;
-  }
 
-  async getLocationByName(name: string): Promise<Location | undefined> {
-    const [location] = await db.select().from(locations).where(eq(locations.name, name));
-    return location || undefined;
-  }
 
-  async createLocation(location: InsertLocation): Promise<Location> {
-    const [newLocation] = await db.insert(locations).values({
-      ...location,
-      createdAt: new Date()
-    }).returning();
-    return newLocation;
-  }
-
-  async getAllLocations(): Promise<Location[]> {
-    return await db.select().from(locations).orderBy(locations.name);
-  }
-
-  async updateLocation(id: number, locationData: Partial<InsertLocation>): Promise<Location | undefined> {
-    const [updatedLocation] = await db.update(locations)
-      .set({
-        ...locationData,
-        updatedAt: new Date()
-      })
-      .where(eq(locations.id, id))
-      .returning();
-    return updatedLocation || undefined;
-  }
-
-  async deleteLocation(id: number): Promise<boolean> {
-    const [deletedLocation] = await db.delete(locations)
-      .where(eq(locations.id, id))
-      .returning();
-    return !!deletedLocation;
-  }
-
-  // Inventory quantity update method for transfers
-  async updateInventoryQuantity(itemId: number, warehouseId: number, quantityChange: number): Promise<void> {
+  // Single method to handle inventory quantity changes for all scenarios
+  async updateInventoryQuantity(itemId: number, warehouseId: number, quantityChange: number): Promise<Inventory | undefined> {
     // Check if inventory record exists
     const [existingInventory] = await db.select()
       .from(inventory)
       .where(and(eq(inventory.itemId, itemId), eq(inventory.warehouseId, warehouseId)));
 
     if (existingInventory) {
-      // Update existing inventory
+      // Update existing inventory with quantity change (positive = add, negative = subtract)
       const newQuantity = Math.max(0, existingInventory.quantity + quantityChange);
-      await db.update(inventory)
+      const [updatedInventory] = await db.update(inventory)
         .set({ 
           quantity: newQuantity,
           lastUpdated: new Date()
         })
-        .where(and(eq(inventory.itemId, itemId), eq(inventory.warehouseId, warehouseId)));
+        .where(and(eq(inventory.itemId, itemId), eq(inventory.warehouseId, warehouseId)))
+        .returning();
+      return updatedInventory || undefined;
     } else if (quantityChange > 0) {
       // Create new inventory record if adding quantity
-      await db.insert(inventory).values({
+      const [newInventory] = await db.insert(inventory).values({
         itemId,
         warehouseId,
         quantity: quantityChange,
         lastUpdated: new Date()
-      });
+      }).returning();
+      return newInventory;
     }
-    // If quantityChange is negative and no existing inventory, do nothing
+    // If quantityChange is negative and no existing inventory, return undefined
+    return undefined;
   }
 
   // Notification operations
