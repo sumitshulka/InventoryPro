@@ -162,6 +162,20 @@ export default function Sidebar({ user, isOpen, onClose }: SidebarProps) {
                   </li>
                   <li>
                     <Link 
+                      href="/check-in"
+                      className={cn(
+                        "flex items-center px-3 py-2 rounded-md",
+                        isActive("/check-in") 
+                          ? "bg-primary/10 border-l-4 border-primary text-primary" 
+                          : "text-gray-700 hover:text-primary hover:bg-primary/5"
+                      )}
+                    >
+                      <span className="material-icons mr-3">input</span>
+                      <span className="whitespace-nowrap">Issues</span>
+                    </Link>
+                  </li>
+                  <li>
+                    <Link 
                       href="/transfers"
                       className={cn(
                         "flex items-center px-3 py-2 rounded-md",
@@ -259,6 +273,20 @@ export default function Sidebar({ user, isOpen, onClose }: SidebarProps) {
                       >
                         <span className="material-icons mr-3">people</span>
                         <span className="whitespace-nowrap">Users</span>
+                      </Link>
+                    </li>
+                    <li>
+                      <Link 
+                        href="/approvals"
+                        className={cn(
+                          "flex items-center px-3 py-2 rounded-md",
+                          isActive("/approvals") 
+                            ? "bg-primary/10 border-l-4 border-primary text-primary" 
+                            : "text-gray-700 hover:text-primary hover:bg-primary/5"
+                        )}
+                      >
+                        <span className="material-icons mr-3">approval</span>
+                        <span className="whitespace-nowrap">Approvals</span>
                       </Link>
                     </li>
                     <li>

@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Bell, Send, Reply, Archive, CheckCircle, X, AlertCircle, Info, Clock, Search, Filter, MessageSquare, Trash2, User, Calendar } from "lucide-react";
+import { Bell, Send, Reply, Archive, CheckCircle, X, AlertCircle, Info, Clock, Search, Filter, MessageSquare, Trash2, User, Calendar, ArrowLeft } from "lucide-react";
+import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -106,6 +107,7 @@ export default function NotificationCenterPage() {
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [, setLocation] = useLocation();
 
   // Get all notifications
   const { data: notifications = [], isLoading } = useQuery<Notification[]>({
@@ -297,6 +299,17 @@ export default function NotificationCenterPage() {
 
   return (
     <div className="container mx-auto p-6">
+      {/* Back to Dashboard Button */}
+      <div className="mb-4">
+        <Button
+          variant="outline"
+          onClick={() => setLocation("/")}
+          className="flex items-center gap-2"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back to Dashboard
+        </Button>
+      </div>
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
           <Bell className="h-8 w-8 text-blue-600" />
