@@ -67,7 +67,7 @@ export default function RequestsPage() {
   const [selectedRequest, setSelectedRequest] = useState<any>(null);
   const [activeTab, setActiveTab] = useState("all");
 
-  const { data: requests, isLoading: requestsLoading } = useQuery({
+  const { data: requests, isLoading: requestsLoading, refetch: refetchRequests } = useQuery({
     queryKey: ["/api/requests"],
   });
 
@@ -76,15 +76,15 @@ export default function RequestsPage() {
     enabled: !!user?.id,
   });
 
-  const { data: items, isLoading: itemsLoading } = useQuery({
+  const { data: items, isLoading: itemsLoading, refetch: refetchItems } = useQuery({
     queryKey: ["/api/items"],
   });
 
-  const { data: warehouses, isLoading: warehousesLoading } = useQuery({
+  const { data: warehouses, isLoading: warehousesLoading, refetch: refetchWarehouses } = useQuery({
     queryKey: ["/api/warehouses"],
   });
 
-  const { data: users, isLoading: usersLoading } = useQuery({
+  const { data: users, isLoading: usersLoading, refetch: refetchUsers } = useQuery({
     queryKey: ["/api/users"],
   });
 
