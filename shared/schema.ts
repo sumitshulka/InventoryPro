@@ -29,6 +29,7 @@ export const users = pgTable("users", {
   managerId: integer("manager_id"),
   warehouseId: integer("warehouse_id"),
   departmentId: integer("department_id"),
+  isWarehouseOperator: boolean("is_warehouse_operator").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -41,6 +42,7 @@ export const insertUserSchema = createInsertSchema(users).pick({
   managerId: true,
   warehouseId: true,
   departmentId: true,
+  isWarehouseOperator: true,
 });
 
 // Office Locations

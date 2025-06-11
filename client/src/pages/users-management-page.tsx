@@ -45,6 +45,7 @@ const formSchema = z.object({
   managerId: z.string().optional(),
   warehouseId: z.string().optional(),
   departmentId: z.string().optional(),
+  isWarehouseOperator: z.boolean().default(false),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -83,6 +84,7 @@ export default function UsersManagementPage() {
       managerId: "none",
       warehouseId: "none", 
       departmentId: "none",
+      isWarehouseOperator: false,
     },
   });
 
@@ -97,6 +99,7 @@ export default function UsersManagementPage() {
         managerId: data.managerId === "none" || !data.managerId ? null : parseInt(data.managerId),
         warehouseId: data.warehouseId === "none" || !data.warehouseId ? null : parseInt(data.warehouseId),
         departmentId: data.departmentId === "none" || !data.departmentId ? null : parseInt(data.departmentId),
+        isWarehouseOperator: data.isWarehouseOperator,
       };
 
       if (isEditMode && editUserId) {
