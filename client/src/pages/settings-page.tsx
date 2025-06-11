@@ -54,13 +54,26 @@ const organizationSettingsSchema = z.object({
   allowedCategories: z.array(z.string()).min(1, "At least one category is required"),
 });
 
+const locationSchema = z.object({
+  name: z.string().min(1, "Location name is required"),
+  address: z.string().min(1, "Address is required"),
+  city: z.string().min(1, "City is required"),
+  state: z.string().min(1, "State is required"),
+  zipCode: z.string().min(1, "ZIP code is required"),
+  country: z.string().min(1, "Country is required"),
+  isActive: z.boolean(),
+});
+
 type ApprovalSettingsFormValues = z.infer<typeof approvalSettingsSchema>;
 type OrganizationSettingsFormValues = z.infer<typeof organizationSettingsSchema>;
+type LocationFormValues = z.infer<typeof locationSchema>;
 
 export default function SettingsPage() {
   const { toast } = useToast();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isLocationDialogOpen, setIsLocationDialogOpen] = useState(false);
   const [editingSettings, setEditingSettings] = useState<any>(null);
+  const [editingLocation, setEditingLocation] = useState<any>(null);
 
   const { data: approvalSettings, isLoading } = useQuery({
     queryKey: ["/api/approval-settings"],
@@ -68,6 +81,10 @@ export default function SettingsPage() {
 
   const { data: organizationSettings, isLoading: orgSettingsLoading } = useQuery({
     queryKey: ["/api/organization-settings"],
+  });
+
+  const { data: locations, isLoading: locationsLoading } = useQuery({
+    queryKey: ["/api/locations"],
   });
 
   const { data: users } = useQuery({
@@ -98,6 +115,19 @@ export default function SettingsPage() {
       timezone: "UTC",
       defaultUnits: ["pcs", "boxes", "reams", "kg", "liters"],
       allowedCategories: ["Electronics", "Office Supplies", "Furniture"],
+    },
+  });
+
+  const locationForm = useForm<LocationFormValues>({
+    resolver: zodResolver(locationSchema),
+    defaultValues: {
+      name: "",
+      address: "",
+      city: "",
+      state: "",
+      zipCode: "",
+      country: "India",
+      isActive: true,
     },
   });
 
@@ -212,11 +242,88 @@ export default function SettingsPage() {
     },
   });
 
+  const createLocationMutation = useMutation({
+    mutationFn: async (data: LocationFormValues) => {
+      const res = await apiRequest("POST", "/api/locations", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/locations"] });
+      toast({
+        title: "Location created",
+        description: "The office location has been created successfully.",
+      });
+      locationForm.reset();
+      setIsLocationDialogOpen(false);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to create location",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updateLocationMutation = useMutation({
+    mutationFn: async (data: LocationFormValues & { id: number }) => {
+      const { id, ...updateData } = data;
+      const res = await apiRequest("PUT", `/api/locations/${id}`, updateData);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/locations"] });
+      toast({
+        title: "Location updated",
+        description: "The office location has been updated successfully.",
+      });
+      locationForm.reset();
+      setIsLocationDialogOpen(false);
+      setEditingLocation(null);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to update location",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteLocationMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await apiRequest("DELETE", `/api/locations/${id}`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/locations"] });
+      toast({
+        title: "Location deleted",
+        description: "The office location has been deleted successfully.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to delete location",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const onSubmit = (data: ApprovalSettingsFormValues) => {
     if (editingSettings) {
       updateMutation.mutate(data);
     } else {
       createMutation.mutate(data);
+    }
+  };
+
+  const onLocationSubmit = (data: LocationFormValues) => {
+    if (editingLocation) {
+      updateLocationMutation.mutate({ ...data, id: editingLocation.id });
+    } else {
+      createLocationMutation.mutate(data);
     }
   };
 
@@ -255,6 +362,7 @@ export default function SettingsPage() {
         <Tabs defaultValue="approval-hierarchy" className="space-y-4">
           <TabsList>
             <TabsTrigger value="approval-hierarchy">Approval Hierarchy</TabsTrigger>
+            <TabsTrigger value="office-locations">Office Locations</TabsTrigger>
             <TabsTrigger value="organization">Organization</TabsTrigger>
             <TabsTrigger value="user-management">User Management</TabsTrigger>
             <TabsTrigger value="system-config">System Configuration</TabsTrigger>
@@ -342,6 +450,111 @@ export default function SettingsPage() {
                         <TableRow>
                           <TableCell colSpan={6} className="text-center py-8 text-gray-500">
                             No approval settings configured
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="office-locations" className="space-y-4">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+                <div>
+                  <CardTitle>Office Locations</CardTitle>
+                  <p className="text-sm text-muted-foreground">
+                    Manage office locations for warehouses and operations
+                  </p>
+                </div>
+                <Button onClick={() => {
+                  setEditingLocation(null);
+                  locationForm.reset();
+                  setIsLocationDialogOpen(true);
+                }}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Location
+                </Button>
+              </CardHeader>
+              <CardContent>
+                {locationsLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-6 w-6 animate-spin" />
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Location Name</TableHead>
+                        <TableHead>Address</TableHead>
+                        <TableHead>City</TableHead>
+                        <TableHead>State</TableHead>
+                        <TableHead>Country</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {locations && Array.isArray(locations) && locations.length > 0 ? (
+                        locations.map((location: any) => (
+                          <TableRow key={location.id}>
+                            <TableCell className="font-medium">
+                              {location.name}
+                            </TableCell>
+                            <TableCell>{location.address}</TableCell>
+                            <TableCell>{location.city}</TableCell>
+                            <TableCell>{location.state}</TableCell>
+                            <TableCell>{location.country}</TableCell>
+                            <TableCell>
+                              <span
+                                className={`px-2 py-1 text-xs rounded-full ${
+                                  location.isActive
+                                    ? "bg-green-100 text-green-800"
+                                    : "bg-red-100 text-red-800"
+                                }`}
+                              >
+                                {location.isActive ? "Active" : "Inactive"}
+                              </span>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex space-x-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    setEditingLocation(location);
+                                    locationForm.reset({
+                                      name: location.name,
+                                      address: location.address,
+                                      city: location.city,
+                                      state: location.state,
+                                      zipCode: location.zipCode,
+                                      country: location.country,
+                                      isActive: location.isActive,
+                                    });
+                                    setIsLocationDialogOpen(true);
+                                  }}
+                                >
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => deleteLocationMutation.mutate(location.id)}
+                                  disabled={deleteLocationMutation.isPending}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      ) : (
+                        <TableRow>
+                          <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                            No office locations found. Add your first location to get started.
                           </TableCell>
                         </TableRow>
                       )}
