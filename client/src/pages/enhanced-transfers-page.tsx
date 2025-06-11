@@ -47,7 +47,8 @@ import {
   Truck, 
   Package, 
   Clock, 
-  CheckCircle, 
+  CheckCircle,
+  RefreshCw, 
   X,
   Calendar,
   User,
@@ -398,12 +399,26 @@ export default function EnhancedTransfersPage() {
           <TabsContent value={activeTab} className="space-y-4">
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Package className="h-5 w-5" />
-                  {activeTab === "all" ? "All Transfers" :
-                   activeTab === "pending" ? "Pending Transfers" :
-                   activeTab === "in-transit" ? "In Transit" : "Completed Transfers"}
-                </CardTitle>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2">
+                    <Package className="h-5 w-5" />
+                    {activeTab === "all" ? "All Transfers" :
+                     activeTab === "pending" ? "Pending Transfers" :
+                     activeTab === "in-transit" ? "In Transit" : "Completed Transfers"}
+                  </CardTitle>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      queryClient.invalidateQueries({ queryKey: ['/api/transfers'] });
+                      queryClient.invalidateQueries({ queryKey: ['/api/items'] });
+                      queryClient.invalidateQueries({ queryKey: ['/api/warehouses'] });
+                    }}
+                    className="ml-2"
+                  >
+                    <RefreshCw className="h-4 w-4" />
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="overflow-x-auto">

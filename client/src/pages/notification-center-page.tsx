@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Bell, Send, Reply, Archive, CheckCircle, X, AlertCircle, Info, Clock, Search, Filter, MessageSquare, Trash2, User, Calendar, ArrowLeft } from "lucide-react";
+import { Bell, Send, Reply, Archive, CheckCircle, X, AlertCircle, Info, Clock, Search, Filter, MessageSquare, Trash2, User, Calendar, ArrowLeft, RefreshCw } from "lucide-react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,7 +16,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { formatDistanceToNow, format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 
@@ -462,6 +462,17 @@ export default function NotificationCenterPage() {
                       className="pl-10 w-64"
                     />
                   </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      queryClient.invalidateQueries({ queryKey: ['/api/notifications'] });
+                      queryClient.invalidateQueries({ queryKey: ['/api/users'] });
+                    }}
+                    className="ml-2"
+                  >
+                    <RefreshCw className="h-4 w-4" />
+                  </Button>
                 </div>
               </div>
               

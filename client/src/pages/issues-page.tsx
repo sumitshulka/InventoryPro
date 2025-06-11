@@ -17,7 +17,7 @@ import { z } from "zod";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { format, formatDistanceToNow } from "date-fns";
-import { AlertTriangle, Plus, Search, Filter, CheckCircle, Clock, X, Flag, Bell, MessageSquare, Archive, Reply, Mail, MailOpen } from "lucide-react";
+import { AlertTriangle, Plus, Search, Filter, CheckCircle, Clock, X, Flag, Bell, MessageSquare, Archive, Reply, Mail, MailOpen, RefreshCw } from "lucide-react";
 import AppLayout from "@/components/layout/app-layout";
 
 interface Issue {

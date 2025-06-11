@@ -7,6 +7,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { format } from "date-fns";
+import { RefreshCw } from "lucide-react";
+import { queryClient } from "@/lib/queryClient";
 
 export default function AuditTrailPage() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -128,9 +130,22 @@ export default function AuditTrailPage() {
         {/* Audit Logs */}
         <Card>
           <CardHeader>
-            <CardTitle>
-              Audit Logs ({filteredLogs.length})
-            </CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle>
+                Audit Logs ({filteredLogs.length})
+              </CardTitle>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  queryClient.invalidateQueries({ queryKey: ['/api/audit-logs'] });
+                  queryClient.invalidateQueries({ queryKey: ['/api/users'] });
+                }}
+                className="ml-2"
+              >
+                <RefreshCw className="h-4 w-4" />
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
             {filteredLogs.length === 0 ? (
