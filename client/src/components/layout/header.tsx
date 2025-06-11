@@ -11,7 +11,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/hooks/use-auth";
 import { useLocation } from "wouter";
-import { NotificationBell } from "@/components/notification-bell";
 
 type HeaderProps = {
   user: User;
@@ -48,7 +47,12 @@ export default function Header({ user, onMenuClick }: HeaderProps) {
         </div>
         
         <div className="flex items-center space-x-4">
-          <NotificationBell onOpenNotificationCenter={() => navigate('/notifications')} />
+          <button 
+            className="text-gray-500 hover:text-primary"
+            onClick={() => navigate('/notifications')}
+          >
+            <span className="material-icons">notifications</span>
+          </button>
           <button className="text-gray-500 hover:text-primary">
             <span className="material-icons">help_outline</span>
           </button>
