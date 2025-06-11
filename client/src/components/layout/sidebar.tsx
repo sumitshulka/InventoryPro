@@ -86,6 +86,20 @@ export default function Sidebar({ user, isOpen, onClose }: SidebarProps) {
 
                   <li>
                     <Link 
+                      href="/inventory"
+                      className={cn(
+                        "flex items-center px-3 py-2 rounded-md",
+                        isActive("/inventory") 
+                          ? "bg-primary/10 border-l-4 border-primary text-primary" 
+                          : "text-gray-700 hover:text-primary hover:bg-primary/5"
+                      )}
+                    >
+                      <span className="material-icons mr-3">inventory_2</span>
+                      <span className="whitespace-nowrap">Inventory</span>
+                    </Link>
+                  </li>
+                  <li>
+                    <Link 
                       href="/items"
                       className={cn(
                         "flex items-center px-3 py-2 rounded-md",
@@ -119,20 +133,6 @@ export default function Sidebar({ user, isOpen, onClose }: SidebarProps) {
               <div className="mb-4">
                 <p className="text-xs font-medium text-gray-500 px-3 py-2">OPERATIONS</p>
                 <ul>
-                  <li>
-                    <Link 
-                      href="/inventory"
-                      className={cn(
-                        "flex items-center px-3 py-2 rounded-md",
-                        isActive("/inventory") 
-                          ? "bg-primary/10 border-l-4 border-primary text-primary" 
-                          : "text-gray-700 hover:text-primary hover:bg-primary/5"
-                      )}
-                    >
-                      <span className="material-icons mr-3">input</span>
-                      <span className="whitespace-nowrap">Check In</span>
-                    </Link>
-                  </li>
                   <li>
                     <Link 
                       href="/requests"
