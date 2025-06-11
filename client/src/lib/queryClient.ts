@@ -66,7 +66,7 @@ export async function invalidateRelatedQueries(entityType: string, action: 'crea
       queryKeysToInvalidate.push('/api/users');
       break;
     case 'warehouse':
-      queryKeysToInvalidate.push('/api/warehouses', '/api/warehouses/stats');
+      queryKeysToInvalidate.push('/api/warehouses', '/api/warehouses/stats', '/api/dashboard/summary');
       break;
     case 'location':
       queryKeysToInvalidate.push('/api/locations');
