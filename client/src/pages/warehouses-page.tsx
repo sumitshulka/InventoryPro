@@ -71,7 +71,7 @@ export default function WarehousesPage() {
     resolver: zodResolver(formSchema),
     defaultValues: {
       name: "",
-      locationId: "",
+      locationId: 0,
       managerId: "none",
       capacity: 1000,
       isActive: true,
