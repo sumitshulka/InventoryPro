@@ -2757,9 +2757,72 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // For now, return empty array since audit logging isn't fully implemented
       // In a real system, this would fetch from an audit_logs table
-      const auditLogs = [];
+      const auditLogs: any[] = [];
 
       res.json(auditLogs);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get issues
+  app.get("/api/issues", async (req, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      // For now, return empty array since issues functionality is not yet implemented in storage
+      // In a real system, this would fetch from an issues table
+      const issues: any[] = [];
+
+      res.json(issues);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Create new issue
+  app.post("/api/issues", async (req, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      // For now, return a mock response since issues functionality is not yet implemented
+      const newIssue = {
+        id: Date.now(),
+        ...req.body,
+        reportedBy: req.user.id,
+        status: 'open',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+
+      res.status(201).json(newIssue);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Update issue status
+  app.patch("/api/issues/:id/status", async (req, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const { id } = req.params;
+      const { status } = req.body;
+
+      // For now, return a mock response since issues functionality is not yet implemented
+      const updatedIssue = {
+        id: parseInt(id),
+        status,
+        updatedAt: new Date().toISOString()
+      };
+
+      res.json(updatedIssue);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

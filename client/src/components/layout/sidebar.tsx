@@ -162,15 +162,15 @@ export default function Sidebar({ user, isOpen, onClose }: SidebarProps) {
                   </li>
                   <li>
                     <Link 
-                      href="/check-in"
+                      href="/issues"
                       className={cn(
                         "flex items-center px-3 py-2 rounded-md",
-                        isActive("/check-in") 
+                        isActive("/issues") 
                           ? "bg-primary/10 border-l-4 border-primary text-primary" 
                           : "text-gray-700 hover:text-primary hover:bg-primary/5"
                       )}
                     >
-                      <span className="material-icons mr-3">input</span>
+                      <span className="material-icons mr-3">error_outline</span>
                       <span className="whitespace-nowrap">Issues</span>
                     </Link>
                   </li>

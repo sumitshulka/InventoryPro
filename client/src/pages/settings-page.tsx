@@ -364,7 +364,6 @@ export default function SettingsPage() {
             <TabsTrigger value="approval-hierarchy">Approval Hierarchy</TabsTrigger>
             <TabsTrigger value="office-locations">Office Locations</TabsTrigger>
             <TabsTrigger value="organization">Organization</TabsTrigger>
-            <TabsTrigger value="user-management">User Management</TabsTrigger>
             <TabsTrigger value="system-config">System Configuration</TabsTrigger>
           </TabsList>
 

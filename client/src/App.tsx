@@ -23,6 +23,7 @@ import ApprovalManagementPage from "@/pages/approval-management-page";
 import SettingsPage from "@/pages/settings-page";
 import NotificationCenterPage from "@/pages/notification-center-page";
 import AuditTrailPage from "@/pages/audit-trail-page";
+import IssuesPage from "@/pages/issues-page";
 import { ProtectedRoute } from "./lib/protected-route";
 
 function Router() {
@@ -47,6 +48,7 @@ function Router() {
       <ProtectedRoute path="/items" component={ItemMasterPage} />
       <ProtectedRoute path="/warehouses" component={WarehousesPage} />
       <ProtectedRoute path="/check-in" component={CheckInPage} />
+      <ProtectedRoute path="/issues" component={IssuesPage} />
       <ProtectedRoute path="/requests" component={RequestsPage} />
       <ProtectedRoute path="/transfers" component={EnhancedTransfersPage} />
       <ProtectedRoute path="/transfer-notifications" component={TransferNotificationsPage} />
