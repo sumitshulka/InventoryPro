@@ -248,7 +248,7 @@ export default function RequestsPage() {
     <AppLayout>
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-medium text-gray-800">Inventory Requests</h1>
+          <h1 className="text-3xl font-bold text-gray-900">Inventory Check Out Requests</h1>
           <p className="text-gray-600">Create and manage inventory requests</p>
         </div>
         <Button onClick={() => setIsDialogOpen(true)}>

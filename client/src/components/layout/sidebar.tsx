@@ -133,6 +133,22 @@ export default function Sidebar({ user, isOpen, onClose }: SidebarProps) {
               <div className="mb-4">
                 <p className="text-xs font-medium text-gray-500 px-3 py-2">OPERATIONS</p>
                 <ul>
+                  {hasCheckInPermission && (
+                    <li>
+                      <Link 
+                        href="/check-in"
+                        className={cn(
+                          "flex items-center px-3 py-2 rounded-md",
+                          isActive("/check-in") 
+                            ? "bg-primary/10 border-l-4 border-primary text-primary" 
+                            : "text-gray-700 hover:text-primary hover:bg-primary/5"
+                        )}
+                      >
+                        <span className="material-icons mr-3">input</span>
+                        <span className="whitespace-nowrap">Check In</span>
+                      </Link>
+                    </li>
+                  )}
                   <li>
                     <Link 
                       href="/requests"
