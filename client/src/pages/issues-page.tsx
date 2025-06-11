@@ -895,9 +895,12 @@ export default function IssuesPage() {
 
         {/* Create Notification Dialog */}
         <Dialog open={showNewNotificationDialog} onOpenChange={setShowNewNotificationDialog}>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" aria-describedby="notification-dialog-description">
             <DialogHeader>
               <DialogTitle>Send Message</DialogTitle>
+              <p id="notification-dialog-description" className="text-sm text-gray-600">
+                Create and send a message to users, groups, or administrators.
+              </p>
             </DialogHeader>
             <Form {...notificationForm}>
               <form onSubmit={notificationForm.handleSubmit((data) => createNotificationMutation.mutate(data))} className="space-y-4">
@@ -1062,9 +1065,12 @@ export default function IssuesPage() {
 
         {/* Create Issue Dialog */}
         <Dialog open={showNewIssueDialog} onOpenChange={setShowNewIssueDialog}>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" aria-describedby="issue-dialog-description">
             <DialogHeader>
               <DialogTitle>Report New Issue</DialogTitle>
+              <p id="issue-dialog-description" className="text-sm text-gray-600">
+                Report a new issue with detailed description and categorization.
+              </p>
             </DialogHeader>
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -1159,14 +1165,14 @@ export default function IssuesPage() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Related Warehouse (Optional)</FormLabel>
-                        <Select onValueChange={(value) => field.onChange(value ? parseInt(value) : undefined)}>
+                        <Select onValueChange={(value) => field.onChange(value === "none" ? undefined : parseInt(value))}>
                           <FormControl>
                             <SelectTrigger>
                               <SelectValue placeholder="Select warehouse" />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            <SelectItem value="">None</SelectItem>
+                            <SelectItem value="none">None</SelectItem>
                             {Array.isArray(warehouses) && warehouses.map((warehouse: any) => (
                               <SelectItem key={warehouse.id} value={warehouse.id.toString()}>
                                 {warehouse.name}
@@ -1185,14 +1191,14 @@ export default function IssuesPage() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Related Item (Optional)</FormLabel>
-                        <Select onValueChange={(value) => field.onChange(value ? parseInt(value) : undefined)}>
+                        <Select onValueChange={(value) => field.onChange(value === "none" ? undefined : parseInt(value))}>
                           <FormControl>
                             <SelectTrigger>
                               <SelectValue placeholder="Select item" />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            <SelectItem value="">None</SelectItem>
+                            <SelectItem value="none">None</SelectItem>
                             {Array.isArray(items) && items.map((item: any) => (
                               <SelectItem key={item.id} value={item.id.toString()}>
                                 {item.name} ({item.sku})
