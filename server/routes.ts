@@ -2756,11 +2756,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Not authenticated" });
       }
 
-      // For now, return empty array since audit logging isn't fully implemented
-      // In a real system, this would fetch from an audit_logs table
-      const auditLogs: any[] = [];
+      const logs = await db.select({
+        id: auditLogs.id,
+        userId: auditLogs.userId,
+        action: auditLogs.action,
+        entityType: auditLogs.entityType,
+        entityId: auditLogs.entityId,
+        details: auditLogs.details,
+        oldValues: auditLogs.oldValues,
+        newValues: auditLogs.newValues,
+        ipAddress: auditLogs.ipAddress,
+        userAgent: auditLogs.userAgent,
+        createdAt: auditLogs.createdAt,
+        user: {
+          id: users.id,
+          name: users.name,
+          username: users.username,
+          email: users.email
+        }
+      })
+      .from(auditLogs)
+      .leftJoin(users, eq(auditLogs.userId, users.id))
+      .orderBy(desc(auditLogs.createdAt))
+      .limit(100);
 
-      res.json(auditLogs);
+      res.json(logs);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

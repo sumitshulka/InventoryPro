@@ -502,3 +502,33 @@ export type InsertNotification = z.infer<typeof insertNotificationSchema>;
 
 export type Location = typeof locations.$inferSelect;
 export type InsertLocation = z.infer<typeof insertLocationSchema>;
+
+// Audit logs table
+export const auditLogs = pgTable("audit_logs", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id),
+  action: text("action").notNull(), // CREATE, UPDATE, DELETE, LOGIN, LOGOUT, APPROVE, REJECT, TRANSFER, etc.
+  entityType: text("entity_type").notNull(), // item, warehouse, request, transfer, user, etc.
+  entityId: integer("entity_id"), // ID of the affected entity
+  details: text("details").notNull(), // Human-readable description of the action
+  oldValues: text("old_values"), // JSON string of previous values (for updates)
+  newValues: text("new_values"), // JSON string of new values (for creates/updates)
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertAuditLogSchema = createInsertSchema(auditLogs).pick({
+  userId: true,
+  action: true,
+  entityType: true,
+  entityId: true,
+  details: true,
+  oldValues: true,
+  newValues: true,
+  ipAddress: true,
+  userAgent: true,
+});
+
+export type AuditLog = typeof auditLogs.$inferSelect;
+export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;
