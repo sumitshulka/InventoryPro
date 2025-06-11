@@ -331,58 +331,317 @@ export default function IssuesPage() {
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Issues Management</h1>
-            <p className="text-gray-600">Report and track inventory and operational issues</p>
+            <h1 className="text-3xl font-bold text-gray-900">Issues & Notification Center</h1>
+            <p className="text-gray-600">Manage issues, notifications, and communication</p>
           </div>
-          <Dialog open={showNewIssueDialog} onOpenChange={setShowNewIssueDialog}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="h-4 w-4 mr-2" />
-                Report Issue
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-md">
-              <DialogHeader>
-                <DialogTitle>Report New Issue</DialogTitle>
-              </DialogHeader>
-              <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <div className="flex items-center gap-3">
+            {unreadCount > 0 && (
+              <Badge variant="destructive" className="flex items-center gap-1">
+                <Bell className="h-3 w-3" />
+                {unreadCount} unread
+              </Badge>
+            )}
+          </div>
+        </div>
+
+        {/* Tabbed Interface */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="issues" className="flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4" />
+              Issues ({filteredIssues.length})
+            </TabsTrigger>
+            <TabsTrigger value="notifications" className="flex items-center gap-2">
+              <Bell className="h-4 w-4" />
+              Notifications ({filteredNotifications.length})
+              {unreadCount > 0 && (
+                <Badge variant="destructive" className="ml-1">
+                  {unreadCount}
+                </Badge>
+              )}
+            </TabsTrigger>
+          </TabsList>
+
+          {/* Issues Tab */}
+          <TabsContent value="issues" className="space-y-6">
+            <div className="flex flex-col sm:flex-row gap-4">
+              <div className="flex-1">
+                <Input
+                  placeholder="Search issues..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full"
+                />
+              </div>
+              <div className="flex gap-2">
+                <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                  <SelectTrigger className="w-40">
+                    <SelectValue placeholder="Category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Categories</SelectItem>
+                    <SelectItem value="inventory">Inventory</SelectItem>
+                    <SelectItem value="equipment">Equipment</SelectItem>
+                    <SelectItem value="safety">Safety</SelectItem>
+                    <SelectItem value="quality">Quality</SelectItem>
+                    <SelectItem value="process">Process</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+                  <SelectTrigger className="w-32">
+                    <SelectValue placeholder="Priority" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Priority</SelectItem>
+                    <SelectItem value="critical">Critical</SelectItem>
+                    <SelectItem value="high">High</SelectItem>
+                    <SelectItem value="medium">Medium</SelectItem>
+                    <SelectItem value="low">Low</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="w-32">
+                    <SelectValue placeholder="Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Status</SelectItem>
+                    <SelectItem value="open">Open</SelectItem>
+                    <SelectItem value="in-progress">In Progress</SelectItem>
+                    <SelectItem value="resolved">Resolved</SelectItem>
+                    <SelectItem value="closed">Closed</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="grid gap-4">
+              {filteredIssues.length === 0 ? (
+                <Card>
+                  <CardContent className="p-8 text-center">
+                    <AlertTriangle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">No issues found</h3>
+                    <p className="text-gray-600">Try adjusting your filters or report a new issue.</p>
+                  </CardContent>
+                </Card>
+              ) : (
+                filteredIssues.map((issue: any) => (
+                  <Card key={issue.id} className="hover:shadow-md transition-shadow">
+                    <CardContent className="p-6">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3 mb-2">
+                            {getPriorityIcon(issue.priority)}
+                            <h3 className="font-semibold text-gray-900">{issue.title}</h3>
+                            <Badge className={getPriorityColor(issue.priority)}>
+                              {issue.priority}
+                            </Badge>
+                            <Badge className={getStatusColor(issue.status)}>
+                              {issue.status.replace('-', ' ')}
+                            </Badge>
+                          </div>
+                          <p className="text-gray-600 mb-3">{issue.description}</p>
+                          <div className="flex items-center gap-4 text-sm text-gray-500">
+                            <span>Category: {issue.category}</span>
+                            <span>•</span>
+                            <span>Reported: {format(new Date(issue.createdAt), 'MMM dd, yyyy')}</span>
+                            {issue.reporter && (
+                              <>
+                                <span>•</span>
+                                <span>By: {issue.reporter.name}</span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <Select 
+                            value={issue.status} 
+                            onValueChange={(status) => updateIssueStatusMutation.mutate({ id: issue.id, status })}
+                          >
+                            <SelectTrigger className="w-32">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="open">Open</SelectItem>
+                              <SelectItem value="in-progress">In Progress</SelectItem>
+                              <SelectItem value="resolved">Resolved</SelectItem>
+                              <SelectItem value="closed">Closed</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))
+              )}
+            </div>
+          </TabsContent>
+
+          {/* Notifications Tab */}
+          <TabsContent value="notifications" className="space-y-6">
+            <div className="flex flex-col sm:flex-row gap-4">
+              <div className="flex gap-2">
+                <Select value={notificationFilter} onValueChange={setNotificationFilter}>
+                  <SelectTrigger className="w-40">
+                    <SelectValue placeholder="Filter" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Notifications</SelectItem>
+                    <SelectItem value="unread">Unread</SelectItem>
+                    <SelectItem value="read">Read</SelectItem>
+                    <SelectItem value="archived">Archived</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button 
+                  variant="outline" 
+                  onClick={() => {
+                    notifications.filter((n: Notification) => n.status === 'unread').forEach((n: Notification) => {
+                      markAsReadMutation.mutate(n.id);
+                    });
+                  }}
+                  disabled={unreadCount === 0}
+                >
+                  <MailOpen className="h-4 w-4 mr-2" />
+                  Mark All Read
+                </Button>
+              </div>
+            </div>
+
+            <div className="grid gap-4">
+              {notificationsLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full"></div>
+                </div>
+              ) : filteredNotifications.length === 0 ? (
+                <Card>
+                  <CardContent className="p-8 text-center">
+                    <Bell className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">No notifications found</h3>
+                    <p className="text-gray-600">No notifications match your current filter.</p>
+                  </CardContent>
+                </Card>
+              ) : (
+                <ScrollArea className="h-[600px]">
+                  <div className="space-y-3">
+                    {filteredNotifications.map((notification: Notification) => (
+                      <Card 
+                        key={notification.id} 
+                        className={`cursor-pointer transition-all hover:shadow-md ${
+                          notification.status === 'unread' ? 'border-l-4 border-l-primary bg-primary/5' : ''
+                        } ${getNotificationPriorityColor(notification.priority)}`}
+                        onClick={() => handleNotificationClick(notification)}
+                      >
+                        <CardContent className="p-4">
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-2">
+                                {notification.status === 'unread' && (
+                                  <div className="w-2 h-2 bg-primary rounded-full"></div>
+                                )}
+                                <h4 className="font-semibold text-gray-900">{notification.subject}</h4>
+                                <Badge variant="outline" className="text-xs">
+                                  {notification.priority}
+                                </Badge>
+                                <Badge variant="secondary" className="text-xs">
+                                  {notification.category}
+                                </Badge>
+                              </div>
+                              <p className="text-gray-600 text-sm mb-2 line-clamp-2">{notification.message}</p>
+                              <div className="flex items-center gap-3 text-xs text-gray-500">
+                                <span>From: {notification.sender?.name || 'System'}</span>
+                                <span>•</span>
+                                <span>{formatDistanceToNow(new Date(notification.createdAt), { addSuffix: true })}</span>
+                              </div>
+                            </div>
+                            <div className="flex gap-1 ml-4">
+                              {notification.status === 'unread' && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    markAsReadMutation.mutate(notification.id);
+                                  }}
+                                >
+                                  <Mail className="h-3 w-3" />
+                                </Button>
+                              )}
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  archiveNotificationMutation.mutate(notification.id);
+                                }}
+                              >
+                                <Archive className="h-3 w-3" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedNotification(notification);
+                                }}
+                              >
+                                <Reply className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </ScrollArea>
+              )}
+            </div>
+          </TabsContent>
+        </Tabs>
+
+        {/* Issue Creation Dialog */}
+        <Dialog open={showNewIssueDialog} onOpenChange={setShowNewIssueDialog}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Report New Issue</DialogTitle>
+            </DialogHeader>
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="title"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Title</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Brief description of the issue" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="description"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Description</FormLabel>
+                      <FormControl>
+                        <Textarea 
+                          placeholder="Detailed description of the issue" 
+                          className="min-h-[100px]"
+                          {...field} 
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <div className="grid grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
-                    name="title"
+                    name="category"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Title</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Brief description of the issue" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="description"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Description</FormLabel>
-                        <FormControl>
-                          <Textarea 
-                            placeholder="Detailed description of the issue" 
-                            className="min-h-[100px]"
-                            {...field} 
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <div className="grid grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="category"
-                      render={({ field }) => (
-                        <FormItem>
                           <FormLabel>Category</FormLabel>
                           <Select onValueChange={field.onChange} value={field.value}>
                             <FormControl>
@@ -489,40 +748,63 @@ export default function IssuesPage() {
               </Form>
             </DialogContent>
           </Dialog>
-        </div>
 
-        {/* Filters */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Filters</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div className="relative">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                <Input
-                  placeholder="Search issues..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-9"
-                />
+        {/* Notification Detail Dialog */}
+        <Dialog open={!!selectedNotification} onOpenChange={() => setSelectedNotification(null)}>
+          <DialogContent className="sm:max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Notification Details</DialogTitle>
+            </DialogHeader>
+            {selectedNotification && (
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline">{selectedNotification.priority}</Badge>
+                  <Badge variant="secondary">{selectedNotification.category}</Badge>
+                  <Badge className={selectedNotification.status === 'unread' ? 'bg-primary' : 'bg-gray-500'}>
+                    {selectedNotification.status}
+                  </Badge>
+                </div>
+                <div>
+                  <h3 className="font-semibold mb-2">{selectedNotification.subject}</h3>
+                  <p className="text-gray-600 whitespace-pre-wrap">{selectedNotification.message}</p>
+                </div>
+                <div className="flex items-center gap-4 text-sm text-gray-500">
+                  <span>From: {selectedNotification.sender?.name || 'System'}</span>
+                  <span>•</span>
+                  <span>{format(new Date(selectedNotification.createdAt), 'MMM dd, yyyy HH:mm')}</span>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      if (selectedNotification.status === 'unread') {
+                        markAsReadMutation.mutate(selectedNotification.id);
+                      }
+                      setSelectedNotification(null);
+                    }}
+                  >
+                    <Mail className="h-4 w-4 mr-2" />
+                    Mark as Read
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      archiveNotificationMutation.mutate(selectedNotification.id);
+                      setSelectedNotification(null);
+                    }}
+                  >
+                    <Archive className="h-4 w-4 mr-2" />
+                    Archive
+                  </Button>
+                </div>
               </div>
-              <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                <SelectTrigger>
-                  <SelectValue placeholder="All Categories" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Categories</SelectItem>
-                  <SelectItem value="inventory">Inventory</SelectItem>
-                  <SelectItem value="equipment">Equipment</SelectItem>
-                  <SelectItem value="safety">Safety</SelectItem>
-                  <SelectItem value="quality">Quality</SelectItem>
-                  <SelectItem value="process">Process</SelectItem>
-                  <SelectItem value="other">Other</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-                <SelectTrigger>
+            )}
+          </DialogContent>
+        </Dialog>
+      </div>
+    </AppLayout>
+  );
+}
                   <SelectValue placeholder="All Priorities" />
                 </SelectTrigger>
                 <SelectContent>
