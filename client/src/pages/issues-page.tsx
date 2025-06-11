@@ -8,13 +8,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { format } from "date-fns";
-import { AlertTriangle, Plus, Search, Filter, CheckCircle, Clock, X, Flag } from "lucide-react";
+import { format, formatDistanceToNow } from "date-fns";
+import { AlertTriangle, Plus, Search, Filter, CheckCircle, Clock, X, Flag, Bell, MessageSquare, Archive, Reply, Mail, MailOpen } from "lucide-react";
 import AppLayout from "@/components/layout/app-layout";
 
 interface Issue {
@@ -49,6 +52,29 @@ interface Issue {
   };
 }
 
+interface Notification {
+  id: number;
+  senderId: number;
+  recipientId: number;
+  subject: string;
+  message: string;
+  category: string;
+  priority: 'low' | 'normal' | 'high' | 'urgent';
+  status: 'unread' | 'read' | 'replied' | 'closed';
+  createdAt: string;
+  updatedAt: string;
+  parentId: number | null;
+  relatedEntityType: string | null;
+  relatedEntityId: number | null;
+  isArchived: boolean;
+  archivedAt: string | null;
+  sender: {
+    id: number;
+    name: string;
+    role: string;
+  } | null;
+}
+
 const issueSchema = z.object({
   title: z.string().min(1, "Title is required").max(100, "Title too long"),
   description: z.string().min(1, "Description is required").max(1000, "Description too long"),
@@ -66,6 +92,9 @@ export default function IssuesPage() {
   const [priorityFilter, setPriorityFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [showNewIssueDialog, setShowNewIssueDialog] = useState(false);
+  const [activeTab, setActiveTab] = useState("issues");
+  const [notificationFilter, setNotificationFilter] = useState("all");
+  const [selectedNotification, setSelectedNotification] = useState<Notification | null>(null);
 
   const { data: issues = [], isLoading } = useQuery({
     queryKey: ['/api/issues'],
@@ -82,6 +111,18 @@ export default function IssuesPage() {
 
   const { data: users = [] } = useQuery({
     queryKey: ['/api/users'],
+  });
+
+  // Notification queries
+  const { data: notifications = [], isLoading: notificationsLoading } = useQuery({
+    queryKey: ['/api/notifications'],
+    queryFn: () => fetch('/api/notifications').then(res => res.json()).catch(() => [])
+  });
+
+  const { data: unreadCount = 0 } = useQuery({
+    queryKey: ['/api/notifications/unread-count'],
+    queryFn: () => fetch('/api/notifications/unread-count').then(res => res.json()).then(data => data.count).catch(() => 0),
+    refetchInterval: 30000,
   });
 
   const form = useForm<z.infer<typeof issueSchema>>({
@@ -114,6 +155,72 @@ export default function IssuesPage() {
       toast({
         title: "Error",
         description: error.message || "Failed to report issue",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Notification mutations
+  const markAsReadMutation = useMutation({
+    mutationFn: async (notificationId: number) => {
+      return apiRequest(`/api/notifications/${notificationId}/read`, {
+        method: 'PATCH',
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/notifications'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/notifications/unread-count'] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to mark notification as read",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const archiveNotificationMutation = useMutation({
+    mutationFn: async (notificationId: number) => {
+      return apiRequest(`/api/notifications/${notificationId}/archive`, {
+        method: 'PATCH',
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/notifications'] });
+      toast({
+        title: "Success",
+        description: "Notification archived",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to archive notification",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const replyToNotificationMutation = useMutation({
+    mutationFn: async ({ id, message }: { id: number; message: string }) => {
+      return apiRequest(`/api/notifications/${id}/reply`, {
+        method: 'POST',
+        body: JSON.stringify({ message }),
+        headers: { 'Content-Type': 'application/json' },
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/notifications'] });
+      toast({
+        title: "Success",
+        description: "Reply sent successfully",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to send reply",
         variant: "destructive",
       });
     },
@@ -172,6 +279,37 @@ export default function IssuesPage() {
       case 'low': return <CheckCircle className="h-4 w-4 text-green-500" />;
       default: return <Clock className="h-4 w-4 text-gray-500" />;
     }
+  };
+
+  // Notification filtering and helpers
+  const filteredNotifications = notifications.filter((notification: Notification) => {
+    if (notificationFilter === "all") return true;
+    if (notificationFilter === "unread") return notification.status === "unread";
+    if (notificationFilter === "read") return notification.status === "read";
+    if (notificationFilter === "archived") return notification.isArchived;
+    return true;
+  });
+
+  const getNotificationPriorityColor = (priority: string) => {
+    switch (priority) {
+      case 'urgent':
+        return 'border-l-red-500 bg-red-50 text-red-900';
+      case 'high':
+        return 'border-l-orange-500 bg-orange-50 text-orange-900';
+      case 'normal':
+        return 'border-l-blue-500 bg-blue-50 text-blue-900';
+      case 'low':
+        return 'border-l-gray-500 bg-gray-50 text-gray-900';
+      default:
+        return 'border-l-blue-500 bg-blue-50 text-blue-900';
+    }
+  };
+
+  const handleNotificationClick = (notification: Notification) => {
+    if (notification.status === 'unread') {
+      markAsReadMutation.mutate(notification.id);
+    }
+    setSelectedNotification(notification);
   };
 
   const onSubmit = (data: z.infer<typeof issueSchema>) => {
