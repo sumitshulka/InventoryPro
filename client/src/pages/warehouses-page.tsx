@@ -40,7 +40,7 @@ import { formatCapacity } from "@/lib/formatters";
 
 const formSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters" }),
-  locationId: z.number().min(1, { message: "Location is required" }),
+  locationId: z.string().min(1, { message: "Location is required" }).transform(val => parseInt(val)),
   managerId: z.string().optional().transform(val => val === "" || val === "none" || !val ? null : parseInt(val)),
   capacity: z.number().min(1, { message: "Capacity is required" }),
   isActive: z.boolean().default(true),
@@ -71,7 +71,7 @@ export default function WarehousesPage() {
     resolver: zodResolver(formSchema),
     defaultValues: {
       name: "",
-      locationId: 0,
+      locationId: "",
       managerId: "none",
       capacity: 1000,
       isActive: true,
@@ -118,7 +118,7 @@ export default function WarehousesPage() {
   const resetForm = () => {
     form.reset({
       name: "",
-      location: "",
+      locationId: "",
       managerId: "none",
       capacity: 1000,
       isActive: true,
@@ -131,7 +131,7 @@ export default function WarehousesPage() {
   const handleEditWarehouse = (warehouse: any) => {
     form.reset({
       name: warehouse.name,
-      location: warehouse.location,
+      locationId: warehouse.locationId?.toString() || "",
       managerId: warehouse.managerId?.toString() || "none",
       capacity: warehouse.capacity,
       isActive: warehouse.isActive,
@@ -312,14 +312,29 @@ export default function WarehousesPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="location">Location</Label>
-                <Input
-                  id="location"
-                  placeholder="Enter warehouse address"
-                  {...form.register("location")}
-                />
-                {form.formState.errors.location && (
-                  <p className="text-sm text-red-500">{form.formState.errors.location.message}</p>
+                <Label htmlFor="locationId">Office Location</Label>
+                <Select
+                  value={form.watch("locationId")?.toString() || ""}
+                  onValueChange={(value) => form.setValue("locationId", parseInt(value))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select an office location" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(locations as any[])?.filter((location: any) => location.isActive).map((location: any) => (
+                      <SelectItem key={location.id} value={location.id.toString()}>
+                        {location.name} - {location.city}, {location.state}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {form.formState.errors.locationId && (
+                  <p className="text-sm text-red-500">{form.formState.errors.locationId.message}</p>
+                )}
+                {(!locations || (locations as any[]).length === 0) && (
+                  <p className="text-sm text-amber-600">
+                    No office locations available. Please create locations in Settings first.
+                  </p>
                 )}
               </div>
 
