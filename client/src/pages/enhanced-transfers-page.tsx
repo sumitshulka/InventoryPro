@@ -587,7 +587,6 @@ export default function EnhancedTransfersPage() {
                 <Button 
                   onClick={() => {
                     setIsDialogOpen(false);
-                    // Navigate to warehouses page
                     window.location.href = '/warehouses';
                   }}
                   className="mx-auto"
@@ -839,7 +838,8 @@ export default function EnhancedTransfersPage() {
                   )}
                 </Button>
               </DialogFooter>
-            </form>
+              </form>
+            )}
           </DialogContent>
         </Dialog>
 
