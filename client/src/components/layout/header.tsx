@@ -49,7 +49,7 @@ export default function Header({ user, onMenuClick }: HeaderProps) {
         <div className="flex items-center space-x-4">
           <button 
             className="text-gray-500 hover:text-primary"
-            onClick={() => navigate('/notifications')}
+            onClick={() => navigate('/issues')}
           >
             <span className="material-icons">notifications</span>
           </button>

@@ -12,9 +12,7 @@ import { formatDistanceToNow } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 
-interface NotificationBellProps {
-  onOpenNotificationCenter: () => void;
-}
+interface NotificationBellProps {}
 
 interface Notification {
   id: number;
@@ -69,10 +67,11 @@ const getPriorityColor = (priority: string) => {
   }
 };
 
-export function NotificationBell({ onOpenNotificationCenter }: NotificationBellProps) {
+export function NotificationBell({}: NotificationBellProps) {
   const [isOpen, setIsOpen] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [, setLocation] = useLocation();
 
   // Get unread count
   const { data: unreadCountData } = useQuery({
@@ -125,9 +124,9 @@ export function NotificationBell({ onOpenNotificationCenter }: NotificationBellP
       markAsReadMutation.mutate(notification.id);
     }
     
-    // Close dropdown and open notification center
+    // Close dropdown and navigate to issues page
     setIsOpen(false);
-    onOpenNotificationCenter();
+    setLocation('/issues');
   };
 
   return (
@@ -156,7 +155,7 @@ export function NotificationBell({ onOpenNotificationCenter }: NotificationBellP
                   size="sm"
                   onClick={() => {
                     setIsOpen(false);
-                    onOpenNotificationCenter();
+                    setLocation('/issues');
                   }}
                   className="text-xs"
                 >
@@ -249,12 +248,12 @@ export function NotificationBell({ onOpenNotificationCenter }: NotificationBellP
                     size="sm"
                     onClick={() => {
                       setIsOpen(false);
-                      onOpenNotificationCenter();
+                      setLocation('/issues');
                     }}
                     className="w-full"
                   >
                     <MessageSquare className="h-4 w-4 mr-2" />
-                    Open Notification Center
+                    View All Issues
                   </Button>
                 </div>
               </>
