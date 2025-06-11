@@ -80,11 +80,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
       <Sidebar 
         user={user} 
         isOpen={isSidebarOpen} 
-        onClose={() => {
-          if (isMobile) {
-            setIsSidebarOpen(false);
-          }
-        }}
+        onClose={() => setIsSidebarOpen(false)}
       />
       
       {/* Overlay for mobile sidebar */}

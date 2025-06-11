@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { getUserInitials } from "@/lib/utils";
 import { User } from "@shared/schema";
+import { useMobile } from "@/hooks/use-mobile";
 
 type SidebarProps = {
   user: User;
@@ -12,6 +13,7 @@ type SidebarProps = {
 
 export default function Sidebar({ user, isOpen, onClose }: SidebarProps) {
   const [location] = useLocation();
+  const isMobile = useMobile();
   
   const { data: userOperatedWarehouses = [] } = useQuery<number[]>({
     queryKey: ["/api/users", user?.id, "operated-warehouses"],
@@ -25,9 +27,9 @@ export default function Sidebar({ user, isOpen, onClose }: SidebarProps) {
     return location === path;
   };
 
-  const handleNavClick = (e: React.MouseEvent) => {
+  const handleNavClick = () => {
     // Only close sidebar on mobile after navigation
-    if (window.innerWidth < 768) {
+    if (isMobile) {
       onClose();
     }
     // On desktop, sidebar should remain open - no action needed
