@@ -2507,6 +2507,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Unauthorized" });
       }
 
+      // Check warehouse permissions
+      const user = req.user!;
+      const sourceWarehouseId = parseInt(req.body.sourceWarehouseId);
+      
+      // Only admin can create transfers from any warehouse
+      // Managers and operators can only create transfers from their allocated warehouse
+      if (user.role !== 'admin') {
+        if (!user.warehouseId) {
+          return res.status(403).json({ message: "You are not assigned to any warehouse" });
+        }
+        if (user.warehouseId !== sourceWarehouseId) {
+          return res.status(403).json({ message: "You can only create transfers from your allocated warehouse" });
+        }
+      }
+
       const transferData = insertTransferSchema.parse({
         ...req.body,
         initiatedBy: req.user!.id,

@@ -670,6 +670,23 @@ export default function EnhancedTransfersPage() {
               <form onSubmit={form.handleSubmit(handleSubmit)}>
                 <div className="space-y-6 py-4">
                 {/* Warehouse Selection */}
+                {user?.role !== 'admin' && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-md p-3 mb-4">
+                    <div className="flex">
+                      <div className="flex-shrink-0">
+                        <Warehouse className="h-5 w-5 text-blue-400" />
+                      </div>
+                      <div className="ml-3">
+                        <h3 className="text-sm font-medium text-blue-800">
+                          Transfer Permissions
+                        </h3>
+                        <div className="mt-2 text-sm text-blue-700">
+                          You can only create transfers from your allocated warehouse ({user?.warehouseId ? warehouses?.find((w: any) => w.id === user.warehouseId)?.name : 'None assigned'}) to other warehouses in the organization.
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="sourceWarehouseId">Source Warehouse</Label>
@@ -681,17 +698,36 @@ export default function EnhancedTransfersPage() {
                         <SelectValue placeholder="Select source warehouse" />
                       </SelectTrigger>
                       <SelectContent>
-                        {warehouses?.filter((w: any) => w.isActive).length > 0 ? (
-                          warehouses?.filter((w: any) => w.isActive).map((warehouse: any) => (
-                            <SelectItem key={warehouse.id} value={warehouse.id.toString()}>
-                              {warehouse.name} - {warehouse.location}
-                            </SelectItem>
-                          ))
-                        ) : (
-                          <div className="p-2 text-sm text-gray-500">
-                            No active warehouses available
-                          </div>
-                        )}
+                        {(() => {
+                          // Filter warehouses based on user role and permissions
+                          const availableWarehouses = warehouses?.filter((w: any) => {
+                            if (!w.isActive) return false;
+                            
+                            // Admin can select any warehouse as source
+                            if (user?.role === 'admin') return true;
+                            
+                            // Non-admin users can only select their allocated warehouse as source
+                            return user?.warehouseId === w.id;
+                          });
+                          
+                          return availableWarehouses?.length > 0 ? (
+                            availableWarehouses.map((warehouse: any) => (
+                              <SelectItem key={warehouse.id} value={warehouse.id.toString()}>
+                                {warehouse.name} - {warehouse.location}
+                                {user?.role !== 'admin' && user?.warehouseId === warehouse.id && (
+                                  <span className="ml-2 text-xs text-blue-600">(Your Warehouse)</span>
+                                )}
+                              </SelectItem>
+                            ))
+                          ) : (
+                            <div className="p-2 text-sm text-gray-500">
+                              {user?.role === 'admin' 
+                                ? "No active warehouses available"
+                                : "You are not assigned to any warehouse"
+                              }
+                            </div>
+                          );
+                        })()}
                       </SelectContent>
                     </Select>
                     {form.formState.errors.sourceWarehouseId && (
