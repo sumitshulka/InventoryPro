@@ -59,10 +59,12 @@ export default function MyRequestsPage() {
   const userRequests = allRequests.filter((request: Request) => request.userId === user?.id) || [];
 
   // Fetch request items for selected request
-  const { data: requestItems = [] } = useQuery<RequestItem[]>({
+  const { data: requestItems = [], isLoading: requestItemsLoading } = useQuery<RequestItem[]>({
     queryKey: ["/api/requests", selectedRequest?.id, "items"],
     enabled: !!selectedRequest?.id,
   });
+
+  console.log('Request items data:', requestItems);
 
   // Fetch items and warehouses for reference
   const { data: items = [] } = useQuery<Item[]>({
