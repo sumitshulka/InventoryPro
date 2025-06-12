@@ -223,7 +223,7 @@ export default function WarehousesPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/warehouses"] });
       queryClient.invalidateQueries({ queryKey: ["/api/warehouses/stats"] });
-      invalidateRelatedQueries();
+      invalidateRelatedQueries('warehouse', 'delete');
       toast({
         title: "Success",
         description: "Warehouse has been archived successfully",
@@ -254,7 +254,7 @@ export default function WarehousesPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/warehouses"] });
       queryClient.invalidateQueries({ queryKey: ["/api/warehouses/stats"] });
-      invalidateRelatedQueries();
+      invalidateRelatedQueries('warehouse', 'update');
       toast({
         title: "Success",
         description: "Warehouse has been restored successfully",
