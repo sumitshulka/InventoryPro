@@ -36,6 +36,7 @@ export const users = pgTable("users", {
   warehouseId: integer("warehouse_id"),
   departmentId: integer("department_id"),
   isWarehouseOperator: boolean("is_warehouse_operator").notNull().default(false),
+  isActive: boolean("is_active").notNull().default(true),
   resetToken: text("reset_token"),
   resetTokenExpiry: text("reset_token_expiry"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -45,6 +46,7 @@ export const users = pgTable("users", {
   usersWarehouseIdx: index("users_warehouse_idx").on(table.warehouseId),
   usersDepartmentIdx: index("users_department_idx").on(table.departmentId),
   usersWarehouseOperatorIdx: index("users_warehouse_operator_idx").on(table.isWarehouseOperator),
+  usersActiveIdx: index("users_active_idx").on(table.isActive),
   usersEmailIdx: index("users_email_idx").on(table.email),
   usersCreatedAtIdx: index("users_created_at_idx").on(table.createdAt),
   usersResetTokenIdx: index("users_reset_token_idx").on(table.resetToken),
@@ -60,6 +62,7 @@ export const insertUserSchema = createInsertSchema(users).pick({
   warehouseId: true,
   departmentId: true,
   isWarehouseOperator: true,
+  isActive: true,
   resetToken: true,
   resetTokenExpiry: true,
 });
