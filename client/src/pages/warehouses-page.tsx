@@ -264,6 +264,39 @@ export default function WarehousesPage() {
     setIsDialogOpen(true);
   };
 
+  const handleArchiveWarehouse = (warehouseId: number) => {
+    deleteWarehouseMutation.mutate(warehouseId);
+  };
+
+  const handleRestoreWarehouse = async (warehouseId: number) => {
+    try {
+      const response = await fetch(`/api/warehouses/${warehouseId}/restore`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+      
+      if (!response.ok) {
+        throw new Error("Failed to restore warehouse");
+      }
+      
+      await queryClient.invalidateQueries({ queryKey: ["/api/warehouses"] });
+      await queryClient.invalidateQueries({ queryKey: ["/api/warehouses/stats"] });
+      
+      toast({
+        title: "Success",
+        description: "Warehouse has been restored successfully",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to restore warehouse",
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleSubmit = (values: FormValues) => {
     createWarehouseMutation.mutate(values);
   };
@@ -306,7 +339,7 @@ export default function WarehousesPage() {
         </TabsList>
 
         <TabsContent value="active" className="mt-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             {activeWarehouses.map((warehouse: any) => (
               <WarehouseCard
                 key={warehouse.id}
@@ -322,111 +355,70 @@ export default function WarehousesPage() {
               </div>
             )}
           </div>
-        </TabsContent>
 
-        <TabsContent value="archived" className="mt-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {archivedWarehouses.map((warehouse: any) => (
-              <WarehouseCard
-                key={warehouse.id}
-                warehouse={warehouse}
-                locations={locations}
-                isAdmin={isAdmin}
-                onEdit={handleEditWarehouse}
-                isArchived={true}
-              />
-            ))}
-            {archivedWarehouses.length === 0 && (
-              <div className="col-span-full text-center py-8">
-                <p className="text-gray-500">No archived warehouses found.</p>
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle>Active Warehouses</CardTitle>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={async () => {
+                    await queryClient.invalidateQueries({ queryKey: ['/api/warehouses'] });
+                    await queryClient.refetchQueries({ queryKey: ['/api/warehouses'] });
+                    toast({
+                      title: "Refreshed",
+                      description: "Active warehouses table has been refreshed",
+                    });
+                  }}
+                  className="ml-2"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                </Button>
               </div>
-            )}
-          </div>
-        </TabsContent>
-      </Tabs>
-
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle>All Warehouses</CardTitle>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={async () => {
-                await queryClient.invalidateQueries({ queryKey: ['/api/warehouses'] });
-                await queryClient.invalidateQueries({ queryKey: ['/api/warehouses/stats'] });
-                await queryClient.invalidateQueries({ queryKey: ['/api/locations'] });
-                await queryClient.invalidateQueries({ queryKey: ['/api/users'] });
-                await queryClient.refetchQueries({ queryKey: ['/api/warehouses'] });
-                await queryClient.refetchQueries({ queryKey: ['/api/warehouses/stats'] });
-                await queryClient.refetchQueries({ queryKey: ['/api/locations'] });
-                await queryClient.refetchQueries({ queryKey: ['/api/users'] });
-                toast({
-                  title: "Refreshed",
-                  description: "Warehouses table has been refreshed",
-                });
-              }}
-              className="ml-2"
-            >
-              <RefreshCw className="h-4 w-4" />
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Location</TableHead>
-                  <TableHead>Manager</TableHead>
-                  <TableHead>Capacity</TableHead>
-                  <TableHead>Status</TableHead>
-                  {isAdmin && <TableHead>Actions</TableHead>}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {warehouses?.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={isAdmin ? 6 : 5} className="text-center py-8 text-gray-500">
-                      No warehouses found
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  warehouses?.map((warehouse: any) => (
-                    <TableRow key={warehouse.id} className={warehouse.status === 'deleted' ? 'opacity-60' : ''}>
-                      <TableCell className="font-medium">
-                        {warehouse.name}
-                        {warehouse.status === 'deleted' && (
-                          <span className="text-red-500 text-xs ml-1 font-bold">✗</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {(locations as any[])?.find((loc: any) => loc.id === warehouse.locationId)?.name || 'Location not found'}
-                      </TableCell>
-                      <TableCell>
-                        {warehouse.managerId ? 
-                          (users as any[])?.find((u: any) => u.id === warehouse.managerId)?.name || "Unknown Manager" 
-                          : "—"
-                        }
-                      </TableCell>
-                      <TableCell>{formatCapacity(warehouse.capacity)}</TableCell>
-                      <TableCell>
-                        {warehouse.status === 'deleted' ? (
-                          <span className="bg-red-100 text-red-800 text-xs px-2 py-1 rounded-full">
-                            Archived
-                          </span>
-                        ) : (
-                          <span className={`${warehouse.isActive ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"} text-xs px-2 py-1 rounded-full`}>
-                            {warehouse.isActive ? "Active" : "Inactive"}
-                          </span>
-                        )}
-                      </TableCell>
-                      {isAdmin && (
-                        <TableCell>
-                          <div className="flex gap-1">
-                            {warehouse.status !== 'deleted' && (
-                              <>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Location</TableHead>
+                      <TableHead>Manager</TableHead>
+                      <TableHead>Capacity</TableHead>
+                      <TableHead>Status</TableHead>
+                      {isAdmin && <TableHead>Actions</TableHead>}
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {activeWarehouses.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={isAdmin ? 6 : 5} className="text-center py-8 text-gray-500">
+                          No active warehouses found
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      activeWarehouses.map((warehouse: any) => (
+                        <TableRow key={warehouse.id}>
+                          <TableCell className="font-medium">{warehouse.name}</TableCell>
+                          <TableCell>
+                            {(locations as any[])?.find((loc: any) => loc.id === warehouse.locationId)?.name || 'Location not found'}
+                          </TableCell>
+                          <TableCell>
+                            {warehouse.managerId ? 
+                              (users as any[])?.find((u: any) => u.id === warehouse.managerId)?.name || "Unknown Manager" 
+                              : "—"
+                            }
+                          </TableCell>
+                          <TableCell>{formatCapacity(warehouse.capacity)}</TableCell>
+                          <TableCell>
+                            <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">
+                              Active
+                            </span>
+                          </TableCell>
+                          {isAdmin && (
+                            <TableCell>
+                              <div className="flex gap-1">
                                 <Button
                                   variant="ghost"
                                   size="sm"
@@ -448,33 +440,137 @@ export default function WarehousesPage() {
                                     <AlertDialogHeader>
                                       <AlertDialogTitle>Archive Warehouse</AlertDialogTitle>
                                       <AlertDialogDescription>
-                                        Are you sure you want to archive "{warehouse.name}"? This will preserve all transaction history but mark the warehouse as deleted. This action cannot be undone.
+                                        Are you sure you want to archive "{warehouse.name}"? This will move it to the archived section.
                                       </AlertDialogDescription>
                                     </AlertDialogHeader>
                                     <AlertDialogFooter>
                                       <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                      <AlertDialogAction
-                                        onClick={() => deleteWarehouseMutation.mutate(warehouse.id)}
-                                        className="bg-red-600 hover:bg-red-700"
-                                      >
-                                        Archive Warehouse
+                                      <AlertDialogAction onClick={() => handleArchiveWarehouse(warehouse.id)}>
+                                        Archive
                                       </AlertDialogAction>
                                     </AlertDialogFooter>
                                   </AlertDialogContent>
                                 </AlertDialog>
-                              </>
-                            )}
-                          </div>
-                        </TableCell>
-                      )}
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
+                              </div>
+                            </TableCell>
+                          )}
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="archived" className="mt-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            {archivedWarehouses.map((warehouse: any) => (
+              <WarehouseCard
+                key={warehouse.id}
+                warehouse={warehouse}
+                locations={locations}
+                isAdmin={isAdmin}
+                onEdit={handleEditWarehouse}
+                isArchived={true}
+              />
+            ))}
+            {archivedWarehouses.length === 0 && (
+              <div className="col-span-full text-center py-8">
+                <p className="text-gray-500">No archived warehouses found.</p>
+              </div>
+            )}
           </div>
-        </CardContent>
-      </Card>
+
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle>Archived Warehouses</CardTitle>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={async () => {
+                    await queryClient.invalidateQueries({ queryKey: ['/api/warehouses'] });
+                    await queryClient.refetchQueries({ queryKey: ['/api/warehouses'] });
+                    toast({
+                      title: "Refreshed",
+                      description: "Archived warehouses table has been refreshed",
+                    });
+                  }}
+                  className="ml-2"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Location</TableHead>
+                      <TableHead>Manager</TableHead>
+                      <TableHead>Capacity</TableHead>
+                      <TableHead>Status</TableHead>
+                      {isAdmin && <TableHead>Actions</TableHead>}
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {archivedWarehouses.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={isAdmin ? 6 : 5} className="text-center py-8 text-gray-500">
+                          No archived warehouses found
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      archivedWarehouses.map((warehouse: any) => (
+                        <TableRow key={warehouse.id} className="opacity-60">
+                          <TableCell className="font-medium">
+                            {warehouse.name}
+                            <span className="text-red-500 text-xs ml-1 font-bold">✗</span>
+                          </TableCell>
+                          <TableCell>
+                            {(locations as any[])?.find((loc: any) => loc.id === warehouse.locationId)?.name || 'Location not found'}
+                          </TableCell>
+                          <TableCell>
+                            {warehouse.managerId ? 
+                              (users as any[])?.find((u: any) => u.id === warehouse.managerId)?.name || "Unknown Manager" 
+                              : "—"
+                            }
+                          </TableCell>
+                          <TableCell>{formatCapacity(warehouse.capacity)}</TableCell>
+                          <TableCell>
+                            <span className="bg-red-100 text-red-800 text-xs px-2 py-1 rounded-full">
+                              Archived
+                            </span>
+                          </TableCell>
+                          {isAdmin && (
+                            <TableCell>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleRestoreWarehouse(warehouse.id)}
+                                className="text-green-600 hover:text-green-700"
+                              >
+                                <Archive className="h-4 w-4 mr-1" />
+                                Restore
+                              </Button>
+                            </TableCell>
+                          )}
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
+
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent>

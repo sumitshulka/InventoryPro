@@ -478,6 +478,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(archivedWarehouse);
   });
 
+  // Restore archived warehouse (admin only)
+  app.patch("/api/warehouses/:id/restore", checkRole("admin"), async (req, res) => {
+    try {
+      const warehouseId = parseInt(req.params.id, 10);
+      const restoredWarehouse = await storage.restoreWarehouse(warehouseId);
+      if (!restoredWarehouse) {
+        return res.status(404).json({ message: "Warehouse not found" });
+      }
+      res.json(restoredWarehouse);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message || "Failed to restore warehouse" });
+    }
+  });
+
   // Get active warehouses only (excludes archived)
   app.get("/api/warehouses/active", async (req, res) => {
     try {
