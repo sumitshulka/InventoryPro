@@ -673,7 +673,8 @@ export class MemStorage implements IStorage {
     const newUser: User = { 
       ...user, 
       id,
-      resetToken: user.resetToken || null, 
+      resetToken: user.resetToken || null,
+      resetTokenExpiry: user.resetTokenExpiry || null, 
       createdAt,
       role: user.role || 'user',
       managerId: user.managerId || null,

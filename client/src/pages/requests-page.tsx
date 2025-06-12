@@ -212,8 +212,8 @@ export default function RequestsPage() {
   const isWarehouseOperator = userOperatedWarehouses.length > 0;
   const canViewAllRequests = user?.role === 'admin' || user?.role === 'manager' || isWarehouseOperator;
 
-  const filteredRequests = requests
-    ? requests.filter((request: any) => {
+  const filteredRequests = (requests as any[])
+    ? (requests as any[]).filter((request: any) => {
         // Role-based filtering: employees can only see their own requests unless they're warehouse operators
         if (!canViewAllRequests && request.userId !== user?.id) {
           return false;

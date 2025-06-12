@@ -1480,7 +1480,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updatedApproval = await storage.updateRequestApproval(approvalId, {
         status: action === 'approve' ? 'approved' : 'rejected',
         approvedAt: new Date(),
-        notes: notes || null
+        comments: notes || null
       });
 
       // Update request status based on approval
