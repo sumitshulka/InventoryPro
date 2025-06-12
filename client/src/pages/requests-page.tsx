@@ -123,13 +123,8 @@ export default function RequestsPage() {
       return res.json();
     },
     onSuccess: () => {
-      // Invalidate all related queries to ensure fresh data
+      // Optimized: Only invalidate essential queries, not all related data
       queryClient.invalidateQueries({ queryKey: ["/api/requests"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/summary"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/reports/inventory-stock"] });
-      
-      // Force refetch of requests query
-      queryClient.refetchQueries({ queryKey: ["/api/requests"] });
       
       toast({
         title: "Request created",
