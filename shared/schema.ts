@@ -589,6 +589,52 @@ export const insertNotificationSchema = createInsertSchema(notifications).pick({
 export type Notification = typeof notifications.$inferSelect;
 export type InsertNotification = z.infer<typeof insertNotificationSchema>;
 
+// Issues table for tracking problems and concerns
+export const issues = pgTable("issues", {
+  id: serial("id").primaryKey(),
+  title: text("title").notNull(),
+  description: text("description").notNull(),
+  category: text("category").notNull().default("general"), // general, inventory, equipment, maintenance, safety
+  priority: text("priority").notNull().default("medium"), // low, medium, high, critical
+  status: text("status").notNull().default("open"), // open, in-progress, resolved, closed
+  reportedBy: integer("reported_by").notNull().references(() => users.id),
+  assignedTo: integer("assigned_to").references(() => users.id),
+  warehouseId: integer("warehouse_id").references(() => warehouses.id),
+  itemId: integer("item_id").references(() => items.id),
+  attachments: text("attachments").array(), // Array of file paths/URLs
+  estimatedResolutionDate: timestamp("estimated_resolution_date"),
+  actualResolutionDate: timestamp("actual_resolution_date"),
+  resolutionNotes: text("resolution_notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  reportedByIdx: index("issues_reported_by_idx").on(table.reportedBy),
+  assignedToIdx: index("issues_assigned_to_idx").on(table.assignedTo),
+  statusIdx: index("issues_status_idx").on(table.status),
+  priorityIdx: index("issues_priority_idx").on(table.priority),
+  categoryIdx: index("issues_category_idx").on(table.category),
+  warehouseIdx: index("issues_warehouse_idx").on(table.warehouseId),
+  createdAtIdx: index("issues_created_at_idx").on(table.createdAt),
+}));
+
+export const insertIssueSchema = createInsertSchema(issues).pick({
+  title: true,
+  description: true,
+  category: true,
+  priority: true,
+  status: true,
+  reportedBy: true,
+  assignedTo: true,
+  warehouseId: true,
+  itemId: true,
+  attachments: true,
+  estimatedResolutionDate: true,
+  resolutionNotes: true,
+});
+
+export type Issue = typeof issues.$inferSelect;
+export type InsertIssue = z.infer<typeof insertIssueSchema>;
+
 export type Location = typeof locations.$inferSelect;
 export type InsertLocation = z.infer<typeof insertLocationSchema>;
 
