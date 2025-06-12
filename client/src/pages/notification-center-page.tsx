@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Bell, Send, Reply, Archive, CheckCircle, X, AlertCircle, Info, Clock, Search, Filter, MessageSquare, Trash2, User, Calendar, ArrowLeft, RefreshCw } from "lucide-react";
+import { Bell, Send, Reply, Archive, CheckCircle, X, AlertCircle, Info, Clock, Search, Filter, MessageSquare, Trash2, User, Calendar, ArrowLeft, RefreshCw, Mail } from "lucide-react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -275,12 +275,15 @@ export default function NotificationCenterPage() {
 
   const handleReplyDialogOpen = (notification: Notification) => {
     setSelectedNotification(notification);
-    setShowReplyDialog(true);
-    // Reset form with fresh values
+    // Reset form with fresh values first
     replyForm.reset({
       message: '',
       priority: 'normal',
     });
+    // Small delay to ensure form is reset before opening dialog
+    setTimeout(() => {
+      setShowReplyDialog(true);
+    }, 100);
   };
 
   const handleNotificationClick = (notification: Notification) => {
@@ -571,6 +574,12 @@ export default function NotificationCenterPage() {
                                 <Badge variant="outline" className="text-xs">
                                   {notification.category}
                                 </Badge>
+                                {notification.isArchived && (
+                                  <Badge variant="secondary" className="text-xs bg-gray-200 text-gray-700">
+                                    <Archive className="h-3 w-3 mr-1" />
+                                    Archived
+                                  </Badge>
+                                )}
                                 <Badge 
                                   variant={notification.status === 'unread' ? 'default' : 'secondary'}
                                   className="text-xs"
@@ -636,11 +645,11 @@ export default function NotificationCenterPage() {
                           <DialogTrigger asChild>
                             <Button 
                               size="sm" 
-                              className="w-full"
+                              className="w-full bg-blue-600 hover:bg-blue-700"
                               onClick={() => handleReplyDialogOpen(selectedNotification)}
                             >
                               <Reply className="h-4 w-4 mr-2" />
-                              Reply
+                              Write Reply
                             </Button>
                           </DialogTrigger>
                           <DialogContent className="max-w-md">
@@ -725,7 +734,7 @@ export default function NotificationCenterPage() {
                       className="w-full"
                     >
                       <MessageSquare className="h-4 w-4 mr-2" />
-                      View Thread
+                      View Conversation
                     </Button>
                     
                     <Button
