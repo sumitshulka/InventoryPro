@@ -340,6 +340,7 @@ export const insertApprovalSettingsSchema = createInsertSchema(approvalSettings)
 export const organizationSettings = pgTable("organization_settings", {
   id: serial("id").primaryKey(),
   organizationName: text("organization_name").notNull().default("My Organization"),
+  logo: text("logo"), // Base64 encoded image data
   currency: text("currency").notNull().default("USD"),
   currencySymbol: text("currency_symbol").notNull().default("$"),
   timezone: text("timezone").notNull().default("UTC"),

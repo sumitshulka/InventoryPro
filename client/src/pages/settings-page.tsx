@@ -47,6 +47,7 @@ const approvalSettingsSchema = z.object({
 
 const organizationSettingsSchema = z.object({
   organizationName: z.string().min(1, "Organization name is required"),
+  logo: z.string().optional(),
   currency: z.string().min(1, "Currency is required"),
   currencySymbol: z.string().min(1, "Currency symbol is required"),
   timezone: z.string().min(1, "Timezone is required"),
@@ -134,6 +135,7 @@ export default function SettingsPage() {
     resolver: zodResolver(organizationSettingsSchema),
     defaultValues: {
       organizationName: "My Organization",
+      logo: "",
       currency: "USD",
       currencySymbol: "₹",
       timezone: "UTC",
@@ -171,6 +173,7 @@ export default function SettingsPage() {
     if (organizationSettings) {
       orgForm.reset({
         organizationName: (organizationSettings as any).organizationName || "My Organization",
+        logo: (organizationSettings as any).logo || "",
         currency: (organizationSettings as any).currency || "USD",
         currencySymbol: (organizationSettings as any).currencySymbol || "₹",
         timezone: (organizationSettings as any).timezone || "UTC",
