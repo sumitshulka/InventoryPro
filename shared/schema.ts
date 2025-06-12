@@ -9,7 +9,10 @@ export const departments = pgTable("departments", {
   description: text("description"),
   managerId: integer("manager_id"),
   isActive: boolean("is_active").notNull().default(true),
-});
+}, (table) => ({
+  departmentsManagerIdx: index("departments_manager_idx").on(table.managerId),
+  departmentsActiveIdx: index("departments_active_idx").on(table.isActive),
+}));
 
 export const insertDepartmentSchema = createInsertSchema(departments).pick({
   name: true,
@@ -34,7 +37,15 @@ export const users = pgTable("users", {
   departmentId: integer("department_id"),
   isWarehouseOperator: boolean("is_warehouse_operator").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (table) => ({
+  usersRoleIdx: index("users_role_idx").on(table.role),
+  usersManagerIdx: index("users_manager_idx").on(table.managerId),
+  usersWarehouseIdx: index("users_warehouse_idx").on(table.warehouseId),
+  usersDepartmentIdx: index("users_department_idx").on(table.departmentId),
+  usersWarehouseOperatorIdx: index("users_warehouse_operator_idx").on(table.isWarehouseOperator),
+  usersEmailIdx: index("users_email_idx").on(table.email),
+  usersCreatedAtIdx: index("users_created_at_idx").on(table.createdAt),
+}));
 
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
@@ -59,7 +70,13 @@ export const locations = pgTable("locations", {
   country: text("country").notNull().default("India"),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (table) => ({
+  locationsCityIdx: index("locations_city_idx").on(table.city),
+  locationsStateIdx: index("locations_state_idx").on(table.state),
+  locationsCountryIdx: index("locations_country_idx").on(table.country),
+  locationsActiveIdx: index("locations_active_idx").on(table.isActive),
+  locationsCreatedAtIdx: index("locations_created_at_idx").on(table.createdAt),
+}));
 
 export const insertLocationSchema = createInsertSchema(locations).pick({
   name: true,
@@ -93,7 +110,13 @@ export const warehouses = pgTable("warehouses", {
   isActive: boolean("is_active").notNull().default(true),
   status: text("status").notNull().default("active"), // active, suspended, deleted
   deletedAt: timestamp("deleted_at"),
-});
+}, (table) => ({
+  warehousesLocationIdx: index("warehouses_location_idx").on(table.locationId),
+  warehousesManagerIdx: index("warehouses_manager_idx").on(table.managerId),
+  warehousesActiveIdx: index("warehouses_active_idx").on(table.isActive),
+  warehousesStatusIdx: index("warehouses_status_idx").on(table.status),
+  warehousesDeletedAtIdx: index("warehouses_deleted_at_idx").on(table.deletedAt),
+}));
 
 export const insertWarehouseSchema = createInsertSchema(warehouses).pick({
   name: true,
@@ -114,6 +137,10 @@ export const warehouseOperators = pgTable("warehouse_operators", {
 }, (table) => ({
   // Ensure a user can't be added as operator to same warehouse multiple times
   uniqueUserWarehouse: unique().on(table.userId, table.warehouseId),
+  warehouseOperatorsUserIdx: index("warehouse_operators_user_idx").on(table.userId),
+  warehouseOperatorsWarehouseIdx: index("warehouse_operators_warehouse_idx").on(table.warehouseId),
+  warehouseOperatorsActiveIdx: index("warehouse_operators_active_idx").on(table.isActive),
+  warehouseOperatorsCreatedAtIdx: index("warehouse_operators_created_at_idx").on(table.createdAt),
 }));
 
 export const insertWarehouseOperatorSchema = createInsertSchema(warehouseOperators).pick({
@@ -131,7 +158,12 @@ export const items = pgTable("items", {
   minStockLevel: integer("min_stock_level").notNull().default(10),
   categoryId: integer("category_id"),
   unit: text("unit").notNull().default("pcs"),
-});
+}, (table) => ({
+  itemsCategoryIdx: index("items_category_idx").on(table.categoryId),
+  itemsNameIdx: index("items_name_idx").on(table.name),
+  itemsUnitIdx: index("items_unit_idx").on(table.unit),
+  itemsMinStockIdx: index("items_min_stock_idx").on(table.minStockLevel),
+}));
 
 export const insertItemSchema = createInsertSchema(items).pick({
   name: true,
