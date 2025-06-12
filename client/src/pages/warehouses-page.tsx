@@ -147,6 +147,18 @@ export default function WarehousesPage() {
     queryKey: ["/api/users"],
   });
 
+  const { data: inventory } = useQuery({
+    queryKey: ["/api/reports/inventory-stock"],
+  });
+
+  // Helper function to calculate total items in a warehouse
+  const getTotalItemsInWarehouse = (warehouseId: number) => {
+    if (!inventory) return 0;
+    return (inventory as any[])
+      .filter((inv: any) => inv.warehouseId === warehouseId)
+      .reduce((total: number, inv: any) => total + inv.quantity, 0);
+  };
+
   // Filter warehouses based on archive status
   const activeWarehouses = warehouses?.filter((warehouse: any) => warehouse.status !== 'deleted') || [];
   const archivedWarehouses = warehouses?.filter((warehouse: any) => warehouse.status === 'deleted') || [];
@@ -392,6 +404,7 @@ export default function WarehousesPage() {
                       <TableHead>Location</TableHead>
                       <TableHead>Manager</TableHead>
                       <TableHead>Capacity</TableHead>
+                      <TableHead>Total Items</TableHead>
                       <TableHead>Status</TableHead>
                       {isAdmin && <TableHead>Actions</TableHead>}
                     </TableRow>
@@ -399,7 +412,7 @@ export default function WarehousesPage() {
                   <TableBody>
                     {activeWarehouses.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={isAdmin ? 6 : 5} className="text-center py-8 text-gray-500">
+                        <TableCell colSpan={isAdmin ? 7 : 6} className="text-center py-8 text-gray-500">
                           No active warehouses found
                         </TableCell>
                       </TableRow>
@@ -417,6 +430,11 @@ export default function WarehousesPage() {
                             }
                           </TableCell>
                           <TableCell>{formatCapacity(warehouse.capacity)}</TableCell>
+                          <TableCell className="text-center">
+                            <span className="font-medium text-blue-600">
+                              {getTotalItemsInWarehouse(warehouse.id).toLocaleString()}
+                            </span>
+                          </TableCell>
                           <TableCell>
                             <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">
                               Active
@@ -519,6 +537,7 @@ export default function WarehousesPage() {
                       <TableHead>Location</TableHead>
                       <TableHead>Manager</TableHead>
                       <TableHead>Capacity</TableHead>
+                      <TableHead>Total Items</TableHead>
                       <TableHead>Status</TableHead>
                       {isAdmin && <TableHead>Actions</TableHead>}
                     </TableRow>
@@ -526,7 +545,7 @@ export default function WarehousesPage() {
                   <TableBody>
                     {archivedWarehouses.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={isAdmin ? 6 : 5} className="text-center py-8 text-gray-500">
+                        <TableCell colSpan={isAdmin ? 7 : 6} className="text-center py-8 text-gray-500">
                           No archived warehouses found
                         </TableCell>
                       </TableRow>
@@ -547,6 +566,11 @@ export default function WarehousesPage() {
                             }
                           </TableCell>
                           <TableCell>{formatCapacity(warehouse.capacity)}</TableCell>
+                          <TableCell className="text-center">
+                            <span className="font-medium text-gray-500">
+                              {getTotalItemsInWarehouse(warehouse.id).toLocaleString()}
+                            </span>
+                          </TableCell>
                           <TableCell>
                             <span className="bg-red-100 text-red-800 text-xs px-2 py-1 rounded-full">
                               Archived
