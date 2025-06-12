@@ -1485,9 +1485,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Update request status based on approval
       const request = await storage.getRequest(approval.requestId);
-      if (request) {
-        let newStatus = action === 'approve' ? 'approved' : 'rejected';
-        await storage.updateRequest(approval.requestId, { status: newStatus });
+      if (request && action === 'approve') {
+        // Update request to approved status
+        await storage.updateRequest(approval.requestId, { status: 'approved' });
+        
+        // Process inventory deduction for approved checkout request
+        if (request.status !== 'completed') {
+          const requestItems = await storage.getRequestItemsByRequest(approval.requestId);
+          
+          // Create issue transactions and update inventory for each item
+          for (const requestItem of requestItems) {
+            // Create issue transaction record
+            const transactionCode = `ISS-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+            await storage.createTransaction({
+              transactionCode,
+              transactionType: 'issue',
+              itemId: requestItem.itemId,
+              quantity: requestItem.quantity,
+              sourceWarehouseId: request.warehouseId,
+              destinationWarehouseId: null,
+              userId: req.user.id,
+              status: 'completed',
+              completedAt: new Date(),
+              rate: null,
+              totalValue: null,
+              supplierName: null,
+              supplierContact: null,
+              purchaseOrderNumber: null,
+              deliveryChallanNumber: null
+            });
+            
+            // Update inventory - reduce quantity
+            const currentInventory = await storage.getInventoryByItemAndWarehouse(
+              requestItem.itemId, 
+              request.warehouseId
+            );
+            
+            if (currentInventory) {
+              const newQuantity = Math.max(0, currentInventory.quantity - requestItem.quantity);
+              await storage.updateInventory(currentInventory.id, { quantity: newQuantity });
+            }
+          }
+          
+          // Mark request as completed after inventory updates
+          await storage.updateRequest(approval.requestId, { status: 'completed' });
+        }
+      } else if (request && action === 'reject') {
+        await storage.updateRequest(approval.requestId, { status: 'rejected' });
       }
 
       res.json(updatedApproval);
