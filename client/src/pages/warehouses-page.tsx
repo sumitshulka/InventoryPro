@@ -313,32 +313,15 @@ export default function WarehousesPage() {
   };
 
   const handleRefresh = async () => {
-    // Invalidate all related queries to force a complete refresh
-    await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ["/api/warehouses"] }),
-      queryClient.invalidateQueries({ queryKey: ["/api/locations"] }),
-      queryClient.invalidateQueries({ queryKey: ["/api/users"] }),
-      queryClient.invalidateQueries({ queryKey: ["/api/reports/inventory-stock"] }),
-      queryClient.invalidateQueries({ queryKey: ["/api/warehouses/stats"] }),
-    ]);
+    // Use page reload for reliable data refresh
+    window.location.reload();
   };
 
   const performRefresh = async () => {
     setIsRefreshing(true);
-    try {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["/api/warehouses"] }),
-        queryClient.invalidateQueries({ queryKey: ["/api/locations"] }),
-        queryClient.invalidateQueries({ queryKey: ["/api/users"] }),
-        queryClient.invalidateQueries({ queryKey: ["/api/reports/inventory-stock"] }),
-        queryClient.invalidateQueries({ queryKey: ["/api/warehouses/stats"] }),
-      ]);
-      
-      // Wait for queries to refetch
-      await new Promise(resolve => setTimeout(resolve, 1000));
-    } finally {
-      setIsRefreshing(false);
-    }
+    
+    // For immediate visual feedback, use browser refresh
+    window.location.reload();
   };
 
   const handleSubmit = (values: FormValues) => {
