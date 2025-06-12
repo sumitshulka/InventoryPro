@@ -244,6 +244,7 @@ export default function IssuesPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/notifications'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/notifications/unread-count'] });
       toast({
         title: "Success",
         description: "Notification archived",
@@ -267,6 +268,7 @@ export default function IssuesPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/notifications'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/notifications/unread-count'] });
       setShowReplyDialog(false);
       setSelectedNotification(null); // Close the notification detail modal
       replyForm.reset();
@@ -370,6 +372,19 @@ export default function IssuesPage() {
     }
   };
 
+  const handleRefresh = () => {
+    queryClient.invalidateQueries({ queryKey: ['/api/notifications'] });
+    queryClient.invalidateQueries({ queryKey: ['/api/notifications/unread-count'] });
+    queryClient.invalidateQueries({ queryKey: ['/api/issues'] });
+    queryClient.invalidateQueries({ queryKey: ['/api/users'] });
+    queryClient.invalidateQueries({ queryKey: ['/api/warehouses'] });
+    queryClient.invalidateQueries({ queryKey: ['/api/items'] });
+    toast({
+      title: "Refreshed",
+      description: "Data refreshed successfully",
+    });
+  };
+
   const onSubmit = (data: z.infer<typeof issueSchema>) => {
     createIssueMutation.mutate(data);
   };
@@ -418,13 +433,7 @@ export default function IssuesPage() {
             <Button
               variant="outline"
               size="sm"
-              onClick={async () => {
-                await queryClient.refetchQueries({ queryKey: ['/api/issues'] });
-                await queryClient.refetchQueries({ queryKey: ['/api/notifications'] });
-                await queryClient.refetchQueries({ queryKey: ['/api/users'] });
-                await queryClient.refetchQueries({ queryKey: ['/api/warehouses'] });
-                await queryClient.refetchQueries({ queryKey: ['/api/items'] });
-              }}
+              onClick={handleRefresh}
             >
               <RefreshCw className="h-4 w-4" />
             </Button>
