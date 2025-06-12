@@ -250,11 +250,11 @@ export default function RequestsPage() {
   const canApproveRequest = (request: any) => {
     if (!user) return false;
     
-    // Users cannot approve their own requests
-    if (request.userId === user.id) return false;
-    
-    // Admin can approve any request
+    // Admin can approve any request, including their own
     if (user.role === "admin") return true;
+    
+    // Non-admin users cannot approve their own requests
+    if (request.userId === user.id) return false;
     
     // For managers, they can only approve requests from their subordinates
     // This requires checking if the requester reports to this manager
