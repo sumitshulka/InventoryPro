@@ -45,6 +45,19 @@ const approvalSettingsSchema = z.object({
   isActive: z.boolean(),
 });
 
+const emailSettingsSchema = z.object({
+  provider: z.string().min(1, "Provider is required"),
+  displayName: z.string().min(1, "Display name is required"),
+  host: z.string().optional(),
+  port: z.number().optional(),
+  secure: z.boolean().default(false),
+  username: z.string().optional(),
+  password: z.string().optional(),
+  fromEmail: z.string().email("Valid email is required"),
+  fromName: z.string().min(1, "From name is required"),
+  verificationTestEmail: z.string().email("Valid test email is required"),
+});
+
 const organizationSettingsSchema = z.object({
   organizationName: z.string().min(1, "Organization name is required"),
   logo: z.string().optional(),
@@ -76,6 +89,7 @@ const departmentSchema = z.object({
 });
 
 type ApprovalSettingsFormValues = z.infer<typeof approvalSettingsSchema>;
+type EmailSettingsFormValues = z.infer<typeof emailSettingsSchema>;
 type OrganizationSettingsFormValues = z.infer<typeof organizationSettingsSchema>;
 type LocationFormValues = z.infer<typeof locationSchema>;
 type DepartmentFormValues = z.infer<typeof departmentSchema>;
@@ -119,6 +133,11 @@ export default function SettingsPage() {
 
   // Check if user is admin
   const isAdmin = (user as any)?.role === 'admin';
+
+  const { data: emailSettings, isLoading: emailSettingsLoading } = useQuery({
+    queryKey: ["/api/email-settings"],
+    enabled: isAdmin,
+  });
 
   const form = useForm<ApprovalSettingsFormValues>({
     resolver: zodResolver(approvalSettingsSchema),
@@ -165,6 +184,22 @@ export default function SettingsPage() {
       description: "",
       managerId: undefined,
       isActive: true,
+    },
+  });
+
+  const emailForm = useForm<EmailSettingsFormValues>({
+    resolver: zodResolver(emailSettingsSchema),
+    defaultValues: {
+      provider: "smtp",
+      displayName: "",
+      host: "",
+      port: 587,
+      secure: false,
+      username: "",
+      password: "",
+      fromEmail: "",
+      fromName: "",
+      verificationTestEmail: "",
     },
   });
 

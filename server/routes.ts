@@ -3301,6 +3301,121 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==== Email Configuration Routes ====
+  // Get email settings (admin only)
+  app.get("/api/email-settings", checkRole("admin"), async (req, res) => {
+    try {
+      const settings = await storage.getEmailSettings();
+      res.json(settings || null);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Create or update email settings (admin only)
+  app.post("/api/email-settings", checkRole("admin"), async (req, res) => {
+    try {
+      const settingsData = insertEmailSettingsSchema.parse(req.body);
+      const settings = await storage.createEmailSettings(settingsData);
+      res.status(201).json(settings);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Update email settings (admin only)
+  app.put("/api/email-settings/:id", checkRole("admin"), async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const settingsData = insertEmailSettingsSchema.partial().parse(req.body);
+      const settings = await storage.updateEmailSettings(id, settingsData);
+      if (!settings) {
+        return res.status(404).json({ message: "Email settings not found" });
+      }
+      res.json(settings);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Test email configuration (admin only)
+  app.post("/api/email-settings/test", checkRole("admin"), async (req, res) => {
+    try {
+      const { testEmail, settingsId, ...tempSettings } = req.body;
+      
+      if (!testEmail) {
+        return res.status(400).json({ message: "Test email address is required" });
+      }
+
+      let settings;
+      if (settingsId) {
+        settings = await storage.getEmailSettings();
+      } else {
+        // Test with provided settings without saving
+        const validatedSettings = insertEmailSettingsSchema.parse(tempSettings);
+        settings = { 
+          ...validatedSettings, 
+          id: 0, 
+          isActive: true, 
+          isVerified: false, 
+          lastTestedAt: null,
+          createdAt: new Date(), 
+          updatedAt: new Date() 
+        };
+      }
+
+      if (!settings) {
+        return res.status(404).json({ message: "Email settings not found" });
+      }
+
+      // Import email service dynamically
+      const { EmailService } = await import('./email-service');
+      const emailService = new EmailService(settings);
+      
+      // Test connection first
+      const connectionTest = await emailService.testConnection();
+      if (!connectionTest) {
+        return res.status(400).json({ 
+          message: "Failed to connect to email server. Please check your configuration." 
+        });
+      }
+
+      // Send test email
+      const testResult = await emailService.sendTestEmail(testEmail);
+      
+      if (testResult) {
+        // Mark as verified if this is an existing configuration
+        if (settingsId && settings.id) {
+          await storage.markEmailSettingsAsVerified(settings.id);
+        }
+        res.json({ 
+          success: true, 
+          message: "Test email sent successfully. Please check your inbox." 
+        });
+      } else {
+        res.status(400).json({ 
+          message: "Failed to send test email. Please check your configuration." 
+        });
+      }
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Delete email settings (admin only)
+  app.delete("/api/email-settings/:id", checkRole("admin"), async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const deleted = await storage.deleteEmailSettings(id);
+      if (!deleted) {
+        return res.status(404).json({ message: "Email settings not found" });
+      }
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
