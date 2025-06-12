@@ -242,7 +242,26 @@ export default function RequestsPage() {
     return item ? item.name : `Item #${itemId}`;
   };
 
-  const isManager = user?.role === "admin" || user?.role === "manager";
+  // Function to check if current user can approve a specific request
+  const canApproveRequest = (request: any) => {
+    if (!user) return false;
+    
+    // Users cannot approve their own requests
+    if (request.userId === user.id) return false;
+    
+    // Admin can approve any request
+    if (user.role === "admin") return true;
+    
+    // For managers, they can only approve requests from their subordinates
+    // This requires checking if the requester reports to this manager
+    if (user.role === "manager") {
+      // Check if the request is from a user who reports to this manager
+      const requester = users?.find((u: any) => u.id === request.userId);
+      return requester?.managerId === user.id;
+    }
+    
+    return false;
+  };
 
   if (requestsLoading || itemsLoading || warehousesLoading || usersLoading) {
     return (
@@ -341,7 +360,7 @@ export default function RequestsPage() {
                               >
                                 <Eye className="h-4 w-4" />
                               </Button>
-                              {isManager && request.status === "pending" && (
+                              {canApproveRequest(request) && request.status === "pending" && (
                                 <>
                                   <Button
                                     variant="ghost"
@@ -616,7 +635,7 @@ export default function RequestsPage() {
             </div>
 
             <DialogFooter>
-              {isManager && (
+              {selectedRequest && canApproveRequest(selectedRequest) && (
                 <div className="flex space-x-2 mr-auto">
                   {selectedRequest.status === "pending" && (
                     <>
