@@ -100,14 +100,16 @@ export default function CheckInPage() {
     transactionCode: string;
     itemId: number;
     quantity: number;
-    transactionDate: string;
-    cost?: number;
-    notes?: string;
+    cost?: string;
+    rate?: string;
     status?: string;
-    purchaseOrderNumber?: string;
+    poNumber?: string;
+    deliveryChallanNumber?: string;
     supplierName?: string;
     destinationWarehouseId?: number;
     requesterId?: number;
+    checkInDate?: string;
+    createdAt: string;
     item?: any;
     user?: any;
     destinationWarehouse?: any;
@@ -560,6 +562,7 @@ export default function CheckInPage() {
                         <TableHead>Date</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead>PO Number</TableHead>
+                        <TableHead>DC Number</TableHead>
                         <TableHead>Supplier</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -570,14 +573,17 @@ export default function CheckInPage() {
                           const warehouse = warehouses?.find(w => w.id === transaction.destinationWarehouseId);
                           const requester = users?.find(u => u.id === transaction.requesterId);
                           
-                          // Fix date formatting - use simple date formatting
-                          const formatTransactionDate = (dateString: string) => {
+                          // Fix date formatting - use checkInDate or fallback to createdAt
+                          const formatTransactionDate = (transaction: any) => {
                             try {
-                              const date = new Date(dateString);
+                              const dateToUse = transaction.checkInDate || transaction.createdAt;
+                              if (!dateToUse) return "No Date";
+                              
+                              const date = new Date(dateToUse);
                               if (isNaN(date.getTime())) {
                                 return "Invalid Date";
                               }
-                              return date.toLocaleDateString() + " " + date.toLocaleTimeString();
+                              return format(date, "PPp");
                             } catch (error) {
                               return "Invalid Date";
                             }
@@ -595,13 +601,14 @@ export default function CheckInPage() {
                                 }
                               </TableCell>
                               <TableCell>{warehouse?.name || "Unknown Warehouse"}</TableCell>
-                              <TableCell>{formatTransactionDate(transaction.transactionDate)}</TableCell>
+                              <TableCell>{formatTransactionDate(transaction)}</TableCell>
                               <TableCell>
                                 <span className={`px-2 py-1 rounded-full text-xs ${getStatusColor(transaction.status || "completed")}`}>
                                   {transaction.status || "completed"}
                                 </span>
                               </TableCell>
-                              <TableCell>{transaction.purchaseOrderNumber || "-"}</TableCell>
+                              <TableCell>{transaction.poNumber || "-"}</TableCell>
+                              <TableCell>{transaction.deliveryChallanNumber || "-"}</TableCell>
                               <TableCell>{transaction.supplierName || "-"}</TableCell>
                             </TableRow>
                           );

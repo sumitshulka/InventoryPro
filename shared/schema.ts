@@ -223,6 +223,7 @@ export const transactions = pgTable("transactions", {
   rate: numeric("rate", { precision: 10, scale: 2 }),
   supplierName: text("supplier_name"),
   poNumber: text("po_number"),
+  deliveryChallanNumber: text("delivery_challan_number"),
   checkInDate: timestamp("check_in_date"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   completedAt: timestamp("completed_at"),
