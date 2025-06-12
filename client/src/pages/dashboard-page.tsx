@@ -6,12 +6,15 @@ import WarehouseOverview from "@/components/dashboard/warehouse-overview";
 import PendingRequests from "@/components/dashboard/pending-requests";
 import LowStockItems from "@/components/dashboard/low-stock-items";
 import RecentActivity from "@/components/dashboard/recent-activity";
-import { Loader2 } from "lucide-react";
+import { Loader2, Bell, ArrowRight } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import EmployeeDashboard from "./employee-dashboard";
+import { Button } from "@/components/ui/button";
+import { useLocation } from "wouter";
 
 export default function DashboardPage() {
   const { user } = useAuth();
+  const [, setLocation] = useLocation();
   
   const { data: userOperatedWarehouses = [] } = useQuery<number[]>({
     queryKey: ["/api/users", user?.id, "operated-warehouses"],
@@ -33,6 +36,14 @@ export default function DashboardPage() {
   const { data: warehouseStats, isLoading: warehouseStatsLoading } = useQuery({
     queryKey: ["/api/warehouses/stats"],
   });
+
+  // Fetch pending approvals count for current user
+  const { data: pendingApprovals } = useQuery({
+    queryKey: ["/api/pending-approvals"],
+    enabled: !!user?.id && (user?.role === 'admin' || user?.role === 'manager'),
+  });
+
+  const pendingApprovalsCount = Array.isArray(pendingApprovals) ? pendingApprovals.length : 0;
   
   if (isLoading || warehouseStatsLoading) {
     return (
