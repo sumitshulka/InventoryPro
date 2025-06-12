@@ -33,7 +33,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Loader2, Plus, Edit, Trash2, Building2 } from "lucide-react";
+import { Loader2, Plus, Edit, Trash2, Building2, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 
@@ -187,10 +187,25 @@ export default function DepartmentsPage() {
             <p className="text-muted-foreground">Manage organizational departments and their managers</p>
           </div>
           {isAdmin && (
-            <Button onClick={() => setIsDialogOpen(true)}>
-              <Plus className="mr-2 h-4 w-4" />
-              Add Department
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={async () => {
+                  await queryClient.refetchQueries({ queryKey: ['/api/departments'] });
+                  toast({
+                    title: "Refreshed",
+                    description: "Departments table has been refreshed",
+                  });
+                }}
+              >
+                <RefreshCw className="h-4 w-4" />
+              </Button>
+              <Button onClick={() => setIsDialogOpen(true)}>
+                <Plus className="mr-2 h-4 w-4" />
+                Add Department
+              </Button>
+            </div>
           )}
         </div>
 

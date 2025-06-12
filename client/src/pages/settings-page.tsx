@@ -648,10 +648,25 @@ export default function SettingsPage() {
                     Configure approval requirements for different request types
                   </p>
                 </div>
-                <Button onClick={() => setIsDialogOpen(true)}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Setting
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={async () => {
+                      await queryClient.refetchQueries({ queryKey: ['/api/approval-settings'] });
+                      toast({
+                        title: "Refreshed",
+                        description: "Approval settings table has been refreshed",
+                      });
+                    }}
+                  >
+                    <RefreshCw className="h-4 w-4" />
+                  </Button>
+                  <Button onClick={() => setIsDialogOpen(true)}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Setting
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent>
                 {isLoading ? (
@@ -740,14 +755,29 @@ export default function SettingsPage() {
                     Manage organizational departments and assign users
                   </p>
                 </div>
-                <Button onClick={() => {
-                  setEditingDepartment(null);
-                  departmentForm.reset();
-                  setIsDepartmentDialogOpen(true);
-                }}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Department
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={async () => {
+                      await queryClient.refetchQueries({ queryKey: ['/api/departments'] });
+                      toast({
+                        title: "Refreshed",
+                        description: "Departments table has been refreshed",
+                      });
+                    }}
+                  >
+                    <RefreshCw className="h-4 w-4" />
+                  </Button>
+                  <Button onClick={() => {
+                    setEditingDepartment(null);
+                    departmentForm.reset();
+                    setIsDepartmentDialogOpen(true);
+                  }}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Department
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent>
                 {departmentsLoading ? (
