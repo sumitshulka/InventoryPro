@@ -3743,6 +3743,120 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Low Stock Report API
+  app.get("/api/reports/low-stock", async (req, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const { 
+        asOfDate = new Date().toISOString().split('T')[0],
+        warehouseId,
+        itemId, 
+        status,
+        categoryId
+      } = req.query;
+
+      // Get all necessary data
+      const allItems = await storage.getAllItems();
+      const allInventory = await storage.getAllInventory();
+      const allWarehouses = await storage.getAllWarehouses();
+      const allCategories = await storage.getAllCategories();
+      const allTransactions = await storage.getAllTransactions();
+
+      // Create maps for quick lookups
+      const itemMap = new Map();
+      allItems.forEach(item => itemMap.set(item.id, item));
+
+      const warehouseMap = new Map();
+      allWarehouses.forEach(warehouse => warehouseMap.set(warehouse.id, warehouse));
+
+      const categoryMap = new Map();
+      allCategories.forEach(category => categoryMap.set(category.id, category));
+
+      // Filter inventory based on criteria
+      let filteredInventory = allInventory.filter(inv => {
+        const item = itemMap.get(inv.itemId);
+        if (!item) return false;
+
+        // Check if stock is below minimum level
+        const isLowStock = inv.quantity < item.minStockLevel;
+        if (!isLowStock) return false;
+
+        // Apply filters
+        if (warehouseId && inv.warehouseId !== parseInt(warehouseId as string)) return false;
+        if (itemId && inv.itemId !== parseInt(itemId as string)) return false;
+        if (categoryId && item.categoryId !== parseInt(categoryId as string)) return false;
+
+        return true;
+      });
+
+      // Build low stock report data
+      const lowStockData = filteredInventory.map(inv => {
+        const item = itemMap.get(inv.itemId);
+        const warehouse = warehouseMap.get(inv.warehouseId);
+        const category = item.categoryId ? categoryMap.get(item.categoryId) : null;
+
+        const stockDifference = inv.quantity - item.minStockLevel;
+        const stockPercentage = Math.round((inv.quantity / item.minStockLevel) * 100);
+
+        // Determine status based on stock level
+        let itemStatus: 'critical' | 'low' | 'warning';
+        if (inv.quantity <= 0) {
+          itemStatus = 'critical';
+        } else if (stockPercentage <= 25) {
+          itemStatus = 'critical';
+        } else if (stockPercentage <= 50) {
+          itemStatus = 'low';
+        } else {
+          itemStatus = 'warning';
+        }
+
+        // Find last restock date from transactions
+        const itemTransactions = allTransactions
+          .filter(t => 
+            t.itemId === inv.itemId && 
+            t.destinationWarehouseId === inv.warehouseId &&
+            (t.transactionType === 'check-in' || t.transactionType === 'adjustment')
+          )
+          .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+        const lastRestockDate = itemTransactions.length > 0 ? itemTransactions[0].createdAt : null;
+
+        return {
+          id: inv.id,
+          itemId: inv.itemId,
+          itemName: item.name,
+          itemSku: item.sku,
+          warehouseId: inv.warehouseId,
+          warehouseName: warehouse?.name || 'Unknown',
+          currentQuantity: inv.quantity,
+          minStockLevel: item.minStockLevel,
+          unit: item.unit,
+          categoryName: category?.name,
+          stockDifference,
+          stockPercentage,
+          lastRestockDate,
+          status: itemStatus
+        };
+      });
+
+      // Apply status filter if specified
+      const finalData = status 
+        ? lowStockData.filter(item => item.status === status)
+        : lowStockData;
+
+      // Sort by most critical first (lowest stock percentage)
+      finalData.sort((a, b) => a.stockPercentage - b.stockPercentage);
+
+      res.json(finalData);
+    } catch (error: any) {
+      console.error('Low stock report error:', error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
