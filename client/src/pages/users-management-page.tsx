@@ -69,6 +69,7 @@ export default function UsersManagementPage() {
   const [editUserId, setEditUserId] = useState<number | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState<number | null>(null);
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
 
   const isAdmin = user?.role === "admin";
   const isManager = user?.role === "manager";
@@ -257,6 +258,13 @@ export default function UsersManagementPage() {
     toggleUserStatusMutation.mutate({ userId, isActive: !currentStatus });
   };
 
+  // Filter users based on status
+  const filteredUsers = (users as any[])?.filter((userData: any) => {
+    if (statusFilter === 'active') return userData.isActive;
+    if (statusFilter === 'inactive') return !userData.isActive;
+    return true; // 'all' shows all users
+  }) || [];
+
   if (isLoading) {
     return (
       <AppLayout>
@@ -318,10 +326,25 @@ export default function UsersManagementPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Users className="h-5 w-5" />
-              {isManager ? "Your Team Members" : "All Users"}
-            </CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                <Users className="h-5 w-5" />
+                {isManager ? "Your Team Members" : "All Users"}
+              </CardTitle>
+              <div className="flex items-center gap-2">
+                <label className="text-sm font-medium">Filter by status:</label>
+                <Select value={statusFilter} onValueChange={(value: 'all' | 'active' | 'inactive') => setStatusFilter(value)}>
+                  <SelectTrigger className="w-32">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Users</SelectItem>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="inactive">Inactive</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
             <div className="rounded-md border">
@@ -340,14 +363,16 @@ export default function UsersManagementPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {(users as any[])?.length === 0 ? (
+                  {filteredUsers.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={canEdit ? 9 : 8} className="text-center py-8 text-gray-500">
-                        {isManager ? "No subordinates assigned to you" : "No users found"}
+                        {statusFilter === 'active' ? "No active users found" :
+                         statusFilter === 'inactive' ? "No inactive users found" :
+                         isManager ? "No subordinates assigned to you" : "No users found"}
                       </TableCell>
                     </TableRow>
                   ) : (
-                    (users as any[])?.map((userData: any) => (
+                    filteredUsers.map((userData: any) => (
                       <TableRow key={userData.id}>
                         <TableCell className="font-medium">{userData.name}</TableCell>
                         <TableCell>{userData.username}</TableCell>
