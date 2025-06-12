@@ -220,6 +220,9 @@ export const transactions = pgTable("transactions", {
   requesterId: integer("requester_id"),
   status: text("status").notNull().default("completed"),
   cost: numeric("cost", { precision: 10, scale: 2 }),
+  rate: numeric("rate", { precision: 10, scale: 2 }),
+  supplierName: text("supplier_name"),
+  poNumber: text("po_number"),
   checkInDate: timestamp("check_in_date"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   completedAt: timestamp("completed_at"),
@@ -252,6 +255,12 @@ export const insertTransactionSchema = createInsertSchema(transactions)
       if (typeof arg === 'number') return arg.toString();
       return arg;
     }, z.string().optional()),
+    rate: z.preprocess((arg) => {
+      if (typeof arg === 'number') return arg.toString();
+      return arg;
+    }, z.string().optional()),
+    supplierName: z.string().optional(),
+    poNumber: z.string().optional(),
     checkInDate: z.preprocess((arg) => {
       if (typeof arg === 'string' || arg instanceof Date) return new Date(arg);
       return arg;

@@ -165,12 +165,11 @@ export default function CheckInPage() {
           quantity: parseInt(item.quantity),
           destinationWarehouseId: parseInt(values.destinationWarehouseId),
           requesterId: user?.id,
-          notes: values.notes || null,
           cost: item.cost ? parseFloat(item.cost) : null,
-          transactionDate: values.checkInDate.toISOString(),
-          purchaseOrderNumber: values.purchaseOrderNumber || null,
-          deliveryChallanNumber: values.deliveryChallanNumber || null,
+          rate: item.cost ? parseFloat(item.cost) : null,
+          poNumber: values.purchaseOrderNumber || null,
           supplierName: values.supplierName || null,
+          checkInDate: values.checkInDate.toISOString(),
           status: "completed"
         };
 
