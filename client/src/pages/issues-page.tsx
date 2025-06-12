@@ -259,11 +259,16 @@ export default function IssuesPage() {
   });
 
   const replyToNotificationMutation = useMutation({
-    mutationFn: async ({ id, message }: { id: number; message: string }) => {
-      return apiRequest('POST', `/api/notifications/${id}/reply`, { message });
+    mutationFn: async (data: z.infer<typeof replySchema> & { id: number }) => {
+      return apiRequest('POST', `/api/notifications/${data.id}/reply`, {
+        message: data.message,
+        priority: data.priority,
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/notifications'] });
+      setShowReplyDialog(false);
+      replyForm.reset();
       toast({
         title: "Success",
         description: "Reply sent successfully",
@@ -627,6 +632,12 @@ export default function IssuesPage() {
                                   <Badge variant="secondary" className="text-xs">
                                     {notification.category}
                                   </Badge>
+                                  {notification.isArchived && (
+                                    <Badge variant="secondary" className="text-xs bg-gray-200 text-gray-700">
+                                      <Archive className="h-3 w-3 mr-1" />
+                                      Archived
+                                    </Badge>
+                                  )}
                                 </div>
                                 <p className="text-gray-600 text-sm mb-2 line-clamp-2">{notification.message}</p>
                                 <div className="flex items-center gap-3 text-xs text-gray-500">
@@ -672,6 +683,11 @@ export default function IssuesPage() {
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     setSelectedNotification(notification);
+                                    setShowReplyDialog(true);
+                                    replyForm.reset({
+                                      message: "",
+                                      priority: "normal",
+                                    });
                                   }}
                                 >
                                   <Reply className="h-3 w-3" />
@@ -1236,6 +1252,81 @@ export default function IssuesPage() {
                   </Button>
                   <Button type="submit" disabled={createIssueMutation.isPending}>
                     {createIssueMutation.isPending ? "Creating..." : "Report Issue"}
+                  </Button>
+                </div>
+              </form>
+            </Form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Reply Dialog */}
+        <Dialog open={showReplyDialog} onOpenChange={setShowReplyDialog}>
+          <DialogContent className="sm:max-w-md" aria-describedby="reply-dialog-description">
+            <DialogHeader>
+              <DialogTitle>Reply to: {selectedNotification?.subject}</DialogTitle>
+              <div id="reply-dialog-description" className="text-sm text-gray-600">
+                Write your reply message below.
+              </div>
+            </DialogHeader>
+            <Form {...replyForm}>
+              <form 
+                onSubmit={replyForm.handleSubmit((data) => {
+                  if (selectedNotification) {
+                    replyToNotificationMutation.mutate({
+                      ...data,
+                      id: selectedNotification.id,
+                    });
+                  }
+                })} 
+                className="space-y-4"
+              >
+                <FormField
+                  control={replyForm.control}
+                  name="message"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Reply Message</FormLabel>
+                      <FormControl>
+                        <Textarea 
+                          {...field} 
+                          placeholder="Type your reply here..." 
+                          rows={6}
+                          className="min-h-[120px]"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={replyForm.control}
+                  name="priority"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Priority</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select priority" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="low">Low</SelectItem>
+                          <SelectItem value="normal">Normal</SelectItem>
+                          <SelectItem value="high">High</SelectItem>
+                          <SelectItem value="urgent">Urgent</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <div className="flex justify-end gap-2">
+                  <Button type="button" variant="outline" onClick={() => setShowReplyDialog(false)}>
+                    Cancel
+                  </Button>
+                  <Button type="submit" disabled={replyToNotificationMutation.isPending}>
+                    {replyToNotificationMutation.isPending ? "Sending..." : "Send Reply"}
                   </Button>
                 </div>
               </form>
