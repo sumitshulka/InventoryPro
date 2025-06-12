@@ -36,6 +36,8 @@ export const users = pgTable("users", {
   warehouseId: integer("warehouse_id"),
   departmentId: integer("department_id"),
   isWarehouseOperator: boolean("is_warehouse_operator").notNull().default(false),
+  resetToken: text("reset_token"),
+  resetTokenExpiry: text("reset_token_expiry"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   usersRoleIdx: index("users_role_idx").on(table.role),
@@ -45,6 +47,7 @@ export const users = pgTable("users", {
   usersWarehouseOperatorIdx: index("users_warehouse_operator_idx").on(table.isWarehouseOperator),
   usersEmailIdx: index("users_email_idx").on(table.email),
   usersCreatedAtIdx: index("users_created_at_idx").on(table.createdAt),
+  usersResetTokenIdx: index("users_reset_token_idx").on(table.resetToken),
 }));
 
 export const insertUserSchema = createInsertSchema(users).pick({
@@ -57,6 +60,8 @@ export const insertUserSchema = createInsertSchema(users).pick({
   warehouseId: true,
   departmentId: true,
   isWarehouseOperator: true,
+  resetToken: true,
+  resetTokenExpiry: true,
 });
 
 // Office Locations
