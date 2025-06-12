@@ -123,7 +123,9 @@ export default function DashboardPage() {
           icon="inventory_2"
           iconBgColor="bg-primary bg-opacity-10"
           iconColor="text-primary"
-          changeValue={12.5}
+          changeValue={dashboardData?.statistics?.totalItemsChange || 0}
+          changeDirection={dashboardData?.statistics?.totalItemsChange >= 0 ? "up" : "down"}
+          changeColor={dashboardData?.statistics?.totalItemsChange >= 0 ? "text-success" : "text-error"}
           changeText="vs last month"
         />
         <MetricCard
@@ -132,9 +134,9 @@ export default function DashboardPage() {
           icon="warning"
           iconBgColor="bg-warning bg-opacity-10"
           iconColor="text-warning"
-          changeValue={8.7}
-          changeDirection="up"
-          changeColor="text-error"
+          changeValue={Math.abs(dashboardData?.statistics?.lowStockChange || 0)}
+          changeDirection={dashboardData?.statistics?.lowStockChange >= 0 ? "up" : "down"}
+          changeColor={dashboardData?.statistics?.lowStockChange >= 0 ? "text-error" : "text-success"}
           changeText="vs last month"
         />
         <MetricCard
@@ -143,8 +145,9 @@ export default function DashboardPage() {
           icon="pending_actions"
           iconBgColor="bg-info bg-opacity-10"
           iconColor="text-info"
-          changeValue={4.3}
-          changeDirection="down"
+          changeValue={Math.abs(dashboardData?.statistics?.pendingRequestsChange || 0)}
+          changeDirection={dashboardData?.statistics?.pendingRequestsChange >= 0 ? "up" : "down"}
+          changeColor={dashboardData?.statistics?.pendingRequestsChange >= 0 ? "text-error" : "text-success"}
           changeText="vs last month"
         />
         <MetricCard
@@ -153,9 +156,9 @@ export default function DashboardPage() {
           icon="swap_horiz"
           iconBgColor="bg-secondary bg-opacity-10"
           iconColor="text-secondary"
-          changeValue={15.2}
-          changeDirection="up"
-          changeColor="text-error"
+          changeValue={Math.abs(dashboardData?.statistics?.activeTransfersChange || 0)}
+          changeDirection={dashboardData?.statistics?.activeTransfersChange >= 0 ? "up" : "down"}
+          changeColor={dashboardData?.statistics?.activeTransfersChange >= 0 ? "text-info" : "text-success"}
           changeText="vs last month"
         />
       </div>

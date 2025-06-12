@@ -1359,11 +1359,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get dashboard summary
   app.get("/api/dashboard/summary", async (req, res) => {
     try {
-      const totalItems = (await storage.getAllItems()).length;
+      // Get current date and last month date for comparisons
+      const now = new Date();
+      const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
+      const currentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
       
-      // Count low stock items
-      const allInventory = await storage.getAllInventory();
+      // Get all data needed for calculations
       const allItems = await storage.getAllItems();
+      const allInventory = await storage.getAllInventory();
+      const allTransactions = await storage.getAllTransactions();
+      const allRequests = await storage.getAllRequests();
+      
+      // Current metrics
+      const totalItems = allItems.length;
       
       const itemMap = new Map();
       allItems.forEach(item => {
@@ -1375,8 +1383,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return item && inv.quantity < item.minStockLevel;
       });
       
-      // Count pending requests
-      const pendingRequests = await storage.getRequestsByStatus('pending');
+      const pendingRequests = allRequests.filter(req => req.status === 'pending');
+      const activeTransfers = allTransactions.filter(t => 
+        t.transactionType === 'transfer' && t.status === 'in-transit'
+      );
+      
+      // Calculate historical data for comparisons
+      const lastMonthItems = allItems.filter(item => 
+        new Date(item.createdAt) < currentMonth
+      ).length;
+      
+      const lastMonthRequests = allRequests.filter(req => 
+        new Date(req.createdAt) >= lastMonth && 
+        new Date(req.createdAt) < currentMonth && 
+        req.status === 'pending'
+      ).length;
+      
+      const currentMonthRequests = allRequests.filter(req => 
+        new Date(req.createdAt) >= currentMonth && 
+        req.status === 'pending'
+      ).length;
+      
+      const lastMonthTransfers = allTransactions.filter(t => 
+        t.transactionType === 'transfer' && 
+        new Date(t.createdAt) >= lastMonth && 
+        new Date(t.createdAt) < currentMonth &&
+        t.status === 'in-transit'
+      ).length;
+      
+      // Calculate percentage changes
+      const calculateChange = (current: number, previous: number) => {
+        if (previous === 0) return current > 0 ? 100 : 0;
+        return Number(((current - previous) / previous * 100).toFixed(1));
+      };
+      
+      const totalItemsChange = calculateChange(totalItems, lastMonthItems);
+      const pendingRequestsChange = calculateChange(pendingRequests.length, lastMonthRequests);
+      const activeTransfersChange = calculateChange(activeTransfers.length, lastMonthTransfers);
+      
+      // Low stock items change (comparing current low stock vs last month's transactions indicating stock issues)
+      const lastMonthLowStockIndicator = allTransactions.filter(t => 
+        new Date(t.createdAt) >= lastMonth && 
+        new Date(t.createdAt) < currentMonth &&
+        t.transactionType === 'transfer' // Transfers often indicate stock shortages
+      ).length;
+      const lowStockChange = calculateChange(lowStockItems.length, lastMonthLowStockIndicator);
       
       // Get request items for pending requests to display correct item counts
       const pendingRequestsWithItems = await Promise.all(
@@ -1389,12 +1440,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         })
       );
       
-      // Count active transfers
-      const activeTransfers = (await storage.getAllTransactions())
-        .filter(t => t.transactionType === 'transfer' && t.status === 'in-transit');
-      
       // Get most recent transactions
-      let recentTransactions = await storage.getAllTransactions();
+      let recentTransactions = [...allTransactions];
       recentTransactions.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
       recentTransactions = recentTransactions.slice(0, 5);
       
@@ -1403,6 +1450,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         lowStockItemsCount: lowStockItems.length,
         pendingRequestsCount: pendingRequests.length,
         activeTransfersCount: activeTransfers.length,
+        
+        // Add comparative statistics
+        statistics: {
+          totalItemsChange,
+          lowStockChange,
+          pendingRequestsChange,
+          activeTransfersChange
+        },
+        
         recentTransactions,
         lowStockItems: lowStockItems.slice(0, 5).map(inv => ({
           ...inv,
