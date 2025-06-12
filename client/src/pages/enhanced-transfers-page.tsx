@@ -411,9 +411,18 @@ export default function EnhancedTransfersPage() {
                     variant="outline"
                     size="sm"
                     onClick={async () => {
+                      await queryClient.invalidateQueries({ queryKey: ['/api/transfers'] });
+                      await queryClient.invalidateQueries({ queryKey: ['/api/items'] });
+                      await queryClient.invalidateQueries({ queryKey: ['/api/warehouses'] });
+                      await queryClient.invalidateQueries({ queryKey: ['/api/users'] });
                       await queryClient.refetchQueries({ queryKey: ['/api/transfers'] });
                       await queryClient.refetchQueries({ queryKey: ['/api/items'] });
                       await queryClient.refetchQueries({ queryKey: ['/api/warehouses'] });
+                      await queryClient.refetchQueries({ queryKey: ['/api/users'] });
+                      toast({
+                        title: "Refreshed",
+                        description: "Transfers table has been refreshed",
+                      });
                     }}
                     className="ml-2"
                   >
