@@ -38,6 +38,8 @@ import {
   InsertRejectedGoods,
   Notification,
   InsertNotification,
+  AuditLog,
+  InsertAuditLog,
   users,
   departments,
   locations,
@@ -56,7 +58,8 @@ import {
   transferItems,
   transferUpdates,
   rejectedGoods,
-  notifications
+  notifications,
+  auditLogs
 } from "@shared/schema";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
@@ -248,6 +251,9 @@ export interface IStorage {
   deleteNotification(id: number): Promise<boolean>;
   getUnreadNotificationCount(recipientId: number): Promise<number>;
   cleanupArchivedNotifications(): Promise<number>;
+
+  // Audit Log operations
+  createAuditLog(auditLog: InsertAuditLog): Promise<AuditLog>;
 
   // Hierarchy and Approval Workflow helpers
   getUserManager(userId: number): Promise<User | undefined>;
@@ -2283,6 +2289,15 @@ export class DatabaseStorage implements IStorage {
       .returning();
 
     return closedResult.length + openResult.length;
+  }
+
+  // Audit Log operations
+  async createAuditLog(auditLog: InsertAuditLog): Promise<AuditLog> {
+    const [newAuditLog] = await db
+      .insert(auditLogs)
+      .values(auditLog)
+      .returning();
+    return newAuditLog;
   }
 }
 
