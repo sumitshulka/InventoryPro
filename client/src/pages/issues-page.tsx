@@ -268,6 +268,7 @@ export default function IssuesPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/notifications'] });
       setShowReplyDialog(false);
+      setSelectedNotification(null); // Close the notification detail modal
       replyForm.reset();
       toast({
         title: "Success",
@@ -638,6 +639,12 @@ export default function IssuesPage() {
                                       Archived
                                     </Badge>
                                   )}
+                                  {notification.status === 'replied' && (
+                                    <Badge variant="secondary" className="text-xs bg-green-100 text-green-700">
+                                      <CheckCircle className="h-3 w-3 mr-1" />
+                                      Replied
+                                    </Badge>
+                                  )}
                                 </div>
                                 <p className="text-gray-600 text-sm mb-2 line-clamp-2">{notification.message}</p>
                                 <div className="flex items-center gap-3 text-xs text-gray-500">
@@ -677,21 +684,23 @@ export default function IssuesPage() {
                                 >
                                   <Archive className="h-3 w-3" />
                                 </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setSelectedNotification(notification);
-                                    setShowReplyDialog(true);
-                                    replyForm.reset({
-                                      message: "",
-                                      priority: "normal",
-                                    });
-                                  }}
-                                >
-                                  <Reply className="h-3 w-3" />
-                                </Button>
+                                {notification.status !== 'replied' && notification.status !== 'closed' && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setSelectedNotification(notification);
+                                      setShowReplyDialog(true);
+                                      replyForm.reset({
+                                        message: "",
+                                        priority: "normal",
+                                      });
+                                    }}
+                                  >
+                                    <Reply className="h-3 w-3" />
+                                  </Button>
+                                )}
                               </div>
                             </div>
                           </CardContent>
