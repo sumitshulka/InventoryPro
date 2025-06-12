@@ -32,8 +32,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { apiRequest, queryClient, invalidateRelatedQueries } from "@/lib/queryClient";
-import { Loader2, Plus, Edit, MapPin, Trash2, RefreshCw } from "lucide-react";
+import { Loader2, Plus, Edit, MapPin, Trash2, RefreshCw, Archive } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { formatCapacity } from "@/lib/formatters";
@@ -66,12 +67,73 @@ type FormValues = {
   isActive: boolean;
 };
 
+// WarehouseCard component
+const WarehouseCard = ({ warehouse, locations, isAdmin, onEdit, isArchived = false }: {
+  warehouse: any;
+  locations: any;
+  isAdmin: boolean;
+  onEdit: (warehouse: any) => void;
+  isArchived?: boolean;
+}) => {
+  return (
+    <Card className="hover:shadow-md transition-shadow">
+      <CardContent className="p-6">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="font-medium text-gray-800">{warehouse.name}</h3>
+          <span className={`${warehouse.isActive ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"} text-xs px-2 py-1 rounded-full`}>
+            {warehouse.isActive ? "Active" : "Archived"}
+          </span>
+        </div>
+        <div className="flex items-center text-sm text-gray-600 mb-2">
+          <MapPin className="h-4 w-4 text-gray-500 mr-1" />
+          {(locations as any[])?.find((loc: any) => loc.id === warehouse.locationId)?.name || 'Location not found'}
+        </div>
+        <div className="flex items-center text-sm text-gray-600 mb-4">
+          <span className="material-icons text-gray-500 text-sm mr-1">person</span>
+          Manager: {warehouse.manager ? warehouse.manager.name : "Not assigned"}
+        </div>
+        {warehouse.capacityUsed !== undefined && (
+          <div className="mb-3">
+            <div className="flex items-center justify-between text-sm mb-1">
+              <span className="text-gray-600">Capacity Used</span>
+              <span className="font-medium">{warehouse.capacityUsed}%</span>
+            </div>
+            <div className="w-full h-2 bg-gray-200 rounded-full">
+              <div
+                className="h-2 bg-primary rounded-full"
+                style={{ width: `${warehouse.capacityUsed}%` }}
+              ></div>
+            </div>
+          </div>
+        )}
+        <div className="grid grid-cols-2 gap-2 text-center mt-4">
+          <div className="bg-gray-50 rounded p-2">
+            <p className="text-xs text-gray-500">Capacity</p>
+            <p className="font-medium">{formatCapacity(warehouse.capacity)}</p>
+          </div>
+          {isAdmin && (
+            <Button
+              variant="outline"
+              className="bg-gray-50 text-gray-600 hover:text-primary hover:bg-gray-100"
+              onClick={() => onEdit(warehouse)}
+            >
+              {isArchived ? <Archive className="h-4 w-4 mr-1" /> : <Edit className="h-4 w-4 mr-1" />}
+              {isArchived ? "Restore" : "Edit"}
+            </Button>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
+
 export default function WarehousesPage() {
   const { toast } = useToast();
   const { user } = useAuth();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [editWarehouseId, setEditWarehouseId] = useState<number | null>(null);
+  const [activeTab, setActiveTab] = useState("active");
 
   const { data: warehouses, isLoading } = useQuery({
     queryKey: ["/api/warehouses"],
@@ -84,6 +146,10 @@ export default function WarehousesPage() {
   const { data: users } = useQuery({
     queryKey: ["/api/users"],
   });
+
+  // Filter warehouses based on active status
+  const activeWarehouses = warehouses?.filter((warehouse: any) => warehouse.isActive) || [];
+  const archivedWarehouses = warehouses?.filter((warehouse: any) => !warehouse.isActive) || [];
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -229,58 +295,55 @@ export default function WarehousesPage() {
         )}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        {warehouses?.map((warehouse: any) => (
-          <Card key={warehouse.id} className="hover:shadow-md transition-shadow">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="font-medium text-gray-800">{warehouse.name}</h3>
-                <span className={`${warehouse.isActive ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"} text-xs px-2 py-1 rounded-full`}>
-                  {warehouse.isActive ? "Active" : "Inactive"}
-                </span>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="active">
+            Active Warehouses ({activeWarehouses.length})
+          </TabsTrigger>
+          <TabsTrigger value="archived">
+            Archived Warehouses ({archivedWarehouses.length})
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="active" className="mt-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {activeWarehouses.map((warehouse: any) => (
+              <WarehouseCard
+                key={warehouse.id}
+                warehouse={warehouse}
+                locations={locations}
+                isAdmin={isAdmin}
+                onEdit={handleEditWarehouse}
+              />
+            ))}
+            {activeWarehouses.length === 0 && (
+              <div className="col-span-full text-center py-8">
+                <p className="text-gray-500">No active warehouses found.</p>
               </div>
-              <div className="flex items-center text-sm text-gray-600 mb-2">
-                <MapPin className="h-4 w-4 text-gray-500 mr-1" />
-                {(locations as any[])?.find((loc: any) => loc.id === warehouse.locationId)?.name || 'Location not found'}
+            )}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="archived" className="mt-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {archivedWarehouses.map((warehouse: any) => (
+              <WarehouseCard
+                key={warehouse.id}
+                warehouse={warehouse}
+                locations={locations}
+                isAdmin={isAdmin}
+                onEdit={handleEditWarehouse}
+                isArchived={true}
+              />
+            ))}
+            {archivedWarehouses.length === 0 && (
+              <div className="col-span-full text-center py-8">
+                <p className="text-gray-500">No archived warehouses found.</p>
               </div>
-              <div className="flex items-center text-sm text-gray-600 mb-4">
-                <span className="material-icons text-gray-500 text-sm mr-1">person</span>
-                Manager: {warehouse.manager ? warehouse.manager.name : "Not assigned"}
-              </div>
-              {warehouse.capacityUsed !== undefined && (
-                <div className="mb-3">
-                  <div className="flex items-center justify-between text-sm mb-1">
-                    <span className="text-gray-600">Capacity Used</span>
-                    <span className="font-medium">{warehouse.capacityUsed}%</span>
-                  </div>
-                  <div className="w-full h-2 bg-gray-200 rounded-full">
-                    <div
-                      className="h-2 bg-primary rounded-full"
-                      style={{ width: `${warehouse.capacityUsed}%` }}
-                    ></div>
-                  </div>
-                </div>
-              )}
-              <div className="grid grid-cols-2 gap-2 text-center mt-4">
-                <div className="bg-gray-50 rounded p-2">
-                  <p className="text-xs text-gray-500">Capacity</p>
-                  <p className="font-medium">{formatCapacity(warehouse.capacity)}</p>
-                </div>
-                {isAdmin && (
-                  <Button
-                    variant="outline"
-                    className="bg-gray-50 text-gray-600 hover:text-primary hover:bg-gray-100"
-                    onClick={() => handleEditWarehouse(warehouse)}
-                  >
-                    <Edit className="h-4 w-4 mr-1" />
-                    Edit
-                  </Button>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+            )}
+          </div>
+        </TabsContent>
+      </Tabs>
 
       <Card>
         <CardHeader>
