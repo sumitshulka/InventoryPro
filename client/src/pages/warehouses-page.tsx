@@ -313,15 +313,39 @@ export default function WarehousesPage() {
   };
 
   const handleRefresh = async () => {
-    // Use page reload for reliable data refresh
-    window.location.reload();
+    // Clear cache and aggressively refetch all queries
+    queryClient.clear();
+    
+    // Immediately trigger fresh data fetch
+    await Promise.all([
+      queryClient.fetchQuery({ queryKey: ["/api/warehouses"], staleTime: 0 }),
+      queryClient.fetchQuery({ queryKey: ["/api/locations"], staleTime: 0 }),
+      queryClient.fetchQuery({ queryKey: ["/api/users"], staleTime: 0 }),
+      queryClient.fetchQuery({ queryKey: ["/api/reports/inventory-stock"], staleTime: 0 }),
+      queryClient.fetchQuery({ queryKey: ["/api/warehouses/stats"], staleTime: 0 }),
+    ]);
   };
 
   const performRefresh = async () => {
     setIsRefreshing(true);
-    
-    // For immediate visual feedback, use browser refresh
-    window.location.reload();
+    try {
+      // Clear all cached data first
+      queryClient.clear();
+      
+      // Force fresh fetch of all warehouse-related data
+      await Promise.all([
+        queryClient.fetchQuery({ queryKey: ["/api/warehouses"], staleTime: 0 }),
+        queryClient.fetchQuery({ queryKey: ["/api/locations"], staleTime: 0 }),
+        queryClient.fetchQuery({ queryKey: ["/api/users"], staleTime: 0 }),
+        queryClient.fetchQuery({ queryKey: ["/api/reports/inventory-stock"], staleTime: 0 }),
+        queryClient.fetchQuery({ queryKey: ["/api/warehouses/stats"], staleTime: 0 }),
+      ]);
+      
+      // Allow brief moment for UI state update
+      await new Promise(resolve => setTimeout(resolve, 300));
+    } finally {
+      setIsRefreshing(false);
+    }
   };
 
   const handleSubmit = (values: FormValues) => {
