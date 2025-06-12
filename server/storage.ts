@@ -2293,8 +2293,7 @@ export class DatabaseStorage implements IStorage {
     const returnTransfer = await this.createTransfer({
       sourceWarehouseId: rejectedGoods.warehouseId,
       destinationWarehouseId: originalTransfer.sourceWarehouseId,
-      requesterId: rejectedGoods.rejectedBy,
-      priority: 'medium',
+      initiatedBy: rejectedGoods.rejectedBy,
       expectedShipmentDate: new Date(),
       expectedArrivalDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000), // 3 days
       notes: `Return of rejected goods - Reason: ${rejectedGoods.rejectionReason}`,
@@ -2305,7 +2304,7 @@ export class DatabaseStorage implements IStorage {
     await this.createTransferItem({
       transferId: returnTransfer.id,
       itemId: rejectedGoods.itemId,
-      quantity: rejectedGoods.quantity,
+      requestedQuantity: rejectedGoods.quantity,
       notes: `Returned rejected goods`
     });
 
@@ -2318,7 +2317,6 @@ export class DatabaseStorage implements IStorage {
       destinationWarehouseId: originalTransfer.sourceWarehouseId,
       userId: rejectedGoods.rejectedBy,
       status: 'completed',
-      notes: `Returned rejected goods to source warehouse - Reason: ${rejectedGoods.rejectionReason}`,
       rate: '0' // No cost for returns
     });
 
@@ -2347,7 +2345,6 @@ export class DatabaseStorage implements IStorage {
       destinationWarehouseId: null,
       userId: rejectedGoods.rejectedBy,
       status: 'completed',
-      notes: `Disposed rejected goods - Reason: ${rejectedGoods.rejectionReason}`,
       rate: '0' // No recovery value for disposed goods
     });
     
