@@ -8,6 +8,13 @@
       "when": 1749645866612,
       "tag": "0000_omniscient_inhumans",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1749708476474,
+      "tag": "0001_massive_power_man",
+      "breakpoints": true
     }
   ]
 }

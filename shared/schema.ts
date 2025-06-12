@@ -184,6 +184,11 @@ export const inventory = pgTable("inventory", {
 }, (table) => {
   return {
     itemWarehouseUnique: unique().on(table.itemId, table.warehouseId),
+    inventoryItemIdx: index("inventory_item_idx").on(table.itemId),
+    inventoryWarehouseIdx: index("inventory_warehouse_idx").on(table.warehouseId),
+    inventoryQuantityIdx: index("inventory_quantity_idx").on(table.quantity),
+    inventoryLastUpdatedIdx: index("inventory_last_updated_idx").on(table.lastUpdated),
+    inventoryItemWarehouseIdx: index("inventory_item_warehouse_idx").on(table.itemId, table.warehouseId),
   };
 });
 
@@ -213,7 +218,21 @@ export const transactions = pgTable("transactions", {
   checkInDate: timestamp("check_in_date"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   completedAt: timestamp("completed_at"),
-});
+}, (table) => ({
+  transactionsItemIdx: index("transactions_item_idx").on(table.itemId),
+  transactionsTypeIdx: index("transactions_type_idx").on(table.transactionType),
+  transactionsUserIdx: index("transactions_user_idx").on(table.userId),
+  transactionsRequesterIdx: index("transactions_requester_idx").on(table.requesterId),
+  transactionsSourceWarehouseIdx: index("transactions_source_warehouse_idx").on(table.sourceWarehouseId),
+  transactionsDestWarehouseIdx: index("transactions_dest_warehouse_idx").on(table.destinationWarehouseId),
+  transactionsRequestIdx: index("transactions_request_idx").on(table.requestId),
+  transactionsStatusIdx: index("transactions_status_idx").on(table.status),
+  transactionsCreatedAtIdx: index("transactions_created_at_idx").on(table.createdAt),
+  transactionsCompletedAtIdx: index("transactions_completed_at_idx").on(table.completedAt),
+  transactionsCheckInDateIdx: index("transactions_check_in_date_idx").on(table.checkInDate),
+  transactionsTypeUserIdx: index("transactions_type_user_idx").on(table.transactionType, table.userId),
+  transactionsItemWarehouseIdx: index("transactions_item_warehouse_idx").on(table.itemId, table.sourceWarehouseId),
+}));
 
 export const insertTransactionSchema = createInsertSchema(transactions)
   .omit({
@@ -251,7 +270,17 @@ export const requests = pgTable("requests", {
   submittedAt: timestamp("submitted_at").defaultNow().notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at"),
-});
+}, (table) => ({
+  requestsUserIdx: index("requests_user_idx").on(table.userId),
+  requestsWarehouseIdx: index("requests_warehouse_idx").on(table.warehouseId),
+  requestsStatusIdx: index("requests_status_idx").on(table.status),
+  requestsPriorityIdx: index("requests_priority_idx").on(table.priority),
+  requestsSubmittedAtIdx: index("requests_submitted_at_idx").on(table.submittedAt),
+  requestsCreatedAtIdx: index("requests_created_at_idx").on(table.createdAt),
+  requestsUpdatedAtIdx: index("requests_updated_at_idx").on(table.updatedAt),
+  requestsUserStatusIdx: index("requests_user_status_idx").on(table.userId, table.status),
+  requestsWarehouseStatusIdx: index("requests_warehouse_status_idx").on(table.warehouseId, table.status),
+}));
 
 export const insertRequestSchema = createInsertSchema(requests).omit({
   id: true,
@@ -266,7 +295,11 @@ export const requestItems = pgTable("request_items", {
   requestId: integer("request_id").notNull(),
   itemId: integer("item_id").notNull(),
   quantity: integer("quantity").notNull(),
-});
+}, (table) => ({
+  requestItemsRequestIdx: index("request_items_request_idx").on(table.requestId),
+  requestItemsItemIdx: index("request_items_item_idx").on(table.itemId),
+  requestItemsRequestItemIdx: index("request_items_request_item_idx").on(table.requestId, table.itemId),
+}));
 
 export const insertRequestItemSchema = createInsertSchema(requestItems).omit({
   id: true,
