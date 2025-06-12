@@ -63,23 +63,45 @@ export default function RejectedGoodsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status, notes }),
       });
-      if (!response.ok) throw new Error('Failed to update status');
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to update status');
+      }
       return response.json();
     },
     onSuccess: () => {
+      // Invalidate multiple cache keys to ensure data consistency
       queryClient.invalidateQueries({ queryKey: ['/api/rejected-goods'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/inventory'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/transfers'] });
+      
+      const actionLabels = {
+        'restocked': 'restocked into warehouse inventory',
+        'returned': 'returned to source warehouse',
+        'disposed': 'marked as disposed'
+      };
+      
       toast({
-        title: "Status Updated",
-        description: "Rejected goods status has been updated successfully.",
+        title: "Action Completed Successfully",
+        description: `The rejected goods have been ${actionLabels[actionType as keyof typeof actionLabels] || 'updated'}.`,
       });
       setActionDialogOpen(false);
       setSelectedItem(null);
       setActionNotes('');
     },
-    onError: () => {
+    onError: (error: Error) => {
+      let userMessage = error.message;
+      
+      if (error.message.includes("Original transfer not found")) {
+        userMessage = "Cannot return goods - the original transfer information is missing.";
+      } else if (error.message.includes("Rejected goods record not found")) {
+        userMessage = "The rejected goods record was not found.";
+      }
+      
       toast({
-        title: "Error",
-        description: "Failed to update rejected goods status.",
+        title: "Action Failed",
+        description: userMessage,
         variant: "destructive",
       });
     },

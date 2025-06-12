@@ -2226,11 +2226,133 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateRejectedGoods(id: number, rejectedGoodsData: Partial<InsertRejectedGoods>): Promise<RejectedGoods | undefined> {
+    // Get the current rejected goods record to access its data
+    const existingRejectedGoods = await this.getRejectedGoods(id);
+    if (!existingRejectedGoods) {
+      throw new Error("Rejected goods record not found");
+    }
+
+    // Handle inventory updates based on the new status
+    if (rejectedGoodsData.status) {
+      await this.handleRejectedGoodsStatusChange(existingRejectedGoods, rejectedGoodsData.status);
+    }
+
     const [updatedRejectedGoods] = await db.update(rejectedGoods)
       .set(rejectedGoodsData)
       .where(eq(rejectedGoods.id, id))
       .returning();
     return updatedRejectedGoods || undefined;
+  }
+
+  // Handle inventory and transaction updates for rejected goods status changes
+  async handleRejectedGoodsStatusChange(rejectedGoods: RejectedGoods, newStatus: string): Promise<void> {
+    switch (newStatus) {
+      case 'restocked':
+        await this.handleRestockAction(rejectedGoods);
+        break;
+      case 'returned':
+        await this.handleReturnAction(rejectedGoods);
+        break;
+      case 'disposed':
+        await this.handleDisposeAction(rejectedGoods);
+        break;
+    }
+  }
+
+  // Handle restock action - add quantity back to current warehouse inventory
+  async handleRestockAction(rejectedGoods: RejectedGoods): Promise<void> {
+    // Add quantity back to the warehouse where it was rejected
+    await this.updateInventoryQuantity(
+      rejectedGoods.itemId,
+      rejectedGoods.warehouseId,
+      rejectedGoods.quantity
+    );
+
+    // Create a transaction record for the restock
+    await this.createTransaction({
+      transactionType: 'adjustment',
+      itemId: rejectedGoods.itemId,
+      quantity: rejectedGoods.quantity,
+      sourceWarehouseId: null,
+      destinationWarehouseId: rejectedGoods.warehouseId,
+      userId: rejectedGoods.rejectedBy,
+      status: 'completed',
+      rate: '0' // No cost for restocking rejected goods
+    });
+  }
+
+  // Handle return action - create reverse transfer back to source warehouse
+  async handleReturnAction(rejectedGoods: RejectedGoods): Promise<void> {
+    // Get the original transfer to find source warehouse
+    const originalTransfer = await this.getTransfer(rejectedGoods.transferId);
+    if (!originalTransfer) {
+      throw new Error("Original transfer not found for return");
+    }
+
+    // Create a return transfer from current warehouse back to source
+    const returnTransfer = await this.createTransfer({
+      sourceWarehouseId: rejectedGoods.warehouseId,
+      destinationWarehouseId: originalTransfer.sourceWarehouseId,
+      requesterId: rejectedGoods.rejectedBy,
+      priority: 'medium',
+      expectedShipmentDate: new Date(),
+      expectedArrivalDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000), // 3 days
+      notes: `Return of rejected goods - Reason: ${rejectedGoods.rejectionReason}`,
+      status: 'approved' // Auto-approve return transfers
+    });
+
+    // Create transfer item for the returned goods
+    await this.createTransferItem({
+      transferId: returnTransfer.id,
+      itemId: rejectedGoods.itemId,
+      quantity: rejectedGoods.quantity,
+      notes: `Returned rejected goods`
+    });
+
+    // Create transaction record for the return
+    await this.createTransaction({
+      transactionType: 'transfer',
+      itemId: rejectedGoods.itemId,
+      quantity: rejectedGoods.quantity,
+      sourceWarehouseId: rejectedGoods.warehouseId,
+      destinationWarehouseId: originalTransfer.sourceWarehouseId,
+      userId: rejectedGoods.rejectedBy,
+      status: 'completed',
+      notes: `Returned rejected goods to source warehouse - Reason: ${rejectedGoods.rejectionReason}`,
+      rate: '0' // No cost for returns
+    });
+
+    // Update inventory: remove from current warehouse, add to source warehouse
+    await this.updateInventoryQuantity(
+      rejectedGoods.itemId,
+      rejectedGoods.warehouseId,
+      -rejectedGoods.quantity
+    );
+    
+    await this.updateInventoryQuantity(
+      rejectedGoods.itemId,
+      originalTransfer.sourceWarehouseId,
+      rejectedGoods.quantity
+    );
+  }
+
+  // Handle dispose action - create disposal transaction record
+  async handleDisposeAction(rejectedGoods: RejectedGoods): Promise<void> {
+    // Create a transaction record for the disposal
+    await this.createTransaction({
+      transactionType: 'adjustment',
+      itemId: rejectedGoods.itemId,
+      quantity: -rejectedGoods.quantity, // Negative quantity for disposal
+      sourceWarehouseId: rejectedGoods.warehouseId,
+      destinationWarehouseId: null,
+      userId: rejectedGoods.rejectedBy,
+      status: 'completed',
+      notes: `Disposed rejected goods - Reason: ${rejectedGoods.rejectionReason}`,
+      rate: '0' // No recovery value for disposed goods
+    });
+    
+    // Note: We don't remove from inventory as rejected goods were never added to inventory
+    // They were rejected during transfer and never entered the destination warehouse inventory
   }
 
   async deleteRejectedGoods(id: number): Promise<boolean> {
