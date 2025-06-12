@@ -216,6 +216,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log("Clean user data for update:", JSON.stringify(cleanUserData, null, 2));
       
+      // Validate warehouse manager assignments - check if any warehouses are being managed by this user
+      if (cleanUserData.warehouseId !== undefined) {
+        const allWarehouses = await storage.getAllWarehouses();
+        const managedWarehouses = allWarehouses.filter(w => w.managerId === userId);
+        
+        // Check if any managed warehouses would become invalid with the new assignment
+        for (const warehouse of managedWarehouses) {
+          if (warehouse.id !== cleanUserData.warehouseId) {
+            return res.status(400).json({ 
+              message: `Cannot change warehouse assignment. User manages ${warehouse.name} but would no longer be assigned to it. A user can only manage warehouses they are assigned to.` 
+            });
+          }
+        }
+      }
+      
       const updatedUser = await storage.updateUser(userId, cleanUserData);
       if (!updatedUser) {
         return res.status(404).json({ message: "User not found" });
@@ -2017,6 +2032,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const warehouseId = parseInt(req.params.id);
       const { managerId } = req.body;
+      
+      // Validate that the manager is assigned to this warehouse
+      if (managerId) {
+        const manager = await storage.getUser(managerId);
+        if (!manager) {
+          return res.status(400).json({ message: "Manager user not found" });
+        }
+        
+        if (manager.warehouseId !== warehouseId) {
+          return res.status(400).json({ 
+            message: "Cannot assign user as warehouse manager. User must be assigned to this warehouse as their default warehouse." 
+          });
+        }
+      }
       
       const updatedWarehouse = await storage.updateWarehouse(warehouseId, { managerId });
       if (!updatedWarehouse) {
