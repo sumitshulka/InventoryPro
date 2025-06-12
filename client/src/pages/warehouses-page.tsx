@@ -283,8 +283,13 @@ export default function WarehousesPage() {
               size="sm"
               onClick={async () => {
                 await queryClient.refetchQueries({ queryKey: ['/api/warehouses'] });
+                await queryClient.refetchQueries({ queryKey: ['/api/warehouses/stats'] });
                 await queryClient.refetchQueries({ queryKey: ['/api/locations'] });
                 await queryClient.refetchQueries({ queryKey: ['/api/users'] });
+                toast({
+                  title: "Refreshed",
+                  description: "Warehouses table has been refreshed",
+                });
               }}
               className="ml-2"
             >
