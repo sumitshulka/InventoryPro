@@ -1469,6 +1469,36 @@ export default function SettingsPage() {
                         )}
                       </div>
 
+                      {emailForm.watch("provider") === "outlook" && (
+                        <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                          <h4 className="font-medium text-blue-900 mb-2">Outlook/Office365 Setup</h4>
+                          <p className="text-sm text-blue-800 mb-2">
+                            For Outlook/Office365 accounts, you need to use an App Password instead of your regular password:
+                          </p>
+                          <ol className="text-sm text-blue-800 list-decimal list-inside space-y-1">
+                            <li>Go to Microsoft Account Security settings</li>
+                            <li>Enable Two-Factor Authentication if not already enabled</li>
+                            <li>Generate an App Password for "Mail" applications</li>
+                            <li>Use this App Password in the password field above</li>
+                          </ol>
+                        </div>
+                      )}
+
+                      {emailForm.watch("provider") === "gmail" && (
+                        <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
+                          <h4 className="font-medium text-yellow-900 mb-2">Gmail Setup</h4>
+                          <p className="text-sm text-yellow-800 mb-2">
+                            For Gmail accounts, you need to use an App Password:
+                          </p>
+                          <ol className="text-sm text-yellow-800 list-decimal list-inside space-y-1">
+                            <li>Enable 2-Step Verification in your Google Account</li>
+                            <li>Go to Google Account settings &gt; Security &gt; App passwords</li>
+                            <li>Generate an App password for "Mail"</li>
+                            <li>Use this 16-character App Password in the password field</li>
+                          </ol>
+                        </div>
+                      )}
+
                       <div className="flex space-x-4">
                         <Button
                           type="button"

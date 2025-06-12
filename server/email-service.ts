@@ -46,10 +46,17 @@ export class EmailService {
         
       case 'outlook':
         this.transporter = nodemailer.createTransport({
-          service: 'hotmail',
+          host: 'smtp-mail.outlook.com',
+          port: 587,
+          secure: false,
+          requireTLS: true,
           auth: {
             user: settings.username!,
             pass: settings.password!,
+          },
+          tls: {
+            ciphers: 'SSLv3',
+            rejectUnauthorized: false,
           },
         });
         break;
@@ -99,9 +106,25 @@ export class EmailService {
     try {
       await this.transporter.verify();
       return true;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Email connection test failed:', error);
-      return false;
+      
+      // Provide more specific error messages
+      if (error.code === 'EAUTH') {
+        if (error.response?.includes('basic authentication is disabled')) {
+          throw new Error('Basic authentication is disabled for this email provider. For Outlook/Office365, you need to use an App Password instead of your regular password. Please generate an App Password from your account settings and use that instead.');
+        } else if (error.response?.includes('Username and Password not accepted')) {
+          throw new Error('Invalid username or password. Please check your credentials and try again.');
+        } else {
+          throw new Error('Authentication failed. Please verify your username and password are correct.');
+        }
+      } else if (error.code === 'ENOTFOUND') {
+        throw new Error('SMTP server not found. Please check the host address.');
+      } else if (error.code === 'ECONNECTION') {
+        throw new Error('Unable to connect to SMTP server. Please check the host and port settings.');
+      } else {
+        throw new Error(`Email connection failed: ${error.message}`);
+      }
     }
   }
 
