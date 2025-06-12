@@ -80,8 +80,8 @@ const WarehouseCard = ({ warehouse, locations, isAdmin, onEdit, isArchived = fal
       <CardContent className="p-6">
         <div className="flex items-center justify-between mb-3">
           <h3 className="font-medium text-gray-800">{warehouse.name}</h3>
-          <span className={`${warehouse.isActive ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"} text-xs px-2 py-1 rounded-full`}>
-            {warehouse.isActive ? "Active" : "Archived"}
+          <span className={`${warehouse.status !== 'deleted' ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"} text-xs px-2 py-1 rounded-full`}>
+            {warehouse.status !== 'deleted' ? "Active" : "Archived"}
           </span>
         </div>
         <div className="flex items-center text-sm text-gray-600 mb-2">
@@ -147,9 +147,9 @@ export default function WarehousesPage() {
     queryKey: ["/api/users"],
   });
 
-  // Filter warehouses based on active status
-  const activeWarehouses = warehouses?.filter((warehouse: any) => warehouse.isActive) || [];
-  const archivedWarehouses = warehouses?.filter((warehouse: any) => !warehouse.isActive) || [];
+  // Filter warehouses based on archive status
+  const activeWarehouses = warehouses?.filter((warehouse: any) => warehouse.status !== 'deleted') || [];
+  const archivedWarehouses = warehouses?.filter((warehouse: any) => warehouse.status === 'deleted') || [];
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
