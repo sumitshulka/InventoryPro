@@ -923,11 +923,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(403).json({ message: "Forbidden" });
     }
     
+    // Get user name for the request
+    const user = await storage.getUser(request.userId);
+    
     // Get items in request
     const requestItems = await storage.getRequestItemsByRequest(requestId);
     
     res.json({
       ...request,
+      userName: user?.name || 'Unknown User',
+      userRole: user?.role || 'unknown',
       items: requestItems
     });
   });

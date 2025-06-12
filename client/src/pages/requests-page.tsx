@@ -578,7 +578,7 @@ export default function RequestsPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <h4 className="text-sm font-medium text-gray-500">Requested By</h4>
-                  <p className="text-gray-900">{getUserName(selectedRequest.userId)}</p>
+                  <p className="text-gray-900">{getUserName(selectedRequest.userId, selectedRequest)}</p>
                 </div>
                 <div>
                   <h4 className="text-sm font-medium text-gray-500">Destination Warehouse</h4>
