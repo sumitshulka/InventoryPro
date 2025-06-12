@@ -1084,8 +1084,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
           }
         } else if (req.user!.role === "manager") {
-          // Managers need admin approval for high priority requests
-          if (request.priority === "high") {
+          // Managers need approval from their own manager
+          const manager = await storage.getUserManager(req.user!.id);
+          if (manager) {
+            await storage.createRequestApproval({
+              requestId: request.id,
+              approverId: manager.id,
+              approvalLevel: manager.role === "admin" ? "admin" : "manager",
+              status: "pending"
+            });
+          } else {
+            // If no manager assigned, require admin approval
             const admins = await storage.getAllUsers();
             const adminUser = admins.find(u => u.role === "admin");
             if (adminUser) {
