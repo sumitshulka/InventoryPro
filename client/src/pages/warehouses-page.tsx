@@ -315,6 +315,17 @@ export default function WarehousesPage() {
     restoreWarehouseMutation.mutate(warehouseId);
   };
 
+  const handleRefresh = async () => {
+    // Invalidate all related queries to force a complete refresh
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["/api/warehouses"] }),
+      queryClient.invalidateQueries({ queryKey: ["/api/locations"] }),
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] }),
+      queryClient.invalidateQueries({ queryKey: ["/api/reports/inventory-stock"] }),
+      queryClient.invalidateQueries({ queryKey: ["/api/warehouses/stats"] }),
+    ]);
+  };
+
   const handleSubmit = (values: FormValues) => {
     createWarehouseMutation.mutate(values);
   };
@@ -382,11 +393,10 @@ export default function WarehousesPage() {
                   variant="outline"
                   size="sm"
                   onClick={async () => {
-                    await queryClient.invalidateQueries({ queryKey: ['/api/warehouses'] });
-                    await queryClient.refetchQueries({ queryKey: ['/api/warehouses'] });
+                    await handleRefresh();
                     toast({
-                      title: "Refreshed",
-                      description: "Active warehouses table has been refreshed",
+                      title: "Data Refreshed",
+                      description: "All warehouse data has been reloaded successfully",
                     });
                   }}
                   className="ml-2"
@@ -515,11 +525,10 @@ export default function WarehousesPage() {
                   variant="outline"
                   size="sm"
                   onClick={async () => {
-                    await queryClient.invalidateQueries({ queryKey: ['/api/warehouses'] });
-                    await queryClient.refetchQueries({ queryKey: ['/api/warehouses'] });
+                    await handleRefresh();
                     toast({
-                      title: "Refreshed",
-                      description: "Archived warehouses table has been refreshed",
+                      title: "Data Refreshed",
+                      description: "All warehouse data has been reloaded successfully",
                     });
                   }}
                   className="ml-2"
