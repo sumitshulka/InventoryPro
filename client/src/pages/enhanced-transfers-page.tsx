@@ -197,19 +197,19 @@ export default function EnhancedTransfersPage() {
 
       return response.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/transfers"] });
+    onSuccess: async () => {
+      // Force immediate cache invalidation and refetch
+      await queryClient.invalidateQueries({ queryKey: ["/api/transfers"] });
+      await queryClient.invalidateQueries({ queryKey: ["/api/items"] });
+      await queryClient.invalidateQueries({ queryKey: ["/api/warehouses"] });
+      await queryClient.refetchQueries({ queryKey: ["/api/transfers"], type: 'active' });
+      
       setIsDialogOpen(false);
       form.reset();
       toast({
         title: "Success",
         description: "Transfer created successfully",
       });
-      
-      // Auto-refresh after 2 seconds to ensure table is updated
-      setTimeout(() => {
-        queryClient.invalidateQueries({ queryKey: ["/api/transfers"] });
-      }, 2000);
     },
     onError: (error: any) => {
       toast({
@@ -234,17 +234,17 @@ export default function EnhancedTransfersPage() {
 
       return response.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/transfers"] });
+    onSuccess: async () => {
+      // Force immediate cache invalidation and refetch
+      await queryClient.invalidateQueries({ queryKey: ["/api/transfers"] });
+      await queryClient.invalidateQueries({ queryKey: ["/api/items"] });
+      await queryClient.invalidateQueries({ queryKey: ["/api/warehouses"] });
+      await queryClient.refetchQueries({ queryKey: ["/api/transfers"], type: 'active' });
+      
       toast({
         title: "Success",
         description: "Transfer updated successfully",
       });
-      
-      // Auto-refresh after 2 seconds to ensure table is updated
-      setTimeout(() => {
-        queryClient.invalidateQueries({ queryKey: ["/api/transfers"] });
-      }, 2000);
     },
     onError: (error: any) => {
       toast({
@@ -411,18 +411,33 @@ export default function EnhancedTransfersPage() {
                     variant="outline"
                     size="sm"
                     onClick={async () => {
-                      await queryClient.invalidateQueries({ queryKey: ['/api/transfers'] });
-                      await queryClient.invalidateQueries({ queryKey: ['/api/items'] });
-                      await queryClient.invalidateQueries({ queryKey: ['/api/warehouses'] });
-                      await queryClient.invalidateQueries({ queryKey: ['/api/users'] });
-                      await queryClient.refetchQueries({ queryKey: ['/api/transfers'] });
-                      await queryClient.refetchQueries({ queryKey: ['/api/items'] });
-                      await queryClient.refetchQueries({ queryKey: ['/api/warehouses'] });
-                      await queryClient.refetchQueries({ queryKey: ['/api/users'] });
-                      toast({
-                        title: "Refreshed",
-                        description: "Transfers table has been refreshed",
-                      });
+                      try {
+                        // Clear all relevant query caches
+                        await queryClient.invalidateQueries({ queryKey: ['/api/transfers'] });
+                        await queryClient.invalidateQueries({ queryKey: ['/api/items'] });
+                        await queryClient.invalidateQueries({ queryKey: ['/api/warehouses'] });
+                        await queryClient.invalidateQueries({ queryKey: ['/api/users'] });
+                        
+                        // Force fresh data fetch
+                        await Promise.all([
+                          queryClient.refetchQueries({ queryKey: ['/api/transfers'], type: 'active' }),
+                          queryClient.refetchQueries({ queryKey: ['/api/items'], type: 'active' }),
+                          queryClient.refetchQueries({ queryKey: ['/api/warehouses'], type: 'active' }),
+                          queryClient.refetchQueries({ queryKey: ['/api/users'], type: 'active' })
+                        ]);
+                        
+                        toast({
+                          title: "Refreshed",
+                          description: "Transfers table has been refreshed with latest data",
+                        });
+                      } catch (error) {
+                        console.error('Refresh error:', error);
+                        toast({
+                          title: "Refresh Failed",
+                          description: "Unable to refresh data. Please try again.",
+                          variant: "destructive",
+                        });
+                      }
                     }}
                     className="ml-2"
                   >
