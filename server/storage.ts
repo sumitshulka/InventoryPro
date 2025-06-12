@@ -2308,6 +2308,59 @@ export class DatabaseStorage implements IStorage {
     return closedResult.length + openResult.length;
   }
 
+  // Email Settings operations
+  async getEmailSettings(): Promise<EmailSettings | undefined> {
+    const result = await db.select().from(emailSettings).limit(1);
+    return result[0];
+  }
+
+  async createEmailSettings(settings: InsertEmailSettings): Promise<EmailSettings> {
+    // First deactivate any existing settings
+    await db.update(emailSettings).set({ isActive: false });
+    
+    const [newSettings] = await db.insert(emailSettings).values({
+      ...settings,
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    }).returning();
+    return newSettings;
+  }
+
+  async updateEmailSettings(id: number, settings: Partial<InsertEmailSettings>): Promise<EmailSettings | undefined> {
+    const [updatedSettings] = await db.update(emailSettings)
+      .set({ ...settings, updatedAt: new Date() })
+      .where(eq(emailSettings.id, id))
+      .returning();
+    return updatedSettings;
+  }
+
+  async deleteEmailSettings(id: number): Promise<boolean> {
+    const [deleted] = await db.delete(emailSettings)
+      .where(eq(emailSettings.id, id))
+      .returning();
+    return !!deleted;
+  }
+
+  async getActiveEmailSettings(): Promise<EmailSettings | undefined> {
+    const result = await db.select().from(emailSettings)
+      .where(eq(emailSettings.isActive, true))
+      .limit(1);
+    return result[0];
+  }
+
+  async markEmailSettingsAsVerified(id: number): Promise<EmailSettings | undefined> {
+    const [updatedSettings] = await db.update(emailSettings)
+      .set({ 
+        isVerified: true, 
+        lastTestedAt: new Date(),
+        updatedAt: new Date()
+      })
+      .where(eq(emailSettings.id, id))
+      .returning();
+    return updatedSettings;
+  }
+
   // Audit Log operations
   async createAuditLog(auditLog: InsertAuditLog): Promise<AuditLog> {
     const [newAuditLog] = await db

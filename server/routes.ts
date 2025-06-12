@@ -19,6 +19,7 @@ import {
   insertTransferItemSchema,
   insertTransferUpdateSchema,
   insertNotificationSchema,
+  insertEmailSettingsSchema,
   departments,
   organizationSettings,
   users,
