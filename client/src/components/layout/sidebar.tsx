@@ -51,10 +51,20 @@ export default function Sidebar({ user, isOpen, onClose }: SidebarProps) {
           {/* Header */}
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center">
-              <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center mr-3">
-                <span className="text-white font-bold text-sm">
-                  {(organizationSettings as any)?.organizationName?.charAt(0) || 'I'}
-                </span>
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center mr-3">
+                {(organizationSettings as any)?.logo ? (
+                  <img 
+                    src={(organizationSettings as any).logo} 
+                    alt="Company Logo" 
+                    className="w-8 h-8 object-contain rounded-lg"
+                  />
+                ) : (
+                  <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+                    <span className="text-white font-bold text-sm">
+                      {(organizationSettings as any)?.organizationName?.charAt(0) || 'I'}
+                    </span>
+                  </div>
+                )}
               </div>
               <div>
                 <h1 className="text-lg font-semibold text-gray-900">
