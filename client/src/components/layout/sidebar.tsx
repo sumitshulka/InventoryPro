@@ -392,6 +392,10 @@ export default function Sidebar({ user, isOpen, onClose }: SidebarProps) {
                   ? "bg-primary/10 border-l-4 border-primary text-primary" 
                   : "text-gray-700 hover:text-primary hover:bg-primary/5"
               )}
+              onClick={() => {
+                console.log("My Profile link clicked");
+                onClose();
+              }}
             >
               <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center mr-3">
                 <span className="text-gray-600 text-sm font-medium">
