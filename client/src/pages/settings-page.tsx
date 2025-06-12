@@ -653,6 +653,7 @@ export default function SettingsPage() {
                     variant="outline"
                     size="sm"
                     onClick={async () => {
+                      await queryClient.invalidateQueries({ queryKey: ['/api/approval-settings'] });
                       await queryClient.refetchQueries({ queryKey: ['/api/approval-settings'] });
                       toast({
                         title: "Refreshed",
@@ -760,7 +761,10 @@ export default function SettingsPage() {
                     variant="outline"
                     size="sm"
                     onClick={async () => {
+                      await queryClient.invalidateQueries({ queryKey: ['/api/departments'] });
+                      await queryClient.invalidateQueries({ queryKey: ['/api/users'] });
                       await queryClient.refetchQueries({ queryKey: ['/api/departments'] });
+                      await queryClient.refetchQueries({ queryKey: ['/api/users'] });
                       toast({
                         title: "Refreshed",
                         description: "Departments table has been refreshed",

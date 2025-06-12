@@ -282,6 +282,10 @@ export default function WarehousesPage() {
               variant="outline"
               size="sm"
               onClick={async () => {
+                await queryClient.invalidateQueries({ queryKey: ['/api/warehouses'] });
+                await queryClient.invalidateQueries({ queryKey: ['/api/warehouses/stats'] });
+                await queryClient.invalidateQueries({ queryKey: ['/api/locations'] });
+                await queryClient.invalidateQueries({ queryKey: ['/api/users'] });
                 await queryClient.refetchQueries({ queryKey: ['/api/warehouses'] });
                 await queryClient.refetchQueries({ queryKey: ['/api/warehouses/stats'] });
                 await queryClient.refetchQueries({ queryKey: ['/api/locations'] });
