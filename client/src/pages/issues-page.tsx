@@ -696,17 +696,19 @@ export default function IssuesPage() {
                             </div>
                           )}
                           <div className="flex gap-2">
-                            {issue.status === 'closed' && issue.reportedBy === 1 && (
+                            {issue.status === 'closed' && (
                               <>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => reopenIssueMutation.mutate(issue.id)}
-                                  disabled={reopenIssueMutation.isPending}
-                                >
-                                  <RefreshCw className="h-4 w-4 mr-1" />
-                                  Reopen
-                                </Button>
+                                {issue.reportedBy === 1 && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => reopenIssueMutation.mutate(issue.id)}
+                                    disabled={reopenIssueMutation.isPending}
+                                  >
+                                    <RefreshCw className="h-4 w-4 mr-1" />
+                                    Reopen
+                                  </Button>
+                                )}
                                 {(user as any)?.role === 'admin' && (
                                   <Button
                                     size="sm"
