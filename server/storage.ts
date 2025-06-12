@@ -40,6 +40,8 @@ import {
   InsertNotification,
   Issue,
   InsertIssue,
+  IssueActivity,
+  InsertIssueActivity,
   AuditLog,
   InsertAuditLog,
   EmailSettings,
@@ -64,6 +66,7 @@ import {
   rejectedGoods,
   notifications,
   issues,
+  issueActivities,
   auditLogs,
   emailSettings
 } from "@shared/schema";
@@ -269,7 +272,14 @@ export interface IStorage {
   getIssuesByCategory(category: string): Promise<Issue[]>;
   createIssue(issue: InsertIssue): Promise<Issue>;
   updateIssue(id: number, issueData: Partial<InsertIssue>): Promise<Issue | undefined>;
+  closeIssue(id: number, userId: number, resolutionNotes: string): Promise<Issue | undefined>;
+  reopenIssue(id: number, userId: number): Promise<Issue | undefined>;
   deleteIssue(id: number): Promise<boolean>;
+
+  // Issue Activity operations
+  getIssueActivities(issueId: number): Promise<IssueActivity[]>;
+  createIssueActivity(activity: InsertIssueActivity): Promise<IssueActivity>;
+  getIssueActivityWithUser(issueId: number): Promise<any[]>;
 
   // Audit Log operations
   createAuditLog(auditLog: InsertAuditLog): Promise<AuditLog>;

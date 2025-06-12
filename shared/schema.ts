@@ -605,6 +605,10 @@ export const issues = pgTable("issues", {
   estimatedResolutionDate: timestamp("estimated_resolution_date"),
   actualResolutionDate: timestamp("actual_resolution_date"),
   resolutionNotes: text("resolution_notes"),
+  closedBy: integer("closed_by").references(() => users.id),
+  closedAt: timestamp("closed_at"),
+  reopenedBy: integer("reopened_by").references(() => users.id),
+  reopenedAt: timestamp("reopened_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -615,6 +619,25 @@ export const issues = pgTable("issues", {
   categoryIdx: index("issues_category_idx").on(table.category),
   warehouseIdx: index("issues_warehouse_idx").on(table.warehouseId),
   createdAtIdx: index("issues_created_at_idx").on(table.createdAt),
+  closedByIdx: index("issues_closed_by_idx").on(table.closedBy),
+  reopenedByIdx: index("issues_reopened_by_idx").on(table.reopenedBy),
+}));
+
+// Issue activity log for tracking all actions
+export const issueActivities = pgTable("issue_activities", {
+  id: serial("id").primaryKey(),
+  issueId: integer("issue_id").notNull().references(() => issues.id),
+  userId: integer("user_id").notNull().references(() => users.id),
+  action: text("action").notNull(), // created, assigned, status_changed, resolved, closed, reopened, commented
+  previousValue: text("previous_value"), // Previous status, assignee, etc.
+  newValue: text("new_value"), // New status, assignee, etc.
+  comment: text("comment"), // User comment or resolution notes
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  issueIdx: index("issue_activities_issue_idx").on(table.issueId),
+  userIdx: index("issue_activities_user_idx").on(table.userId),
+  actionIdx: index("issue_activities_action_idx").on(table.action),
+  createdAtIdx: index("issue_activities_created_at_idx").on(table.createdAt),
 }));
 
 export const insertIssueSchema = createInsertSchema(issues).pick({
@@ -630,10 +653,25 @@ export const insertIssueSchema = createInsertSchema(issues).pick({
   attachments: true,
   estimatedResolutionDate: true,
   resolutionNotes: true,
+  closedBy: true,
+  closedAt: true,
+  reopenedBy: true,
+  reopenedAt: true,
+});
+
+export const insertIssueActivitySchema = createInsertSchema(issueActivities).pick({
+  issueId: true,
+  userId: true,
+  action: true,
+  previousValue: true,
+  newValue: true,
+  comment: true,
 });
 
 export type Issue = typeof issues.$inferSelect;
 export type InsertIssue = z.infer<typeof insertIssueSchema>;
+export type IssueActivity = typeof issueActivities.$inferSelect;
+export type InsertIssueActivity = z.infer<typeof insertIssueActivitySchema>;
 
 export type Location = typeof locations.$inferSelect;
 export type InsertLocation = z.infer<typeof insertLocationSchema>;
