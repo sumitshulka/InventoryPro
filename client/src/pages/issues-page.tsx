@@ -94,6 +94,11 @@ const notificationSchema = z.object({
   recipientIds: z.array(z.number()).optional(),
 });
 
+const replySchema = z.object({
+  message: z.string().min(1, "Reply message is required").max(2000, "Message too long"),
+  priority: z.enum(['low', 'normal', 'high', 'urgent']).default('normal'),
+});
+
 export default function IssuesPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -106,6 +111,7 @@ export default function IssuesPage() {
   const [activeTab, setActiveTab] = useState("issues");
   const [notificationFilter, setNotificationFilter] = useState("all");
   const [selectedNotification, setSelectedNotification] = useState<Notification | null>(null);
+  const [showReplyDialog, setShowReplyDialog] = useState(false);
 
   const { data: issues = [], isLoading } = useQuery({
     queryKey: ['/api/issues'],
@@ -160,6 +166,14 @@ export default function IssuesPage() {
       priority: "normal",
       recipientType: "admins",
       recipientIds: [],
+    },
+  });
+
+  const replyForm = useForm<z.infer<typeof replySchema>>({
+    resolver: zodResolver(replySchema),
+    defaultValues: {
+      message: "",
+      priority: "normal",
     },
   });
 
