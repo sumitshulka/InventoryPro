@@ -133,7 +133,7 @@ export default function WarehousesPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [editWarehouseId, setEditWarehouseId] = useState<number | null>(null);
-  const [lastActionTime, setLastActionTime] = useState<number | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState("active");
 
   const { data: warehouses, isLoading } = useQuery({
@@ -194,7 +194,7 @@ export default function WarehousesPage() {
       }
     },
     onSuccess: async () => {
-      setLastActionTime(Date.now()); // Trigger automatic refresh
+      await performRefresh();
       toast({
         title: isEditMode ? "Warehouse updated" : "Warehouse created",
         description: isEditMode
@@ -233,8 +233,8 @@ export default function WarehousesPage() {
       }
       return response.json();
     },
-    onSuccess: () => {
-      setLastActionTime(Date.now()); // Trigger automatic refresh
+    onSuccess: async () => {
+      await performRefresh();
       toast({
         title: "Success",
         description: "Warehouse has been archived successfully",
@@ -262,8 +262,8 @@ export default function WarehousesPage() {
       }
       return response.json();
     },
-    onSuccess: () => {
-      setLastActionTime(Date.now()); // Trigger automatic refresh
+    onSuccess: async () => {
+      await performRefresh();
       toast({
         title: "Success",
         description: "Warehouse has been restored successfully",
@@ -323,17 +323,23 @@ export default function WarehousesPage() {
     ]);
   };
 
-  // Automatic refresh effect - triggers 2 seconds after any action
-  useEffect(() => {
-    if (lastActionTime) {
-      const timeoutId = setTimeout(async () => {
-        await handleRefresh();
-        setLastActionTime(null); // Reset the action time
-      }, 2000);
-
-      return () => clearTimeout(timeoutId);
+  const performRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["/api/warehouses"] }),
+        queryClient.invalidateQueries({ queryKey: ["/api/locations"] }),
+        queryClient.invalidateQueries({ queryKey: ["/api/users"] }),
+        queryClient.invalidateQueries({ queryKey: ["/api/reports/inventory-stock"] }),
+        queryClient.invalidateQueries({ queryKey: ["/api/warehouses/stats"] }),
+      ]);
+      
+      // Wait for queries to refetch
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    } finally {
+      setIsRefreshing(false);
     }
-  }, [lastActionTime]);
+  };
 
   const handleSubmit = (values: FormValues) => {
     createWarehouseMutation.mutate(values);
@@ -358,12 +364,23 @@ export default function WarehousesPage() {
           <h1 className="text-2xl font-medium text-gray-800">Warehouses</h1>
           <p className="text-gray-600">Manage your warehouse locations</p>
         </div>
-        {isAdmin && (
-          <Button onClick={() => setIsDialogOpen(true)}>
-            <Plus className="mr-2 h-4 w-4" />
-            Add Warehouse
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={performRefresh}
+            disabled={isRefreshing}
+            className="flex items-center gap-2"
+          >
+            <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+            {isRefreshing ? 'Refreshing...' : 'Refresh'}
           </Button>
-        )}
+          {isAdmin && (
+            <Button onClick={() => setIsDialogOpen(true)}>
+              <Plus className="mr-2 h-4 w-4" />
+              Add Warehouse
+            </Button>
+          )}
+        </div>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
