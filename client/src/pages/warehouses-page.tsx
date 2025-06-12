@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
@@ -133,6 +133,7 @@ export default function WarehousesPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [editWarehouseId, setEditWarehouseId] = useState<number | null>(null);
+  const [lastActionTime, setLastActionTime] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState("active");
 
   const { data: warehouses, isLoading } = useQuery({
@@ -193,7 +194,7 @@ export default function WarehousesPage() {
       }
     },
     onSuccess: async () => {
-      await invalidateRelatedQueries('warehouse', isEditMode ? 'update' : 'create');
+      setLastActionTime(Date.now()); // Trigger automatic refresh
       toast({
         title: isEditMode ? "Warehouse updated" : "Warehouse created",
         description: isEditMode
@@ -233,9 +234,7 @@ export default function WarehousesPage() {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/warehouses"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/warehouses/stats"] });
-      invalidateRelatedQueries('warehouse', 'delete');
+      setLastActionTime(Date.now()); // Trigger automatic refresh
       toast({
         title: "Success",
         description: "Warehouse has been archived successfully",
@@ -264,9 +263,7 @@ export default function WarehousesPage() {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/warehouses"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/warehouses/stats"] });
-      invalidateRelatedQueries('warehouse', 'update');
+      setLastActionTime(Date.now()); // Trigger automatic refresh
       toast({
         title: "Success",
         description: "Warehouse has been restored successfully",
@@ -325,6 +322,18 @@ export default function WarehousesPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/warehouses/stats"] }),
     ]);
   };
+
+  // Automatic refresh effect - triggers 2 seconds after any action
+  useEffect(() => {
+    if (lastActionTime) {
+      const timeoutId = setTimeout(async () => {
+        await handleRefresh();
+        setLastActionTime(null); // Reset the action time
+      }, 2000);
+
+      return () => clearTimeout(timeoutId);
+    }
+  }, [lastActionTime]);
 
   const handleSubmit = (values: FormValues) => {
     createWarehouseMutation.mutate(values);
