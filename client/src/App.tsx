@@ -3,6 +3,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { AuthProvider, useAuth } from "@/hooks/use-auth";
 import NotFound from "@/pages/not-found";
 import AuthPage from "@/pages/auth-page";
+import ResetPasswordPage from "@/pages/reset-password-page";
 import DashboardPage from "@/pages/dashboard-page";
 import InventoryPage from "@/pages/inventory-page";
 import ItemMasterPage from "@/pages/item-master-page";
@@ -45,6 +46,7 @@ function Router() {
       <Route path="/auth">
         {user ? <Route path="/" component={DashboardPage} /> : <AuthPage />}
       </Route>
+      <Route path="/reset-password" component={ResetPasswordPage} />
       <ProtectedRoute path="/my-profile" component={MyProfilePage} />
       <ProtectedRoute path="/" component={DashboardPage} />
       <ProtectedRoute path="/inventory" component={InventoryPage} />
