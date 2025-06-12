@@ -321,7 +321,9 @@ export default function WarehousesPage() {
                           <span className="text-red-500 text-xs ml-1 font-bold">✗</span>
                         )}
                       </TableCell>
-                      <TableCell>{warehouse.location}</TableCell>
+                      <TableCell>
+                        {(locations as any[])?.find((loc: any) => loc.id === warehouse.locationId)?.name || 'Location not found'}
+                      </TableCell>
                       <TableCell>
                         {warehouse.managerId ? 
                           (users as any[])?.find((u: any) => u.id === warehouse.managerId)?.name || "Unknown Manager" 
