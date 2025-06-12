@@ -238,6 +238,37 @@ export default function WarehousesPage() {
     },
   });
 
+  const restoreWarehouseMutation = useMutation({
+    mutationFn: async (warehouseId: number) => {
+      const response = await fetch(`/api/warehouses/${warehouseId}/restore`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+      if (!response.ok) {
+        throw new Error("Failed to restore warehouse");
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/warehouses"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/warehouses/stats"] });
+      invalidateRelatedQueries();
+      toast({
+        title: "Success",
+        description: "Warehouse has been restored successfully",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to restore warehouse",
+        variant: "destructive",
+      });
+    },
+  });
+
   const resetForm = () => {
     form.reset({
       name: "",
@@ -268,33 +299,8 @@ export default function WarehousesPage() {
     deleteWarehouseMutation.mutate(warehouseId);
   };
 
-  const handleRestoreWarehouse = async (warehouseId: number) => {
-    try {
-      const response = await fetch(`/api/warehouses/${warehouseId}/restore`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      });
-      
-      if (!response.ok) {
-        throw new Error("Failed to restore warehouse");
-      }
-      
-      await queryClient.invalidateQueries({ queryKey: ["/api/warehouses"] });
-      await queryClient.invalidateQueries({ queryKey: ["/api/warehouses/stats"] });
-      
-      toast({
-        title: "Success",
-        description: "Warehouse has been restored successfully",
-      });
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to restore warehouse",
-        variant: "destructive",
-      });
-    }
+  const handleRestoreWarehouse = (warehouseId: number) => {
+    restoreWarehouseMutation.mutate(warehouseId);
   };
 
   const handleSubmit = (values: FormValues) => {

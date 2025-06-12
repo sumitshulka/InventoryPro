@@ -132,6 +132,7 @@ export interface IStorage {
   updateWarehouse(id: number, warehouseData: Partial<InsertWarehouse>): Promise<Warehouse | undefined>;
   deleteWarehouse(id: number): Promise<boolean>;
   archiveWarehouse(id: number): Promise<Warehouse | undefined>;
+  restoreWarehouse(id: number): Promise<Warehouse | undefined>;
 
   // Item operations
   getItem(id: number): Promise<Item | undefined>;
@@ -820,6 +821,19 @@ export class MemStorage implements IStorage {
     };
     this.warehouses.set(id, archivedWarehouse);
     return archivedWarehouse;
+  }
+
+  async restoreWarehouse(id: number): Promise<Warehouse | undefined> {
+    const warehouse = await this.getWarehouse(id);
+    if (!warehouse) return undefined;
+
+    const restoredWarehouse = { 
+      ...warehouse, 
+      status: 'active' as const,
+      deletedAt: null
+    };
+    this.warehouses.set(id, restoredWarehouse);
+    return restoredWarehouse;
   }
 
   // Item operations
@@ -1612,6 +1626,17 @@ export class DatabaseStorage implements IStorage {
       .where(eq(warehouses.id, id))
       .returning();
     return archivedWarehouse || undefined;
+  }
+
+  async restoreWarehouse(id: number): Promise<Warehouse | undefined> {
+    const [restoredWarehouse] = await db.update(warehouses)
+      .set({ 
+        status: 'active',
+        deletedAt: null
+      })
+      .where(eq(warehouses.id, id))
+      .returning();
+    return restoredWarehouse || undefined;
   }
 
   // Item operations
