@@ -3045,15 +3045,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get issues
+  // Get issues (filtered by warehouse access)
   app.get("/api/issues", async (req, res) => {
     try {
       if (!req.user) {
         return res.status(401).json({ message: "Not authenticated" });
       }
 
-      const issues = await storage.getAllIssues();
-      res.json(issues);
+      const allIssues = await storage.getAllIssues();
+      
+      // Filter issues based on user's access level
+      let filteredIssues = allIssues;
+      
+      if (req.user.role !== 'admin') {
+        filteredIssues = allIssues.filter(issue => {
+          // User can see issues they reported, are assigned to, or from their warehouse
+          return issue.reportedBy === req.user!.id ||
+                 issue.assignedTo === req.user!.id ||
+                 (issue.warehouseId && req.user!.warehouseId === issue.warehouseId);
+        });
+      }
+
+      res.json(filteredIssues);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -3282,7 +3295,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { id } = req.params;
       const { status } = req.body;
 
-      const updatedIssue = await storage.updateIssue(parseInt(id), { status });
+      const updatedIssue = await storage.updateIssue(parseInt(id), { status }, req.user.id);
       
       if (!updatedIssue) {
         return res.status(404).json({ message: "Issue not found" });
@@ -3369,8 +3382,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Issue not found" });
       }
 
-      // Only admin or the reporter can see the activity log
-      if (req.user.role !== 'admin' && issue.reportedBy !== req.user.id) {
+      // Allow access to: admin, reporter, assigned user, or warehouse users
+      const canAccess = req.user.role === 'admin' || 
+                       issue.reportedBy === req.user.id || 
+                       issue.assignedTo === req.user.id ||
+                       (issue.warehouseId && req.user.warehouseId === issue.warehouseId);
+
+      if (!canAccess) {
         return res.status(403).json({ message: "Not authorized to view issue activities" });
       }
 

@@ -2443,11 +2443,42 @@ export class DatabaseStorage implements IStorage {
     return newIssue;
   }
 
-  async updateIssue(id: number, issueData: Partial<InsertIssue>): Promise<Issue | undefined> {
+  async updateIssue(id: number, issueData: Partial<InsertIssue>, userId?: number): Promise<Issue | undefined> {
+    const currentIssue = await this.getIssue(id);
+    if (!currentIssue) return undefined;
+
     const [updatedIssue] = await db.update(issues)
       .set({ ...issueData, updatedAt: new Date() })
       .where(eq(issues.id, id))
       .returning();
+
+    // Log activity for status changes
+    if (issueData.status && issueData.status !== currentIssue.status && userId) {
+      await this.createIssueActivity({
+        issueId: id,
+        userId,
+        action: 'status_changed',
+        previousValue: currentIssue.status,
+        newValue: issueData.status,
+        comment: `Status changed from ${currentIssue.status} to ${issueData.status}`
+      });
+    }
+
+    // Log activity for assignment changes
+    if (issueData.assignedTo !== undefined && issueData.assignedTo !== currentIssue.assignedTo && userId) {
+      const previousAssignee = currentIssue.assignedTo ? `User ID ${currentIssue.assignedTo}` : 'Unassigned';
+      const newAssignee = issueData.assignedTo ? `User ID ${issueData.assignedTo}` : 'Unassigned';
+      
+      await this.createIssueActivity({
+        issueId: id,
+        userId,
+        action: 'assigned',
+        previousValue: previousAssignee,
+        newValue: newAssignee,
+        comment: `Issue assignment changed from ${previousAssignee} to ${newAssignee}`
+      });
+    }
+
     return updatedIssue;
   }
 
