@@ -133,6 +133,7 @@ export default function NotificationCenterPage() {
   const replyForm = useForm<z.infer<typeof replySchema>>({
     resolver: zodResolver(replySchema),
     defaultValues: {
+      message: '',
       priority: 'normal',
     },
   });
@@ -164,20 +165,22 @@ export default function NotificationCenterPage() {
   const replyMutation = useMutation({
     mutationFn: ({ notificationId, data }: { notificationId: number; data: z.infer<typeof replySchema> }) =>
       apiRequest('POST', `/api/notifications/${notificationId}/reply`, data),
-    onSuccess: () => {
+    onSuccess: (response) => {
       queryClient.invalidateQueries({ queryKey: ['/api/notifications'] });
       queryClient.invalidateQueries({ queryKey: ['/api/notifications/unread-count'] });
       setShowReplyDialog(false);
+      setSelectedNotification(null);
       replyForm.reset();
       toast({
-        title: "Success",
-        description: "Reply sent successfully",
+        title: "Reply Sent",
+        description: "Your reply has been sent successfully. The notification is now marked as replied.",
       });
     },
     onError: (error: any) => {
+      console.error('Reply error:', error);
       toast({
-        title: "Error",
-        description: error.message || "Failed to send reply",
+        title: "Failed to Send Reply",
+        description: error.message || "Please check your connection and try again",
         variant: "destructive",
       });
     },
@@ -268,6 +271,16 @@ export default function NotificationCenterPage() {
         data,
       });
     }
+  };
+
+  const handleReplyDialogOpen = (notification: Notification) => {
+    setSelectedNotification(notification);
+    setShowReplyDialog(true);
+    // Reset form with fresh values
+    replyForm.reset({
+      message: '',
+      priority: 'normal',
+    });
   };
 
   const handleNotificationClick = (notification: Notification) => {
@@ -621,7 +634,11 @@ export default function NotificationCenterPage() {
                       <>
                         <Dialog open={showReplyDialog} onOpenChange={setShowReplyDialog}>
                           <DialogTrigger asChild>
-                            <Button size="sm" className="w-full">
+                            <Button 
+                              size="sm" 
+                              className="w-full"
+                              onClick={() => handleReplyDialogOpen(selectedNotification)}
+                            >
                               <Reply className="h-4 w-4 mr-2" />
                               Reply
                             </Button>
