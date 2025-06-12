@@ -870,6 +870,7 @@ export default function SettingsPage() {
                     variant="outline"
                     size="sm"
                     onClick={async () => {
+                      await queryClient.invalidateQueries({ queryKey: ['/api/locations'] });
                       await queryClient.refetchQueries({ queryKey: ['/api/locations'] });
                       toast({
                         title: "Refreshed",
