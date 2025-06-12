@@ -17,7 +17,7 @@ import { z } from "zod";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { format, formatDistanceToNow } from "date-fns";
-import { AlertTriangle, Plus, Search, Filter, CheckCircle, Clock, X, Flag, Bell, MessageSquare, Archive, Reply, Mail, MailOpen, RefreshCw } from "lucide-react";
+import { AlertTriangle, Plus, Search, Filter, CheckCircle, Clock, X, Flag, Bell, MessageSquare, Archive, Reply, Mail, MailOpen, RefreshCw, Trash2 } from "lucide-react";
 import AppLayout from "@/components/layout/app-layout";
 import { DataTablePagination } from "@/components/ui/data-table-pagination";
 
@@ -183,6 +183,10 @@ export default function IssuesPage() {
 
   const { data: users = [] } = useQuery({
     queryKey: ['/api/users'],
+  });
+
+  const { data: user } = useQuery({
+    queryKey: ['/api/user'],
   });
 
   const { data: recipients = [] } = useQuery({
@@ -693,15 +697,30 @@ export default function IssuesPage() {
                           )}
                           <div className="flex gap-2">
                             {issue.status === 'closed' && issue.reportedBy === 1 && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => reopenIssueMutation.mutate(issue.id)}
-                                disabled={reopenIssueMutation.isPending}
-                              >
-                                <RefreshCw className="h-4 w-4 mr-1" />
-                                Reopen
-                              </Button>
+                              <>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => reopenIssueMutation.mutate(issue.id)}
+                                  disabled={reopenIssueMutation.isPending}
+                                >
+                                  <RefreshCw className="h-4 w-4 mr-1" />
+                                  Reopen
+                                </Button>
+                                {(user as any)?.role === 'admin' && (
+                                  <Button
+                                    size="sm"
+                                    variant="destructive"
+                                    onClick={() => {
+                                      setSelectedIssue(issue);
+                                      setShowDeleteDialog(true);
+                                    }}
+                                  >
+                                    <Trash2 className="h-4 w-4 mr-1" />
+                                    Delete
+                                  </Button>
+                                )}
+                              </>
                             )}
                             {issue.status !== 'closed' && (
                               <>
@@ -1633,6 +1652,47 @@ export default function IssuesPage() {
               <Button onClick={() => setShowFullTextModal(false)}>
                 Close
               </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Delete Issue Confirmation Dialog */}
+        <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Delete Issue</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <p className="text-sm text-gray-600">
+                Are you sure you want to permanently delete this issue? This action cannot be undone and will remove all associated activity logs.
+              </p>
+              {selectedIssue && (
+                <div className="bg-gray-50 p-3 rounded-md">
+                  <p className="font-medium text-sm">{selectedIssue.title}</p>
+                  <p className="text-xs text-gray-500">Issue ID: {selectedIssue.id}</p>
+                </div>
+              )}
+              <div className="flex justify-end gap-2">
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={() => setShowDeleteDialog(false)}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  type="button" 
+                  variant="destructive" 
+                  onClick={() => {
+                    if (selectedIssue) {
+                      deleteIssueMutation.mutate(selectedIssue.id);
+                    }
+                  }}
+                  disabled={deleteIssueMutation.isPending}
+                >
+                  {deleteIssueMutation.isPending ? "Deleting..." : "Delete Issue"}
+                </Button>
+              </div>
             </div>
           </DialogContent>
         </Dialog>
