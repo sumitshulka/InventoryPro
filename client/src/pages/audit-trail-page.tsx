@@ -178,10 +178,107 @@ export default function AuditTrailPage() {
                                 {log.details || 'No details available'}
                               </p>
                               
+                              {/* Enhanced display for transfer updates */}
+                              {log.entityType === 'transfer' && log.action === 'UPDATE' && (log.oldValues || log.newValues) && (
+                                <div className="mt-2 space-y-2">
+                                  {(() => {
+                                    try {
+                                      const oldValues = log.oldValues ? JSON.parse(log.oldValues) : {};
+                                      const newValues = log.newValues ? JSON.parse(log.newValues) : {};
+                                      const changes = [];
+                                      
+                                      // Show meaningful changes for transfers
+                                      if (newValues.status && oldValues.status !== newValues.status) {
+                                        changes.push(`Status: ${oldValues.status || 'None'} → ${newValues.status}`);
+                                      }
+                                      if (newValues.courierName !== undefined && oldValues.courierName !== newValues.courierName) {
+                                        changes.push(`Courier: ${oldValues.courierName || 'None'} → ${newValues.courierName || 'None'}`);
+                                      }
+                                      if (newValues.courierPhone !== undefined && oldValues.courierPhone !== newValues.courierPhone) {
+                                        changes.push(`Courier Phone: ${oldValues.courierPhone || 'None'} → ${newValues.courierPhone || 'None'}`);
+                                      }
+                                      if (newValues.handoverPersonName !== undefined && oldValues.handoverPersonName !== newValues.handoverPersonName) {
+                                        changes.push(`Pickup Person: ${oldValues.handoverPersonName || 'None'} → ${newValues.handoverPersonName || 'None'}`);
+                                      }
+                                      if (newValues.handoverPersonPhone !== undefined && oldValues.handoverPersonPhone !== newValues.handoverPersonPhone) {
+                                        changes.push(`Pickup Phone: ${oldValues.handoverPersonPhone || 'None'} → ${newValues.handoverPersonPhone || 'None'}`);
+                                      }
+                                      if (newValues.trackingNumber !== undefined && oldValues.trackingNumber !== newValues.trackingNumber) {
+                                        changes.push(`Tracking: ${oldValues.trackingNumber || 'None'} → ${newValues.trackingNumber || 'None'}`);
+                                      }
+                                      if (newValues.transportMethod !== undefined && oldValues.transportMethod !== newValues.transportMethod) {
+                                        changes.push(`Transport Method: ${oldValues.transportMethod || 'None'} → ${newValues.transportMethod || 'None'}`);
+                                      }
+                                      if (newValues.notes !== undefined && oldValues.notes !== newValues.notes) {
+                                        changes.push(`Notes: ${oldValues.notes || 'None'} → ${newValues.notes || 'None'}`);
+                                      }
+                                      
+                                      return changes.length > 0 ? (
+                                        <div className="text-sm">
+                                          <div className="font-medium text-gray-700 mb-1">Changes:</div>
+                                          <ul className="list-disc list-inside space-y-1 text-gray-600">
+                                            {changes.map((change, idx) => (
+                                              <li key={idx}>{change}</li>
+                                            ))}
+                                          </ul>
+                                        </div>
+                                      ) : null;
+                                    } catch (e) {
+                                      return null;
+                                    }
+                                  })()}
+                                </div>
+                              )}
+                              
+                              {/* Enhanced display for user updates */}
+                              {log.entityType === 'user' && log.action === 'UPDATE' && (log.oldValues || log.newValues) && (
+                                <div className="mt-2 space-y-2">
+                                  {(() => {
+                                    try {
+                                      const oldValues = log.oldValues ? JSON.parse(log.oldValues) : {};
+                                      const newValues = log.newValues ? JSON.parse(log.newValues) : {};
+                                      const changes = [];
+                                      
+                                      if (newValues.username && oldValues.username !== newValues.username) {
+                                        changes.push(`Username: ${oldValues.username} → ${newValues.username}`);
+                                      }
+                                      if (newValues.email && oldValues.email !== newValues.email) {
+                                        changes.push(`Email: ${oldValues.email} → ${newValues.email}`);
+                                      }
+                                      if (newValues.name && oldValues.name !== newValues.name) {
+                                        changes.push(`Name: ${oldValues.name} → ${newValues.name}`);
+                                      }
+                                      if (newValues.role && oldValues.role !== newValues.role) {
+                                        changes.push(`Role: ${oldValues.role} → ${newValues.role}`);
+                                      }
+                                      if (newValues.warehouseId !== undefined && oldValues.warehouseId !== newValues.warehouseId) {
+                                        changes.push(`Warehouse Assignment: ${oldValues.warehouseId || 'None'} → ${newValues.warehouseId || 'None'}`);
+                                      }
+                                      if (newValues.isActive !== undefined && oldValues.isActive !== newValues.isActive) {
+                                        changes.push(`Status: ${oldValues.isActive ? 'Active' : 'Inactive'} → ${newValues.isActive ? 'Active' : 'Inactive'}`);
+                                      }
+                                      
+                                      return changes.length > 0 ? (
+                                        <div className="text-sm">
+                                          <div className="font-medium text-gray-700 mb-1">Changes:</div>
+                                          <ul className="list-disc list-inside space-y-1 text-gray-600">
+                                            {changes.map((change, idx) => (
+                                              <li key={idx}>{change}</li>
+                                            ))}
+                                          </ul>
+                                        </div>
+                                      ) : null;
+                                    } catch (e) {
+                                      return null;
+                                    }
+                                  })()}
+                                </div>
+                              )}
+                              
                               {log.metadata && (
                                 <div className="text-sm text-gray-600">
                                   <details className="cursor-pointer">
-                                    <summary>Additional Details</summary>
+                                    <summary>Technical Details</summary>
                                     <pre className="mt-2 p-2 bg-gray-100 rounded text-xs overflow-auto">
                                       {JSON.stringify(log.metadata, null, 2)}
                                     </pre>

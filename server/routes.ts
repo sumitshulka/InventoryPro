@@ -235,6 +235,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!updatedUser) {
         return res.status(404).json({ message: "User not found" });
       }
+
+      // Create audit log for user update
+      await storage.createAuditLog({
+        userId: req.user!.id,
+        action: 'UPDATE',
+        entityType: 'user',
+        entityId: userId,
+        details: `User ${existingUser.username} updated`,
+        oldValues: JSON.stringify({
+          username: existingUser.username,
+          email: existingUser.email,
+          name: existingUser.name,
+          role: existingUser.role,
+          warehouseId: existingUser.warehouseId,
+          managerId: existingUser.managerId,
+          isActive: existingUser.isActive
+        }),
+        newValues: JSON.stringify(cleanUserData),
+        ipAddress: req.ip || req.connection.remoteAddress,
+        userAgent: req.get('User-Agent')
+      });
+
       res.json(updatedUser);
     } catch (error: any) {
       console.error("User update error:", error);
@@ -2864,6 +2886,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         updateType: req.body.updateType || 'status_change',
         description: req.body.updateDescription || `Transfer updated`,
         metadata: req.body.metadata ? JSON.stringify(req.body.metadata) : undefined
+      });
+
+      // Create audit log for transfer update
+      await storage.createAuditLog({
+        userId: req.user!.id,
+        action: 'UPDATE',
+        entityType: 'transfer',
+        entityId: transferId,
+        details: `Transfer ${transfer.transferCode} updated`,
+        oldValues: JSON.stringify({
+          status: transfer.status,
+          notes: transfer.notes,
+          courierName: transfer.courierName,
+          handoverPersonName: transfer.handoverPersonName,
+          trackingNumber: transfer.trackingNumber
+        }),
+        newValues: JSON.stringify(filteredData),
+        ipAddress: req.ip || req.connection.remoteAddress,
+        userAgent: req.get('User-Agent')
       });
 
       res.json(updatedTransfer);

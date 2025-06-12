@@ -1432,11 +1432,46 @@ export default function EnhancedTransfersPage() {
                 </div>
 
                 {/* Transport Details */}
-                {(selectedTransfer.receiptNumber || selectedTransfer.handoverDate) && (
+                {(selectedTransfer.receiptNumber || selectedTransfer.handoverDate || selectedTransfer.transferMode) && (
                   <div>
                     <h3 className="font-semibold mb-3">Transport Details</h3>
                     <div className="bg-blue-50 p-4 rounded-lg">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                        {selectedTransfer.transferMode && (
+                          <div>
+                            <span className="font-medium">Transport Method:</span>
+                            <span className="ml-2 capitalize">
+                              {selectedTransfer.transferMode === 'courier' ? 'Courier Service' : 
+                               selectedTransfer.transferMode === 'handover' ? 'In-Person Handover' : 
+                               selectedTransfer.transferMode === 'pickup' ? 'Pickup' : 
+                               selectedTransfer.transferMode}
+                            </span>
+                          </div>
+                        )}
+                        {selectedTransfer.courierName && (
+                          <div>
+                            <span className="font-medium">Courier Name:</span>
+                            <span className="ml-2">{selectedTransfer.courierName}</span>
+                          </div>
+                        )}
+                        {selectedTransfer.handoverPersonName && (
+                          <div>
+                            <span className="font-medium">Handover Person:</span>
+                            <span className="ml-2">{selectedTransfer.handoverPersonName}</span>
+                          </div>
+                        )}
+                        {selectedTransfer.handoverPersonContact && (
+                          <div>
+                            <span className="font-medium">Contact Number:</span>
+                            <span className="ml-2">{selectedTransfer.handoverPersonContact}</span>
+                          </div>
+                        )}
+                        {selectedTransfer.trackingNumber && (
+                          <div>
+                            <span className="font-medium">Tracking Number:</span>
+                            <span className="ml-2">{selectedTransfer.trackingNumber}</span>
+                          </div>
+                        )}
                         {selectedTransfer.receiptNumber && (
                           <div>
                             <span className="font-medium">Receipt Number:</span>
