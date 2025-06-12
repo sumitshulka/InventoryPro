@@ -1509,13 +1509,19 @@ export default function EnhancedTransfersPage() {
                       </div>
                     </div>
 
-                    {selectedTransfer.status !== 'pending' && (
+                    {selectedTransfer.status !== 'pending' && selectedTransfer.status !== 'rejected' && (
                       <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
                         <div className="w-2 h-2 bg-green-500 rounded-full mt-2"></div>
                         <div className="flex-1">
                           <div className="font-medium text-sm">Transfer Approved</div>
                           <div className="text-xs text-gray-600">{formatDateTime(selectedTransfer.updatedAt)}</div>
-                          <div className="text-xs text-gray-700">Transfer approved for processing</div>
+                          <div className="text-xs text-gray-700">
+                            {selectedTransfer.approvedByUser ? (
+                              <>Transfer approved by: {selectedTransfer.approvedByUser.name}</>
+                            ) : (
+                              'Transfer approved for processing'
+                            )}
+                          </div>
                         </div>
                       </div>
                     )}
@@ -1526,7 +1532,26 @@ export default function EnhancedTransfersPage() {
                         <div className="flex-1">
                           <div className="font-medium text-sm">Items Dispatched</div>
                           <div className="text-xs text-gray-600">{formatDateTime(selectedTransfer.handoverDate)}</div>
-                          <div className="text-xs text-gray-700">Items handed over to transport</div>
+                          <div className="text-xs text-gray-700">
+                            {selectedTransfer.transferMode === 'courier' && selectedTransfer.courierName ? (
+                              <>Items handed over to courier: {selectedTransfer.courierName}</>
+                            ) : selectedTransfer.transferMode === 'handover' && selectedTransfer.handoverPersonName ? (
+                              <>Items handed over to: {selectedTransfer.handoverPersonName}
+                                {selectedTransfer.handoverPersonContact && ` (${selectedTransfer.handoverPersonContact})`}</>
+                            ) : (
+                              'Items handed over to transport'
+                            )}
+                          </div>
+                          {selectedTransfer.trackingNumber && (
+                            <div className="text-xs text-blue-600 mt-1">
+                              Tracking: {selectedTransfer.trackingNumber}
+                            </div>
+                          )}
+                          {selectedTransfer.receiptNumber && (
+                            <div className="text-xs text-purple-600 mt-1">
+                              Receipt: {selectedTransfer.receiptNumber}
+                            </div>
+                          )}
                         </div>
                       </div>
                     )}
@@ -1537,7 +1562,23 @@ export default function EnhancedTransfersPage() {
                         <div className="flex-1">
                           <div className="font-medium text-sm">Transfer Completed</div>
                           <div className="text-xs text-gray-600">{formatDateTime(selectedTransfer.receivedDate)}</div>
-                          <div className="text-xs text-gray-700">Items received and processed</div>
+                          <div className="text-xs text-gray-700">
+                            {selectedTransfer.receivedBy ? (
+                              <>Items received and processed by: {selectedTransfer.receivedBy}</>
+                            ) : (
+                              'Items received and processed'
+                            )}
+                          </div>
+                          {selectedTransfer.overallCondition && (
+                            <div className="text-xs text-blue-600 mt-1">
+                              Condition: {selectedTransfer.overallCondition}
+                            </div>
+                          )}
+                          {selectedTransfer.receiverNotes && (
+                            <div className="text-xs text-gray-600 mt-1">
+                              Receiver Notes: {selectedTransfer.receiverNotes}
+                            </div>
+                          )}
                         </div>
                       </div>
                     )}
