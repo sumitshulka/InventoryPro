@@ -685,41 +685,38 @@ export default function UsersManagementPage() {
           <AlertDialogContent className="max-w-md">
             <AlertDialogHeader>
               <AlertDialogTitle className="text-red-600">⚠️ Permanently Delete User</AlertDialogTitle>
-              <AlertDialogDescription asChild>
-                <div className="space-y-3">
-                  <div className="text-sm font-medium text-gray-900">
-                    You are about to permanently delete this user from the system.
-                  </div>
-                  
-                  {userToDelete && users && (
-                    <div className="bg-gray-50 p-3 rounded-md">
-                      <div className="font-medium text-sm">
-                        {(users as any[])?.find((u: any) => u.id === userToDelete)?.name}
-                      </div>
-                      <div className="text-xs text-gray-500">
-                        {(users as any[])?.find((u: any) => u.id === userToDelete)?.username} • {(users as any[])?.find((u: any) => u.id === userToDelete)?.role}
-                      </div>
+              <AlertDialogDescription className="text-sm text-muted-foreground">
+                You are about to permanently delete this user from the system.
+              </AlertDialogDescription>
+              <div className="space-y-3 mt-3">
+                {userToDelete && users && (
+                  <div className="bg-gray-50 p-3 rounded-md">
+                    <div className="font-medium text-sm">
+                      {(users as any[])?.find((u: any) => u.id === userToDelete)?.name}
                     </div>
-                  )}
-
-                  <div className="text-sm text-gray-700">
-                    <div className="font-medium">This will permanently:</div>
-                    <ul className="list-disc list-inside mt-1 space-y-1 text-xs">
-                      <li>Remove the user from the database completely</li>
-                      <li>Delete all their notifications and messages</li>
-                      <li>Remove their activity history from issues</li>
-                      <li>Clear their assignments from issues and transactions</li>
-                      <li>Remove manager relationships where applicable</li>
-                    </ul>
-                  </div>
-
-                  <div className="bg-red-50 p-3 rounded-md border border-red-200">
-                    <div className="text-xs font-medium text-red-800">
-                      ⚠️ This action cannot be undone and the user data will not be recoverable.
+                    <div className="text-xs text-gray-500">
+                      {(users as any[])?.find((u: any) => u.id === userToDelete)?.username} • {(users as any[])?.find((u: any) => u.id === userToDelete)?.role}
                     </div>
+                  </div>
+                )}
+
+                <div className="text-sm text-gray-700">
+                  <div className="font-medium">This will permanently:</div>
+                  <ul className="list-disc list-inside mt-1 space-y-1 text-xs">
+                    <li>Remove the user from the database completely</li>
+                    <li>Delete all their notifications and messages</li>
+                    <li>Remove their activity history from issues</li>
+                    <li>Clear their assignments from issues and transactions</li>
+                    <li>Remove manager relationships where applicable</li>
+                  </ul>
+                </div>
+
+                <div className="bg-red-50 p-3 rounded-md border border-red-200">
+                  <div className="text-xs font-medium text-red-800">
+                    ⚠️ This action cannot be undone and the user data will not be recoverable.
                   </div>
                 </div>
-              </AlertDialogDescription>
+              </div>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Cancel</AlertDialogCancel>

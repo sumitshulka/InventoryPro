@@ -561,7 +561,7 @@ export const notifications = pgTable("notifications", {
   category: text("category").notNull().default("general"), // general, inventory, request, transfer, approval
   priority: text("priority").notNull().default("normal"), // low, normal, high, urgent
   status: text("status").notNull().default("unread"), // unread, read, replied, closed
-  parentId: integer("parent_id").references(() => notifications.id), // for replies
+  parentId: integer("parent_id"),
   relatedEntityType: text("related_entity_type"), // item, warehouse, request, transfer
   relatedEntityId: integer("related_entity_id"),
   isArchived: boolean("is_archived").notNull().default(false),
