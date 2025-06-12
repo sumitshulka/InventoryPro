@@ -586,6 +586,65 @@ export default function UsersManagementPage() {
             </form>
           </DialogContent>
         </Dialog>
+
+        {/* Delete User Confirmation Dialog */}
+        <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <AlertDialogContent className="max-w-md">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="text-red-600">⚠️ Permanently Delete User</AlertDialogTitle>
+              <AlertDialogDescription className="space-y-3">
+                <div className="text-sm font-medium text-gray-900">
+                  You are about to permanently delete this user from the system.
+                </div>
+                
+                {userToDelete && users && (
+                  <div className="bg-gray-50 p-3 rounded-md">
+                    <p className="font-medium text-sm">
+                      {(users as any[])?.find((u: any) => u.id === userToDelete)?.name}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      {(users as any[])?.find((u: any) => u.id === userToDelete)?.username} • {(users as any[])?.find((u: any) => u.id === userToDelete)?.role}
+                    </p>
+                  </div>
+                )}
+
+                <div className="text-sm text-gray-700">
+                  <strong>This will permanently:</strong>
+                  <ul className="list-disc list-inside mt-1 space-y-1 text-xs">
+                    <li>Remove the user from the database completely</li>
+                    <li>Delete all their notifications and messages</li>
+                    <li>Remove their activity history from issues</li>
+                    <li>Clear their assignments from issues and transactions</li>
+                    <li>Remove manager relationships where applicable</li>
+                  </ul>
+                </div>
+
+                <div className="bg-red-50 p-3 rounded-md border border-red-200">
+                  <p className="text-xs font-medium text-red-800">
+                    ⚠️ This action cannot be undone and the user data will not be recoverable.
+                  </p>
+                </div>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={confirmDeleteUser}
+                className="bg-red-600 hover:bg-red-700"
+                disabled={deleteUserMutation.isPending}
+              >
+                {deleteUserMutation.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    Deleting...
+                  </>
+                ) : (
+                  "Delete Permanently"
+                )}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </AppLayout>
   );
