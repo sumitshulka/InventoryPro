@@ -2539,8 +2539,18 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteIssue(id: number): Promise<boolean> {
-    const result = await db.delete(issues).where(eq(issues.id, id)).returning();
-    return result.length > 0;
+    try {
+      // Delete all related issue activities first (foreign key constraint)
+      await db.delete(issueActivities).where(eq(issueActivities.issueId, id));
+      
+      // Delete the issue
+      const result = await db.delete(issues).where(eq(issues.id, id)).returning();
+      
+      return result.length > 0;
+    } catch (error) {
+      console.error('Error deleting issue:', error);
+      return false;
+    }
   }
 
   // Issue Activity operations

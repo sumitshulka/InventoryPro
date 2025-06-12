@@ -3399,6 +3399,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Delete issue (admin only, only closed issues)
+  app.delete("/api/issues/:id", async (req, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      if (req.user.role !== 'admin') {
+        return res.status(403).json({ message: "Only administrators can delete issues" });
+      }
+
+      const { id } = req.params;
+      const issue = await storage.getIssue(parseInt(id));
+      
+      if (!issue) {
+        return res.status(404).json({ message: "Issue not found" });
+      }
+
+      if (issue.status !== 'closed') {
+        return res.status(400).json({ message: "Only closed issues can be deleted" });
+      }
+
+      const deleted = await storage.deleteIssue(parseInt(id));
+      
+      if (!deleted) {
+        return res.status(500).json({ message: "Failed to delete issue" });
+      }
+
+      res.json({ message: "Issue deleted successfully" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // ==== Email Configuration Routes ====
   // Get email settings (admin only)
   app.get("/api/email-settings", checkRole("admin"), async (req, res) => {

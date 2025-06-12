@@ -140,6 +140,7 @@ export default function IssuesPage() {
   const [showActivityDialog, setShowActivityDialog] = useState(false);
   const [showFullTextModal, setShowFullTextModal] = useState(false);
   const [fullTextContent, setFullTextContent] = useState("");
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   // Helper function to truncate text and show "View More" button
   const TruncatedText = ({ text, maxLength = 30 }: { text: string; maxLength?: number }) => {
@@ -323,6 +324,27 @@ export default function IssuesPage() {
       toast({
         title: "Error",
         description: error.message || "Failed to reopen issue",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteIssueMutation = useMutation({
+    mutationFn: (issueId: number) =>
+      apiRequest('DELETE', `/api/issues/${issueId}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/issues'] });
+      setShowDeleteDialog(false);
+      setSelectedIssue(null);
+      toast({
+        title: "Success",
+        description: "Issue deleted successfully",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete issue",
         variant: "destructive",
       });
     },
