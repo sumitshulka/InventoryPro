@@ -621,3 +621,44 @@ export const insertAuditLogSchema = createInsertSchema(auditLogs).pick({
 
 export type AuditLog = typeof auditLogs.$inferSelect;
 export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;
+
+// Email Configuration table
+export const emailSettings = pgTable("email_settings", {
+  id: serial("id").primaryKey(),
+  provider: text("provider").notNull(), // smtp, sendgrid, gmail, outlook, ses
+  displayName: text("display_name").notNull(),
+  host: text("host"), // SMTP host
+  port: integer("port"), // SMTP port
+  secure: boolean("secure").default(false), // Use TLS
+  username: text("username"), // SMTP username or API key
+  password: text("password"), // SMTP password or API secret
+  fromEmail: text("from_email").notNull(),
+  fromName: text("from_name").notNull(),
+  isActive: boolean("is_active").notNull().default(false),
+  isVerified: boolean("is_verified").notNull().default(false),
+  verificationTestEmail: text("verification_test_email"),
+  lastTestedAt: timestamp("last_tested_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  providerIdx: index("email_settings_provider_idx").on(table.provider),
+  activeIdx: index("email_settings_active_idx").on(table.isActive),
+  verifiedIdx: index("email_settings_verified_idx").on(table.isVerified),
+}));
+
+export const insertEmailSettingsSchema = createInsertSchema(emailSettings).pick({
+  provider: true,
+  displayName: true,
+  host: true,
+  port: true,
+  secure: true,
+  username: true,
+  password: true,
+  fromEmail: true,
+  fromName: true,
+  isActive: true,
+  verificationTestEmail: true,
+});
+
+export type EmailSettings = typeof emailSettings.$inferSelect;
+export type InsertEmailSettings = z.infer<typeof insertEmailSettingsSchema>;

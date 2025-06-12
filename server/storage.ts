@@ -40,6 +40,8 @@ import {
   InsertNotification,
   AuditLog,
   InsertAuditLog,
+  EmailSettings,
+  InsertEmailSettings,
   users,
   departments,
   locations,
@@ -59,7 +61,8 @@ import {
   transferUpdates,
   rejectedGoods,
   notifications,
-  auditLogs
+  auditLogs,
+  emailSettings
 } from "@shared/schema";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
@@ -255,6 +258,14 @@ export interface IStorage {
 
   // Audit Log operations
   createAuditLog(auditLog: InsertAuditLog): Promise<AuditLog>;
+
+  // Email Settings operations
+  getEmailSettings(): Promise<EmailSettings | undefined>;
+  createEmailSettings(settings: InsertEmailSettings): Promise<EmailSettings>;
+  updateEmailSettings(id: number, settings: Partial<InsertEmailSettings>): Promise<EmailSettings | undefined>;
+  deleteEmailSettings(id: number): Promise<boolean>;
+  getActiveEmailSettings(): Promise<EmailSettings | undefined>;
+  markEmailSettingsAsVerified(id: number): Promise<EmailSettings | undefined>;
 
   // Hierarchy and Approval Workflow helpers
   getUserManager(userId: number): Promise<User | undefined>;
