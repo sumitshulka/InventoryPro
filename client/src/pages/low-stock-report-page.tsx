@@ -31,10 +31,10 @@ interface LowStockItem {
 export default function LowStockReportPage() {
   const [filters, setFilters] = useState({
     asOfDate: format(new Date(), 'yyyy-MM-dd'),
-    warehouseId: '',
-    itemId: '',
-    status: '',
-    categoryId: ''
+    warehouseId: 'all',
+    itemId: 'all',
+    status: 'all',
+    categoryId: 'all'
   });
 
   // Fetch warehouses for filter
@@ -58,10 +58,10 @@ export default function LowStockReportPage() {
     queryFn: async () => {
       const params = new URLSearchParams();
       if (filters.asOfDate) params.append('asOfDate', filters.asOfDate);
-      if (filters.warehouseId) params.append('warehouseId', filters.warehouseId);
-      if (filters.itemId) params.append('itemId', filters.itemId);
-      if (filters.status) params.append('status', filters.status);
-      if (filters.categoryId) params.append('categoryId', filters.categoryId);
+      if (filters.warehouseId && filters.warehouseId !== 'all') params.append('warehouseId', filters.warehouseId);
+      if (filters.itemId && filters.itemId !== 'all') params.append('itemId', filters.itemId);
+      if (filters.status && filters.status !== 'all') params.append('status', filters.status);
+      if (filters.categoryId && filters.categoryId !== 'all') params.append('categoryId', filters.categoryId);
       
       const response = await fetch(`/api/reports/low-stock?${params.toString()}`);
       if (!response.ok) throw new Error('Failed to fetch low stock report');
@@ -76,10 +76,10 @@ export default function LowStockReportPage() {
   const clearFilters = () => {
     setFilters({
       asOfDate: format(new Date(), 'yyyy-MM-dd'),
-      warehouseId: '',
-      itemId: '',
-      status: '',
-      categoryId: ''
+      warehouseId: 'all',
+      itemId: 'all',
+      status: 'all',
+      categoryId: 'all'
     });
   };
 
@@ -255,7 +255,7 @@ export default function LowStockReportPage() {
                     <SelectValue placeholder="All Warehouses" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">All Warehouses</SelectItem>
+                    <SelectItem value="all">All Warehouses</SelectItem>
                     {warehouses.map((warehouse: any) => (
                       <SelectItem key={warehouse.id} value={warehouse.id.toString()}>
                         {warehouse.name}
@@ -272,7 +272,7 @@ export default function LowStockReportPage() {
                     <SelectValue placeholder="All Items" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">All Items</SelectItem>
+                    <SelectItem value="all">All Items</SelectItem>
                     {items.map((item: any) => (
                       <SelectItem key={item.id} value={item.id.toString()}>
                         {item.name} ({item.sku})
@@ -289,7 +289,7 @@ export default function LowStockReportPage() {
                     <SelectValue placeholder="All Categories" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">All Categories</SelectItem>
+                    <SelectItem value="all">All Categories</SelectItem>
                     {categories.map((category: any) => (
                       <SelectItem key={category.id} value={category.id.toString()}>
                         {category.name}
@@ -306,7 +306,7 @@ export default function LowStockReportPage() {
                     <SelectValue placeholder="All Status" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">All Status</SelectItem>
+                    <SelectItem value="all">All Status</SelectItem>
                     <SelectItem value="critical">Critical</SelectItem>
                     <SelectItem value="low">Low</SelectItem>
                     <SelectItem value="warning">Warning</SelectItem>
