@@ -43,7 +43,7 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { apiRequest, queryClient, invalidateRelatedQueries } from "@/lib/queryClient";
-import { Loader2, Plus, Edit, Users, Trash, RefreshCw } from "lucide-react";
+import { Loader2, Plus, Edit, Users, Trash, RefreshCw, Power, PowerOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 
@@ -233,6 +233,30 @@ export default function UsersManagementPage() {
     refetchUsers();
   };
 
+  const toggleUserStatusMutation = useMutation({
+    mutationFn: async ({ userId, isActive }: { userId: number; isActive: boolean }) => {
+      return apiRequest(`/api/users/${userId}/status`, "PATCH", { isActive });
+    },
+    onSuccess: () => {
+      toast({
+        title: "User status updated",
+        description: "User status has been updated successfully.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update user status",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleToggleUserStatus = (userId: number, currentStatus: boolean) => {
+    toggleUserStatusMutation.mutate({ userId, isActive: !currentStatus });
+  };
+
   if (isLoading) {
     return (
       <AppLayout>
@@ -311,13 +335,14 @@ export default function UsersManagementPage() {
                     <TableHead>Manager</TableHead>
                     <TableHead>Warehouse</TableHead>
                     <TableHead>Warehouse Operator</TableHead>
+                    <TableHead>Status</TableHead>
                     {canEdit && <TableHead className="w-[100px]">Actions</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {(users as any[])?.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={canEdit ? 8 : 7} className="text-center py-8 text-gray-500">
+                      <TableCell colSpan={canEdit ? 9 : 8} className="text-center py-8 text-gray-500">
                         {isManager ? "No subordinates assigned to you" : "No users found"}
                       </TableCell>
                     </TableRow>
@@ -356,6 +381,32 @@ export default function UsersManagementPage() {
                           }`}>
                             {userData.isWarehouseOperator ? 'Yes' : 'No'}
                           </span>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center space-x-2">
+                            <span className={`px-2 py-1 rounded-full text-xs ${
+                              userData.isActive 
+                                ? 'bg-green-100 text-green-800' 
+                                : 'bg-red-100 text-red-800'
+                            }`}>
+                              {userData.isActive ? 'Active' : 'Inactive'}
+                            </span>
+                            {canEdit && userData.role !== 'admin' && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleToggleUserStatus(userData.id, userData.isActive)}
+                                disabled={toggleUserStatusMutation.isPending}
+                                title={userData.isActive ? 'Deactivate user' : 'Activate user'}
+                              >
+                                {userData.isActive ? (
+                                  <PowerOff className="h-4 w-4 text-red-600" />
+                                ) : (
+                                  <Power className="h-4 w-4 text-green-600" />
+                                )}
+                              </Button>
+                            )}
+                          </div>
                         </TableCell>
                         {canEdit && (
                           <TableCell>
