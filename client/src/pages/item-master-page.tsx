@@ -240,7 +240,7 @@ export default function ItemMasterPage() {
       minStockLevel: item.minStockLevel,
       categoryId: item.categoryId || null,
       unit: item.unit,
-      status: item.status,
+      status: item.status as "active" | "inactive",
     });
     setIsEditMode(true);
     setEditItemId(item.id);
@@ -360,7 +360,7 @@ export default function ItemMasterPage() {
               <TableBody>
                 {filteredItems.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={isManager ? 8 : 7} className="text-center py-8 text-gray-500">
+                    <TableCell colSpan={9} className="text-center py-8 text-gray-500">
                       No items found
                     </TableCell>
                   </TableRow>
@@ -382,17 +382,57 @@ export default function ItemMasterPage() {
                           </span>
                         </TableCell>
                         <TableCell>{item.unit}</TableCell>
-                        {isManager && (
-                          <TableCell>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleEditItem(item)}
-                            >
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                          </TableCell>
-                        )}
+                        <TableCell>
+                          <Badge variant={item.status === "active" ? "default" : "secondary"}>
+                            {item.status === "active" ? "Active" : "Inactive"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => {
+                                setSelectedItem(item);
+                                setIsViewDialogOpen(true);
+                              }}>
+                                <Eye className="mr-2 h-4 w-4" />
+                                View item details
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => {
+                                setSelectedItem(item);
+                                fetchCheckInHistory(item.id);
+                              }}>
+                                <History className="mr-2 h-4 w-4" />
+                                View check-in history
+                              </DropdownMenuItem>
+                              {isManager && (
+                                <DropdownMenuItem 
+                                  onClick={() => {
+                                    const newStatus = item.status === "active" ? "inactive" : "active";
+                                    updateStatusMutation.mutate({ itemId: item.id, status: newStatus });
+                                  }}
+                                  disabled={item.status === "active" && totalAvailable > 0}
+                                >
+                                  {item.status === "active" ? (
+                                    <>
+                                      <PowerOff className="mr-2 h-4 w-4" />
+                                      Deactivate
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Power className="mr-2 h-4 w-4" />
+                                      Activate
+                                    </>
+                                  )}
+                                </DropdownMenuItem>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
                       </TableRow>
                     );
                   })
@@ -501,18 +541,36 @@ export default function ItemMasterPage() {
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="minStockLevel">Minimum Stock Level</Label>
-                <Input
-                  id="minStockLevel"
-                  type="number"
-                  min="0"
-                  placeholder="Enter minimum stock level"
-                  {...form.register("minStockLevel")}
-                />
-                {form.formState.errors.minStockLevel && (
-                  <p className="text-sm text-red-500">{form.formState.errors.minStockLevel.message}</p>
-                )}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="minStockLevel">Minimum Stock Level</Label>
+                  <Input
+                    id="minStockLevel"
+                    type="number"
+                    min="0"
+                    placeholder="Enter minimum stock level"
+                    {...form.register("minStockLevel")}
+                  />
+                  {form.formState.errors.minStockLevel && (
+                    <p className="text-sm text-red-500">{form.formState.errors.minStockLevel.message}</p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="status">Status</Label>
+                  <Select
+                    onValueChange={(value) => form.setValue("status", value as "active" | "inactive")}
+                    defaultValue={form.getValues("status")}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="active">Active</SelectItem>
+                      <SelectItem value="inactive">Inactive</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </div>
 
@@ -541,6 +599,123 @@ export default function ItemMasterPage() {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* View Item Details Dialog */}
+      <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Item Details</DialogTitle>
+            <DialogDescription>
+              Complete information about the selected item
+            </DialogDescription>
+          </DialogHeader>
+          {selectedItem && (
+            <div className="grid grid-cols-2 gap-4 py-4">
+              <div className="space-y-4">
+                <div>
+                  <Label className="text-sm font-medium text-gray-500">SKU</Label>
+                  <p className="text-sm font-medium">{selectedItem.sku}</p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-gray-500">Name</Label>
+                  <p className="text-sm">{selectedItem.name}</p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-gray-500">Description</Label>
+                  <p className="text-sm">{selectedItem.description || "No description"}</p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-gray-500">Category</Label>
+                  <p className="text-sm">{getCategoryName(selectedItem.categoryId)}</p>
+                </div>
+              </div>
+              <div className="space-y-4">
+                <div>
+                  <Label className="text-sm font-medium text-gray-500">Minimum Stock Level</Label>
+                  <p className="text-sm">{selectedItem.minStockLevel}</p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-gray-500">Unit</Label>
+                  <p className="text-sm">{selectedItem.unit}</p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-gray-500">Status</Label>
+                  <Badge variant={selectedItem.status === "active" ? "default" : "secondary"}>
+                    {selectedItem.status === "active" ? "Active" : "Inactive"}
+                  </Badge>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-gray-500">Total Available</Label>
+                  <p className="text-sm font-medium">{getTotalAvailableQuantity(selectedItem.id)}</p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-gray-500">Created Date</Label>
+                  <p className="text-sm">{format(new Date(selectedItem.createdAt), "PPP")}</p>
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Check-in History Sheet */}
+      <Sheet open={isCheckInHistoryOpen} onOpenChange={setIsCheckInHistoryOpen}>
+        <SheetContent className="w-[600px] sm:w-[800px]">
+          <SheetHeader>
+            <SheetTitle>Check-in History</SheetTitle>
+            <p className="text-sm text-gray-600">
+              {selectedItem && `Check-in history for ${selectedItem.name} (${selectedItem.sku})`}
+            </p>
+          </SheetHeader>
+          <div className="mt-6 space-y-4">
+            {checkInHistory.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                <History className="mx-auto h-8 w-8 mb-2" />
+                <p>No check-in history found for this item</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {checkInHistory.map((transaction, index) => (
+                  <div key={transaction.id || index} className="border rounded-lg p-4 space-y-2">
+                    <div className="flex justify-between items-start">
+                      <div className="space-y-1">
+                        <p className="text-sm font-medium">
+                          Date: {format(new Date(transaction.createdAt), "PPP")}
+                        </p>
+                        <p className="text-sm text-gray-600">
+                          Supplier: {transaction.supplierName || "Not specified"}
+                        </p>
+                        <p className="text-sm text-gray-600">
+                          PO Number: {transaction.poNumber || "Not specified"}
+                        </p>
+                      </div>
+                      <Badge variant="outline">Check-in</Badge>
+                    </div>
+                    <div className="grid grid-cols-3 gap-4 pt-2 border-t">
+                      <div>
+                        <Label className="text-xs text-gray-500">Quantity</Label>
+                        <p className="text-sm font-medium">{transaction.quantity}</p>
+                      </div>
+                      <div>
+                        <Label className="text-xs text-gray-500">Rate</Label>
+                        <p className="text-sm font-medium">
+                          {transaction.rate ? `₹${transaction.rate}` : "Not specified"}
+                        </p>
+                      </div>
+                      <div>
+                        <Label className="text-xs text-gray-500">Amount</Label>
+                        <p className="text-sm font-medium">
+                          {transaction.rate ? `₹${(transaction.quantity * transaction.rate).toFixed(2)}` : "Not specified"}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
     </AppLayout>
   );
 }

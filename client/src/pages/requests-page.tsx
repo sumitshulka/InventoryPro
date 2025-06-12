@@ -466,15 +466,15 @@ export default function RequestsPage() {
                           <SelectValue placeholder="Select an item" />
                         </SelectTrigger>
                         <SelectContent>
-                          {items?.length > 0 ? (
-                            items.map((item: any) => (
+                          {items?.filter((item: any) => item.status === "active").length > 0 ? (
+                            items.filter((item: any) => item.status === "active").map((item: any) => (
                               <SelectItem key={item.id} value={item.id.toString()}>
                                 {item.name} ({item.sku})
                               </SelectItem>
                             ))
                           ) : (
                             <div className="p-2 text-sm text-gray-500">
-                              No items available. Create items in Item Master first.
+                              No active items available. Create items in Item Master first.
                             </div>
                           )}
                         </SelectContent>
