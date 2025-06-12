@@ -59,7 +59,7 @@ export default function Sidebar({ user, isOpen, onClose }: SidebarProps) {
               </div>
               <div>
                 <h1 className="text-lg font-semibold text-gray-900">
-                  {organizationSettings?.organizationName || 'Inventory'}
+                  {(organizationSettings as any)?.organizationName || 'Inventory'}
                 </h1>
                 <p className="text-xs text-gray-500">Management System</p>
               </div>
