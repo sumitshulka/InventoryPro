@@ -158,11 +158,15 @@ export const items = pgTable("items", {
   minStockLevel: integer("min_stock_level").notNull().default(10),
   categoryId: integer("category_id"),
   unit: text("unit").notNull().default("pcs"),
+  status: text("status").notNull().default("active"), // 'active' or 'inactive'
+  createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   itemsCategoryIdx: index("items_category_idx").on(table.categoryId),
   itemsNameIdx: index("items_name_idx").on(table.name),
   itemsUnitIdx: index("items_unit_idx").on(table.unit),
   itemsMinStockIdx: index("items_min_stock_idx").on(table.minStockLevel),
+  itemsStatusIdx: index("items_status_idx").on(table.status),
+  itemsCreatedAtIdx: index("items_created_at_idx").on(table.createdAt),
 }));
 
 export const insertItemSchema = createInsertSchema(items).pick({
@@ -172,6 +176,7 @@ export const insertItemSchema = createInsertSchema(items).pick({
   minStockLevel: true,
   categoryId: true,
   unit: true,
+  status: true,
 });
 
 // Inventory (tracks quantity of items in warehouses)

@@ -33,8 +33,17 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Loader2, Search, Plus, Edit } from "lucide-react";
+import { Loader2, Search, Plus, Edit, MoreVertical, Eye, History, Power, PowerOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Badge } from "@/components/ui/badge";
+import { format } from "date-fns";
 import { useAuth } from "@/hooks/use-auth";
 
 // Item and Category types
@@ -46,6 +55,8 @@ interface Item {
   minStockLevel: number;
   categoryId: number | null;
   unit: string;
+  status: string;
+  createdAt: string;
 }
 
 interface Category {

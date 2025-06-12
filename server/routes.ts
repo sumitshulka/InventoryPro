@@ -483,6 +483,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.status(204).send();
   });
 
+  // Update item status (activate/deactivate) - manager+
+  app.patch("/api/items/:id/status", checkRole("manager"), async (req, res) => {
+    const itemId = parseInt(req.params.id, 10);
+    try {
+      const { status } = z.object({
+        status: z.enum(["active", "inactive"])
+      }).parse(req.body);
+
+      // If deactivating, check that item has 0 quantity in all warehouses
+      if (status === "inactive") {
+        const inventoryItems = await storage.getAllInventory();
+        const itemInventory = inventoryItems.filter(inv => inv.itemId === itemId);
+        const totalQuantity = itemInventory.reduce((sum, inv) => sum + inv.quantity, 0);
+        
+        if (totalQuantity > 0) {
+          return res.status(400).json({ 
+            message: "Cannot deactivate item with available quantity. Current quantity: " + totalQuantity 
+          });
+        }
+      }
+
+      const updatedItem = await storage.updateItem(itemId, { status });
+      if (!updatedItem) {
+        return res.status(404).json({ message: "Item not found" });
+      }
+      res.json(updatedItem);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Get check-in history for an item
+  app.get("/api/items/:id/checkin-history", async (req, res) => {
+    const itemId = parseInt(req.params.id, 10);
+    try {
+      const transactions = await storage.getAllTransactions();
+      const checkInTransactions = transactions.filter(t => 
+        t.itemId === itemId && t.transactionType === "check-in"
+      ).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+      res.json(checkInTransactions);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
   // ==== Inventory Routes ====
   // Get all inventory
   app.get("/api/inventory", async (req, res) => {
