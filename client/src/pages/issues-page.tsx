@@ -138,6 +138,34 @@ export default function IssuesPage() {
   const [selectedIssue, setSelectedIssue] = useState<Issue | null>(null);
   const [showCloseIssueDialog, setShowCloseIssueDialog] = useState(false);
   const [showActivityDialog, setShowActivityDialog] = useState(false);
+  const [showFullTextModal, setShowFullTextModal] = useState(false);
+  const [fullTextContent, setFullTextContent] = useState("");
+
+  // Helper function to truncate text and show "View More" button
+  const TruncatedText = ({ text, maxLength = 150 }: { text: string; maxLength?: number }) => {
+    if (text.length <= maxLength) {
+      return <div className="text-sm bg-gray-50 rounded p-3">{text}</div>;
+    }
+
+    const truncated = text.substring(0, maxLength);
+    
+    return (
+      <div className="text-sm bg-gray-50 rounded p-3">
+        <div className="mb-2">{truncated}...</div>
+        <Button 
+          variant="link" 
+          size="sm" 
+          className="h-auto p-0 text-blue-600 hover:text-blue-800"
+          onClick={() => {
+            setFullTextContent(text);
+            setShowFullTextModal(true);
+          }}
+        >
+          View More
+        </Button>
+      </div>
+    );
+  };
 
   const { data: issues = [], isLoading } = useQuery({
     queryKey: ['/api/issues'],
@@ -1554,9 +1582,7 @@ export default function IssuesPage() {
                       </div>
                     )}
                     {activity.comment && (
-                      <div className="text-sm bg-gray-50 rounded p-3">
-                        {activity.comment}
-                      </div>
+                      <TruncatedText text={activity.comment} />
                     )}
                   </div>
                 ))}
@@ -1567,6 +1593,25 @@ export default function IssuesPage() {
                 )}
               </div>
             </ScrollArea>
+          </DialogContent>
+        </Dialog>
+
+        {/* Full Text Modal */}
+        <Dialog open={showFullTextModal} onOpenChange={setShowFullTextModal}>
+          <DialogContent className="max-w-3xl max-h-[80vh]">
+            <DialogHeader>
+              <DialogTitle>Full Comment Text</DialogTitle>
+            </DialogHeader>
+            <ScrollArea className="max-h-[60vh] pr-4">
+              <div className="text-sm bg-gray-50 rounded p-4 whitespace-pre-wrap">
+                {fullTextContent}
+              </div>
+            </ScrollArea>
+            <div className="flex justify-end pt-4">
+              <Button onClick={() => setShowFullTextModal(false)}>
+                Close
+              </Button>
+            </div>
           </DialogContent>
         </Dialog>
       </div>
