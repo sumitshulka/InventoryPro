@@ -103,7 +103,7 @@ export default function DashboardPage() {
                 </div>
               </div>
               <Button
-                onClick={() => setLocation('/approval-management')}
+                onClick={() => setLocation('/approvals')}
                 variant="secondary"
                 className="bg-white/20 hover:bg-white/30 text-white border-white/30 hover:border-white/50"
               >
