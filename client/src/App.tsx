@@ -25,6 +25,7 @@ import SettingsPage from "@/pages/settings-page";
 import NotificationCenterPage from "@/pages/notification-center-page";
 import AuditTrailPage from "@/pages/audit-trail-page";
 import IssuesPage from "@/pages/issues-page";
+import MyProfilePage from "@/pages/my-profile-page";
 import { ProtectedRoute } from "./lib/protected-route";
 
 function Router() {
@@ -66,6 +67,7 @@ function Router() {
       <ProtectedRoute path="/audit-trail" component={AuditTrailPage} />
       <ProtectedRoute path="/notifications" component={NotificationCenterPage} />
       <ProtectedRoute path="/settings" component={SettingsPage} />
+      <ProtectedRoute path="/my-profile" component={MyProfilePage} />
       <Route component={NotFound} />
     </Switch>
   );

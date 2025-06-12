@@ -4,7 +4,7 @@ import { Separator } from "@/components/ui/separator";
 import { User, Building, Mail, UserCheck, MapPin, Building2 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery } from "@tanstack/react-query";
-import { AppLayout } from "@/components/layout/app-layout";
+import AppLayout from "@/components/layout/app-layout";
 
 export default function MyProfilePage() {
   const { user } = useAuth();

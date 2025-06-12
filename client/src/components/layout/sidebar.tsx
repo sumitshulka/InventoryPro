@@ -385,7 +385,15 @@ export default function Sidebar({ user, isOpen, onClose }: SidebarProps) {
 
           {/* User Profile Section */}
           <div className="mt-auto pt-4 border-t border-gray-200">
-            <div className="flex items-center px-3 py-2">
+            <Link 
+              href="/my-profile"
+              className={cn(
+                "flex items-center px-3 py-2 rounded-md mb-2",
+                isActive("/my-profile") 
+                  ? "bg-primary/10 border-l-4 border-primary text-primary" 
+                  : "text-gray-700 hover:text-primary hover:bg-primary/5"
+              )}
+            >
               <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center mr-3">
                 <span className="text-gray-600 text-sm font-medium">
                   {getUserInitials(user.name)}
@@ -399,7 +407,7 @@ export default function Sidebar({ user, isOpen, onClose }: SidebarProps) {
                   {user.role}
                 </p>
               </div>
-            </div>
+            </Link>
           </div>
         </div>
       </aside>
