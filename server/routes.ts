@@ -2749,7 +2749,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         const allUsers = await db.select({ id: users.id })
           .from(users);
-        targetRecipients = allUsers.map(u => u.id).filter(id => id !== req.user.id);
+        targetRecipients = allUsers.map(u => u.id).filter(id => id !== req.user!.id);
       } else if (notificationData.recipientId) {
         // Single recipient (backward compatibility)
         targetRecipients = [notificationData.recipientId];
@@ -2770,9 +2770,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Log notification creation
       await storage.createAuditLog({
-        userId: req.user.id,
+        userId: req.user!.id,
         action: "CREATE",
-        entity: "notification",
+        entityType: "notification",
         entityId: createdNotifications[0]?.id || 0,
         details: `Created notification to ${targetRecipients.length} recipients: ${notificationData.subject}`
       });
@@ -2914,19 +2914,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Filter based on user role - users can send to managers and admins
       let availableRecipients = [];
       
-      if (req.user.role === 'admin') {
+      if (req.user!.role === 'admin') {
         // Admins can send to anyone
-        availableRecipients = allUsers.filter(u => u.id !== req.user.id);
-      } else if (req.user.role === 'manager') {
+        availableRecipients = allUsers.filter(u => u.id !== req.user!.id);
+      } else if (req.user!.role === 'manager') {
         // Managers can send to other managers, admins, and their subordinates
         availableRecipients = allUsers.filter(u => 
-          u.id !== req.user.id && 
-          (u.role === 'admin' || u.role === 'manager' || u.managerId === req.user.id)
+          u.id !== req.user!.id && 
+          (u.role === 'admin' || u.role === 'manager' || u.managerId === req.user!.id)
         );
       } else {
         // Regular users can send to managers and admins
         availableRecipients = allUsers.filter(u => 
-          u.id !== req.user.id && 
+          u.id !== req.user!.id && 
           (u.role === 'admin' || u.role === 'manager')
         );
       }
