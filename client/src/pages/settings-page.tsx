@@ -483,6 +483,58 @@ export default function SettingsPage() {
     updateOrgSettingsMutation.mutate(data);
   };
 
+  // Email settings mutations
+  const createEmailSettingsMutation = useMutation({
+    mutationFn: async (data: EmailSettingsFormValues) => {
+      const res = await apiRequest("POST", "/api/email-settings", data);
+      return res.json();
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["/api/email-settings"] });
+      toast({
+        title: "Email settings saved",
+        description: "Email configuration has been saved successfully.",
+      });
+      emailForm.reset();
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to save email settings",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const testEmailMutation = useMutation({
+    mutationFn: async (data: EmailSettingsFormValues) => {
+      const res = await apiRequest("POST", "/api/email-settings/test", data);
+      return res.json();
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["/api/email-settings"] });
+      toast({
+        title: "Test email sent",
+        description: "Test email sent successfully. Check your inbox to confirm.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Email test failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const onEmailSubmit = (data: EmailSettingsFormValues) => {
+    createEmailSettingsMutation.mutate(data);
+  };
+
+  const onTestEmail = (data: EmailSettingsFormValues) => {
+    testEmailMutation.mutate(data);
+  };
+
   const handleEdit = (settings: any) => {
     setEditingSettings(settings);
     form.reset({
@@ -562,6 +614,7 @@ export default function SettingsPage() {
             <TabsTrigger value="departments">Departments</TabsTrigger>
             <TabsTrigger value="office-locations">Office Locations</TabsTrigger>
             <TabsTrigger value="organization">Organization</TabsTrigger>
+            <TabsTrigger value="email-config">Email Configuration</TabsTrigger>
             <TabsTrigger value="system-config">System Configuration</TabsTrigger>
           </TabsList>
 
@@ -1165,7 +1218,293 @@ export default function SettingsPage() {
             </Card>
           </TabsContent>
 
+          <TabsContent value="email-config" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Email Provider Configuration</CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Configure your email provider for sending password reset emails and notifications. 
+                  The system supports SMTP, Gmail, Outlook, and SendGrid.
+                </p>
+              </CardHeader>
+              <CardContent>
+                {emailSettingsLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-6 w-6 animate-spin" />
+                    <span className="ml-2">Loading email settings...</span>
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    {emailSettings && (
+                      <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                        <div className="flex items-center">
+                          <div className="flex-shrink-0">
+                            <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                              <span className="text-green-600 text-sm font-medium">✓</span>
+                            </div>
+                          </div>
+                          <div className="ml-3">
+                            <h3 className="text-sm font-medium text-green-800">
+                              Email Provider Configured
+                            </h3>
+                            <div className="mt-1 text-sm text-green-700">
+                              <p>Provider: {(emailSettings as any).provider} ({(emailSettings as any).displayName})</p>
+                              <p>From: {(emailSettings as any).fromName} &lt;{(emailSettings as any).fromEmail}&gt;</p>
+                              <p>Status: {(emailSettings as any).isVerified ? 'Verified' : 'Not verified'}</p>
+                              {(emailSettings as any).lastTestedAt && (
+                                <p>Last tested: {new Date((emailSettings as any).lastTestedAt).toLocaleString()}</p>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
 
+                    <form onSubmit={emailForm.handleSubmit(onEmailSubmit)} className="space-y-6">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-2">
+                          <Label htmlFor="provider">Email Provider</Label>
+                          <Select
+                            value={emailForm.watch("provider")}
+                            onValueChange={(value) => {
+                              emailForm.setValue("provider", value);
+                              if (value === "gmail") {
+                                emailForm.setValue("host", "");
+                                emailForm.setValue("port", 587);
+                                emailForm.setValue("secure", true);
+                              } else if (value === "outlook") {
+                                emailForm.setValue("host", "");
+                                emailForm.setValue("port", 587);
+                                emailForm.setValue("secure", true);
+                              } else if (value === "sendgrid") {
+                                emailForm.setValue("host", "");
+                                emailForm.setValue("port", 587);
+                                emailForm.setValue("secure", true);
+                              } else if (value === "smtp") {
+                                emailForm.setValue("host", "");
+                                emailForm.setValue("port", 587);
+                                emailForm.setValue("secure", false);
+                              }
+                            }}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select email provider" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="smtp">Custom SMTP</SelectItem>
+                              <SelectItem value="gmail">Gmail</SelectItem>
+                              <SelectItem value="outlook">Outlook/Hotmail</SelectItem>
+                              <SelectItem value="sendgrid">SendGrid</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="displayName">Configuration Name</Label>
+                          <Input
+                            id="displayName"
+                            placeholder="e.g., Company Gmail"
+                            {...emailForm.register("displayName")}
+                          />
+                          {emailForm.formState.errors.displayName && (
+                            <p className="text-sm text-red-500">
+                              {emailForm.formState.errors.displayName.message}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      {emailForm.watch("provider") === "smtp" && (
+                        <div className="p-4 border rounded-lg space-y-4">
+                          <h4 className="font-medium">SMTP Server Configuration</h4>
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div className="space-y-2">
+                              <Label htmlFor="host">SMTP Host</Label>
+                              <Input
+                                id="host"
+                                placeholder="smtp.example.com"
+                                {...emailForm.register("host")}
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="port">Port</Label>
+                              <Input
+                                id="port"
+                                type="number"
+                                placeholder="587"
+                                {...emailForm.register("port", { valueAsNumber: true })}
+                              />
+                            </div>
+                            <div className="flex items-center space-x-2 pt-6">
+                              <Switch
+                                id="secure"
+                                checked={emailForm.watch("secure")}
+                                onCheckedChange={(checked) => emailForm.setValue("secure", checked)}
+                              />
+                              <Label htmlFor="secure">Use TLS/SSL</Label>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {emailForm.watch("provider") === "gmail" && (
+                        <div className="p-4 border rounded-lg space-y-4">
+                          <h4 className="font-medium">Gmail Configuration</h4>
+                          <div className="bg-blue-50 p-3 rounded-md">
+                            <p className="text-sm text-blue-700">
+                              <strong>Note:</strong> You'll need to use an App Password, not your regular Gmail password. 
+                              Enable 2-factor authentication and generate an App Password in your Google Account settings.
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
+                      {emailForm.watch("provider") === "outlook" && (
+                        <div className="p-4 border rounded-lg space-y-4">
+                          <h4 className="font-medium">Outlook Configuration</h4>
+                          <div className="bg-blue-50 p-3 rounded-md">
+                            <p className="text-sm text-blue-700">
+                              <strong>Note:</strong> Use your full Outlook.com or Hotmail.com email address and password.
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
+                      {emailForm.watch("provider") === "sendgrid" && (
+                        <div className="p-4 border rounded-lg space-y-4">
+                          <h4 className="font-medium">SendGrid Configuration</h4>
+                          <div className="bg-blue-50 p-3 rounded-md">
+                            <p className="text-sm text-blue-700">
+                              <strong>Note:</strong> You'll need a SendGrid API key. Leave the username field empty and 
+                              enter your API key in the password field.
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="username">
+                            {emailForm.watch("provider") === "sendgrid" ? "Username (leave empty)" : "Username/Email"}
+                          </Label>
+                          <Input
+                            id="username"
+                            placeholder={
+                              emailForm.watch("provider") === "sendgrid" 
+                                ? "Leave empty for SendGrid"
+                                : emailForm.watch("provider") === "gmail"
+                                ? "your-email@gmail.com"
+                                : emailForm.watch("provider") === "outlook"
+                                ? "your-email@outlook.com"
+                                : "SMTP username"
+                            }
+                            {...emailForm.register("username")}
+                            disabled={emailForm.watch("provider") === "sendgrid"}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="password">
+                            {emailForm.watch("provider") === "sendgrid" ? "API Key" : "Password"}
+                          </Label>
+                          <Input
+                            id="password"
+                            type="password"
+                            placeholder={
+                              emailForm.watch("provider") === "sendgrid"
+                                ? "SG.xxxxxxxxxxxx"
+                                : emailForm.watch("provider") === "gmail"
+                                ? "App Password (16 characters)"
+                                : "Password"
+                            }
+                            {...emailForm.register("password")}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="fromEmail">From Email Address</Label>
+                          <Input
+                            id="fromEmail"
+                            type="email"
+                            placeholder="noreply@yourcompany.com"
+                            {...emailForm.register("fromEmail")}
+                          />
+                          {emailForm.formState.errors.fromEmail && (
+                            <p className="text-sm text-red-500">
+                              {emailForm.formState.errors.fromEmail.message}
+                            </p>
+                          )}
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="fromName">From Name</Label>
+                          <Input
+                            id="fromName"
+                            placeholder="Your Company Name"
+                            {...emailForm.register("fromName")}
+                          />
+                          {emailForm.formState.errors.fromName && (
+                            <p className="text-sm text-red-500">
+                              {emailForm.formState.errors.fromName.message}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="verificationTestEmail">Test Email Address</Label>
+                        <Input
+                          id="verificationTestEmail"
+                          type="email"
+                          placeholder="admin@yourcompany.com"
+                          {...emailForm.register("verificationTestEmail")}
+                        />
+                        <p className="text-sm text-muted-foreground">
+                          Enter an email address to receive a test email to verify your configuration works.
+                        </p>
+                        {emailForm.formState.errors.verificationTestEmail && (
+                          <p className="text-sm text-red-500">
+                            {emailForm.formState.errors.verificationTestEmail.message}
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="flex space-x-4">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={emailForm.handleSubmit(onTestEmail)}
+                          disabled={testEmailMutation.isPending}
+                        >
+                          {testEmailMutation.isPending ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Sending Test...
+                            </>
+                          ) : (
+                            "Send Test Email"
+                          )}
+                        </Button>
+                        <Button
+                          type="submit"
+                          disabled={createEmailSettingsMutation.isPending}
+                        >
+                          {createEmailSettingsMutation.isPending ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Saving...
+                            </>
+                          ) : (
+                            emailSettings ? "Update Configuration" : "Save Configuration"
+                          )}
+                        </Button>
+                      </div>
+                    </form>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
 
           <TabsContent value="system-config" className="space-y-4">
             <Card>
