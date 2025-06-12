@@ -851,12 +851,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Create request
       const request = await storage.createRequest(requestData);
       
+      // Optimized: Get inventory data once instead of per-item queries
+      const allInventory = await storage.getAllInventory();
+      const inventoryMap = new Map();
+      
+      // Create efficient lookup map: "itemId-warehouseId" -> inventory
+      for (const inv of allInventory) {
+        const key = `${inv.itemId}-${inv.warehouseId}`;
+        inventoryMap.set(key, inv);
+      }
+      
       // Check stock availability for each item in the requested warehouse
       let needsTransfer = false;
       const transferRequirements = [];
       
-      // Add items to request and check stock
+      // Optimized: Batch create request items and process stock checks
       if (req.body.items && Array.isArray(req.body.items)) {
+        // Prepare batch data for request items
+        const requestItemsData = [];
+        
         for (const item of req.body.items) {
           try {
             const requestItemData = insertRequestItemSchema.parse({
@@ -864,13 +877,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
               requestId: request.id
             });
             
-            await storage.createRequestItem(requestItemData);
+            requestItemsData.push(requestItemData);
             
-            // Check if the requested warehouse has sufficient stock
-            const inventory = await storage.getAllInventory();
-            const stockInWarehouse = inventory.find(inv => 
-              inv.itemId === item.itemId && inv.warehouseId === requestData.warehouseId
-            );
+            // Check stock using pre-loaded inventory map
+            const stockKey = `${item.itemId}-${requestData.warehouseId}`;
+            const stockInWarehouse = inventoryMap.get(stockKey);
             
             if (!stockInWarehouse || stockInWarehouse.quantity < item.quantity) {
               needsTransfer = true;
@@ -883,8 +894,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
               });
             }
           } catch (error) {
-            console.error("Error adding item to request:", error);
+            console.error("Error preparing request item:", error);
           }
+        }
+        
+        // Create all request items at once
+        for (const itemData of requestItemsData) {
+          await storage.createRequestItem(itemData);
         }
       }
       
@@ -2989,7 +3005,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const orgSettings = await db.select().from(organizationSettings).limit(1);
       const valuationMethod = orgSettings[0]?.inventoryValuationMethod || 'Last Value';
 
-      // Get all inventory with item details
+      // Optimized: Get all inventory with item, warehouse, and category details in one query
       const inventoryData = await db.select({
         inventoryId: inventory.id,
         itemId: inventory.itemId,
@@ -3000,28 +3016,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
         itemCategoryId: items.categoryId,
         itemUnit: items.unit,
         warehouseName: warehouses.name,
+        categoryName: categories.name,
       })
       .from(inventory)
       .leftJoin(items, eq(inventory.itemId, items.id))
-      .leftJoin(warehouses, eq(inventory.warehouseId, warehouses.id));
+      .leftJoin(warehouses, eq(inventory.warehouseId, warehouses.id))
+      .leftJoin(categories, eq(items.categoryId, categories.id));
+
+      // Optimized: Get ALL relevant transactions in one bulk query instead of per-item queries
+      const allTransactions = await db.select({
+        id: transactions.id,
+        itemId: transactions.itemId,
+        quantity: transactions.quantity,
+        transactionType: transactions.transactionType,
+        sourceWarehouseId: transactions.sourceWarehouseId,
+        destinationWarehouseId: transactions.destinationWarehouseId,
+        status: transactions.status,
+        cost: transactions.cost,
+        createdAt: transactions.createdAt,
+      })
+      .from(transactions)
+      .where(lte(transactions.createdAt, asOfDate))
+      .orderBy(transactions.itemId, transactions.createdAt);
+
+      // Create efficient lookup maps to avoid repeated queries
+      const transactionsByItem = new Map();
+      const checkInsByItemWarehouse = new Map();
+
+      // Group transactions by item for efficient processing
+      for (const transaction of allTransactions) {
+        // Group all transactions by item
+        if (!transactionsByItem.has(transaction.itemId)) {
+          transactionsByItem.set(transaction.itemId, []);
+        }
+        transactionsByItem.get(transaction.itemId).push(transaction);
+
+        // Group check-in transactions by item-warehouse combination
+        if (transaction.transactionType === 'check-in' && transaction.destinationWarehouseId) {
+          const key = `${transaction.itemId}-${transaction.destinationWarehouseId}`;
+          if (!checkInsByItemWarehouse.has(key)) {
+            checkInsByItemWarehouse.set(key, []);
+          }
+          checkInsByItemWarehouse.get(key).push(transaction);
+        }
+      }
 
       const valuationReport = [];
 
       for (const invItem of inventoryData) {
         if (!invItem.itemId) continue;
 
-        // Get all transactions for this item and warehouse up to the "as of" date
-        const allTransactions = await db.select()
-        .from(transactions)
-        .where(and(
-          eq(transactions.itemId, invItem.itemId),
-          lte(transactions.createdAt, asOfDate)
-        ))
-        .orderBy(transactions.createdAt);
+        // Get pre-grouped transactions for this item (no database query needed)
+        const itemTransactions = transactionsByItem.get(invItem.itemId) || [];
 
-        // Calculate inventory position as of the date by processing all transactions for this warehouse
+        // Calculate inventory position as of the date by processing transactions for this warehouse
         let inventoryAsOfDate = 0;
-        for (const transaction of allTransactions) {
+        for (const transaction of itemTransactions) {
           if (transaction.transactionType === 'check-in' && transaction.destinationWarehouseId === invItem.warehouseId) {
             inventoryAsOfDate += transaction.quantity;
           } else if (transaction.transactionType === 'issue' && transaction.sourceWarehouseId === invItem.warehouseId) {
@@ -3041,11 +3091,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           continue;
         }
 
-        // Filter for check-in transactions only for this warehouse
-        const checkInTransactions = allTransactions.filter(t => 
-          t.transactionType === 'check-in' && 
-          t.destinationWarehouseId === invItem.warehouseId
-        );
+        // Get check-in transactions for this item-warehouse combination (pre-grouped)
+        const checkInKey = `${invItem.itemId}-${invItem.warehouseId}`;
+        const checkInTransactions = checkInsByItemWarehouse.get(checkInKey) || [];
 
         if (checkInTransactions.length === 0) {
           // No check-in transactions, skip this item
@@ -3097,24 +3145,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         const totalValue = unitValue * inventoryAsOfDate;
 
-        // Get category name if categoryId exists
-        let categoryName = 'Uncategorized';
-        if (invItem.itemCategoryId) {
-          const categoryResult = await db.select({
-            name: categories.name
-          })
-          .from(categories)
-          .where(eq(categories.id, invItem.itemCategoryId))
-          .limit(1);
-          
-          categoryName = categoryResult[0]?.name || 'Uncategorized';
-        }
-
         valuationReport.push({
           id: invItem.inventoryId,
           name: invItem.itemName || 'Unknown Item',
           sku: invItem.itemSku || 'N/A',
-          category: categoryName,
+          category: invItem.categoryName || 'Uncategorized',
           warehouse: invItem.warehouseName || 'Unknown Warehouse',
           currentStock: inventoryAsOfDate,
           unit: invItem.itemUnit || 'pcs',
