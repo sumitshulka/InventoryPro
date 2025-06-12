@@ -1470,17 +1470,22 @@ export default function SettingsPage() {
                       </div>
 
                       {emailForm.watch("provider") === "outlook" && (
-                        <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-                          <h4 className="font-medium text-blue-900 mb-2">Outlook/Office365 Setup</h4>
-                          <p className="text-sm text-blue-800 mb-2">
-                            For Outlook/Office365 accounts, you need to use an App Password instead of your regular password:
+                        <div className="bg-amber-50 p-4 rounded-lg border border-amber-200">
+                          <h4 className="font-medium text-amber-900 mb-2">⚠️ Outlook/Office365 Authentication Notice</h4>
+                          <p className="text-sm text-amber-800 mb-3">
+                            Microsoft has disabled basic authentication for most Office365/Outlook.com accounts. This may cause connection failures even with App Passwords.
                           </p>
-                          <ol className="text-sm text-blue-800 list-decimal list-inside space-y-1">
-                            <li>Go to Microsoft Account Security settings</li>
-                            <li>Enable Two-Factor Authentication if not already enabled</li>
-                            <li>Generate an App Password for "Mail" applications</li>
-                            <li>Use this App Password in the password field above</li>
-                          </ol>
+                          <div className="text-sm text-amber-800 mb-3">
+                            <p className="font-medium mb-1">Recommended alternatives:</p>
+                            <ul className="list-disc list-inside space-y-1 ml-2">
+                              <li>Use Gmail with App Password (more reliable)</li>
+                              <li>Use SendGrid for transactional emails</li>
+                              <li>Use custom SMTP provider</li>
+                            </ul>
+                          </div>
+                          <p className="text-sm text-amber-800">
+                            If you must use Outlook, ensure your organization allows SMTP authentication and you have the correct App Password.
+                          </p>
                         </div>
                       )}
 

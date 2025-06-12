@@ -45,17 +45,14 @@ export class EmailService {
         break;
         
       case 'outlook':
+        // For Outlook/Office365, use OAuth2 or suggest alternative
         this.transporter = nodemailer.createTransport({
-          host: 'smtp-mail.outlook.com',
-          port: 587,
-          secure: false,
-          requireTLS: true,
+          service: 'Outlook365',
           auth: {
             user: settings.username!,
             pass: settings.password!,
           },
           tls: {
-            ciphers: 'SSLv3',
             rejectUnauthorized: false,
           },
         });
