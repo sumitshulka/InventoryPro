@@ -26,7 +26,6 @@ import NotificationCenterPage from "@/pages/notification-center-page";
 import AuditTrailPage from "@/pages/audit-trail-page";
 import IssuesPage from "@/pages/issues-page";
 import MyProfilePage from "@/pages/my-profile-page";
-import TestProfilePage from "@/pages/test-profile-page";
 import { ProtectedRoute } from "./lib/protected-route";
 
 function Router() {
@@ -46,7 +45,6 @@ function Router() {
       <Route path="/auth">
         {user ? <Route path="/" component={DashboardPage} /> : <AuthPage />}
       </Route>
-      <ProtectedRoute path="/test-profile" component={TestProfilePage} />
       <ProtectedRoute path="/my-profile" component={MyProfilePage} />
       <ProtectedRoute path="/" component={DashboardPage} />
       <ProtectedRoute path="/inventory" component={InventoryPage} />

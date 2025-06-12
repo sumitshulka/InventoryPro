@@ -9,8 +9,6 @@ import AppLayout from "@/components/layout/app-layout";
 export default function MyProfilePage() {
   const { user } = useAuth();
 
-  console.log("MyProfilePage rendering, user:", user);
-
   const { data: warehouses } = useQuery({
     queryKey: ["/api/warehouses"],
     enabled: user?.role === "admin" || user?.role === "manager" || user?.isWarehouseOperator,
@@ -76,10 +74,7 @@ export default function MyProfilePage() {
           <p className="text-muted-foreground">View your account information and role details</p>
         </div>
         
-        {/* Simple test content */}
-        <div className="bg-blue-50 p-4 rounded-lg">
-          <p className="text-blue-800">Profile page is working! User: {user.name}</p>
-        </div>
+
 
         <div className="grid gap-6 md:grid-cols-2">
           {/* Personal Information */}
