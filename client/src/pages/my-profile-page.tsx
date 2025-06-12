@@ -11,10 +11,12 @@ export default function MyProfilePage() {
 
   const { data: warehouses } = useQuery({
     queryKey: ["/api/warehouses"],
+    enabled: user?.role === "admin" || user?.role === "manager" || user?.isWarehouseOperator,
   });
 
   const { data: departments } = useQuery({
     queryKey: ["/api/departments"],
+    enabled: user?.role === "admin" || user?.role === "manager",
   });
 
   const { data: managers } = useQuery({
@@ -24,18 +26,21 @@ export default function MyProfilePage() {
 
   const getWarehouseName = (warehouseId: number | null) => {
     if (!warehouseId) return "Not assigned";
+    if (!warehouses) return "Warehouse information restricted";
     const warehouse = (warehouses as any[])?.find(w => w.id === warehouseId);
     return warehouse?.name || "Unknown Warehouse";
   };
 
   const getDepartmentName = (departmentId: number | null) => {
     if (!departmentId) return "Not assigned";
+    if (!departments) return "Department information restricted";
     const department = (departments as any[])?.find(d => d.id === departmentId);
     return department?.name || "Unknown Department";
   };
 
   const getManagerName = (managerId: number | null) => {
     if (!managerId) return "No manager assigned";
+    if (!managers) return "Manager information restricted";
     const manager = (managers as any[])?.find(m => m.id === managerId);
     return manager?.name || "Unknown Manager";
   };

@@ -36,6 +36,7 @@ export default function Sidebar({ user, isOpen, onClose }: SidebarProps) {
 
   const { data: organizationSettings } = useQuery({
     queryKey: ['/api/organization-settings'],
+    enabled: user?.role === 'admin' || user?.role === 'manager',
   });
 
   return (
@@ -53,7 +54,7 @@ export default function Sidebar({ user, isOpen, onClose }: SidebarProps) {
             <div className="flex items-center">
               <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center mr-3">
                 <span className="text-white font-bold text-sm">
-                  {organizationSettings?.organizationName?.charAt(0) || 'I'}
+                  {(organizationSettings as any)?.organizationName?.charAt(0) || 'I'}
                 </span>
               </div>
               <div>
@@ -162,22 +163,20 @@ export default function Sidebar({ user, isOpen, onClose }: SidebarProps) {
                       </Link>
                     </li>
                   )}
-                  {!isRegularEmployee && (
-                    <li>
-                      <Link 
-                        href="/requests"
-                        className={cn(
-                          "flex items-center px-3 py-2 rounded-md",
-                          isActive("/requests") 
-                            ? "bg-primary/10 border-l-4 border-primary text-primary" 
-                            : "text-gray-700 hover:text-primary hover:bg-primary/5"
-                        )}
-                      >
-                        <span className="material-icons mr-3">output</span>
-                        <span className="whitespace-nowrap">Check Out</span>
-                      </Link>
-                    </li>
-                  )}
+                  <li>
+                    <Link 
+                      href="/requests"
+                      className={cn(
+                        "flex items-center px-3 py-2 rounded-md",
+                        isActive("/requests") 
+                          ? "bg-primary/10 border-l-4 border-primary text-primary" 
+                          : "text-gray-700 hover:text-primary hover:bg-primary/5"
+                      )}
+                    >
+                      <span className="material-icons mr-3">output</span>
+                      <span className="whitespace-nowrap">{isRegularEmployee ? "Request Items" : "Check Out"}</span>
+                    </Link>
+                  </li>
                   {hasInventoryAccess && (
                     <li>
                       <Link 

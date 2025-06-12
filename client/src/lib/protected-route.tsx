@@ -12,8 +12,8 @@ const RESTRICTED_PATHS = {
   reports: ['/stock-report', '/movement-report', '/reports/inventory-valuation'],
   // Management - only admin and managers
   management: ['/users', '/users-management', '/categories', '/departments', '/approvals', '/settings', '/audit-trail'],
-  // Operations - only admin, manager, or warehouse operators
-  operations: ['/requests', '/check-in']
+  // Operations - only admin, manager, or warehouse operators (excluding regular requests)
+  operations: ['/check-in']
 };
 
 function AccessDeniedPage({ path }: { path: string }) {
