@@ -2627,11 +2627,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Status change permissions
       const canUpdateStatus = (newStatus: string) => {
+        // Allow admins or warehouse managers to approve pending transfers
+        if (newStatus === 'approved' && transfer.status === 'pending') {
+          return user.role === 'admin' || managesSourceWarehouse || managesDestinationWarehouse;
+        }
         if (newStatus === 'in-transit' && transfer.status === 'approved') {
           return managesSourceWarehouse;
         }
         if ((newStatus === 'completed' || newStatus === 'rejected') && transfer.status === 'in-transit') {
           return managesDestinationWarehouse;
+        }
+        // Allow admins or relevant warehouse managers to reject pending transfers
+        if (newStatus === 'rejected' && transfer.status === 'pending') {
+          return user.role === 'admin' || managesSourceWarehouse || managesDestinationWarehouse;
         }
         return false;
       };
