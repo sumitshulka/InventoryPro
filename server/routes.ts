@@ -3569,6 +3569,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Toggle user status (admin only)
+  app.patch("/api/users/:id/status", checkRole("admin"), async (req, res) => {
+    try {
+      const userId = parseInt(req.params.id);
+      const { isActive } = req.body;
+
+      if (typeof isActive !== 'boolean') {
+        return res.status(400).json({ message: "isActive must be a boolean value" });
+      }
+
+      // Prevent deactivating admin users
+      const user = await storage.getUserById(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      if (user.role === 'admin' && !isActive) {
+        return res.status(400).json({ message: "Cannot deactivate admin users" });
+      }
+
+      const updatedUser = await storage.updateUserStatus(userId, isActive);
+      res.json(updatedUser);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

@@ -678,7 +678,8 @@ export class MemStorage implements IStorage {
       managerId: user.managerId || null,
       warehouseId: user.warehouseId || null,
       departmentId: user.departmentId || null,
-      isWarehouseOperator: user.isWarehouseOperator || false
+      isWarehouseOperator: user.isWarehouseOperator || false,
+      isActive: user.isActive !== undefined ? user.isActive : true
     };
     this.users.set(id, newUser);
     return newUser;
@@ -699,6 +700,23 @@ export class MemStorage implements IStorage {
 
   async deleteUser(id: number): Promise<boolean> {
     return this.users.delete(id);
+  }
+
+  async updateUserStatus(id: number, isActive: boolean): Promise<User | undefined> {
+    if (this.isPostgreSQL) {
+      const [updatedUser] = await db.update(users)
+        .set({ isActive })
+        .where(eq(users.id, id))
+        .returning();
+      return updatedUser;
+    } else {
+      const user = this.users.get(id);
+      if (!user) return undefined;
+      
+      const updatedUser = { ...user, isActive };
+      this.users.set(id, updatedUser);
+      return updatedUser;
+    }
   }
 
   // Category operations
@@ -1340,6 +1358,11 @@ export class DatabaseStorage implements IStorage {
     return user || undefined;
   }
 
+  async getUserById(id: number): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user || undefined;
+  }
+
   async getUserByUsername(username: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.username, username));
     return user || undefined;
@@ -1411,6 +1434,14 @@ export class DatabaseStorage implements IStorage {
       console.error('Error deleting user:', error);
       return false;
     }
+  }
+
+  async updateUserStatus(id: number, isActive: boolean): Promise<User | undefined> {
+    const [updatedUser] = await db.update(users)
+      .set({ isActive })
+      .where(eq(users.id, id))
+      .returning();
+    return updatedUser || undefined;
   }
 
   // Department operations
