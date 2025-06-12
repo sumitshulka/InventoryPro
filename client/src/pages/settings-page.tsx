@@ -535,6 +535,27 @@ export default function SettingsPage() {
     testEmailMutation.mutate(data);
   };
 
+  const deleteEmailSettingsMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("DELETE", "/api/email-settings");
+      return res.json();
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["/api/email-settings"] });
+      toast({
+        title: "Email settings deleted",
+        description: "Email configuration has been deleted successfully.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to delete email settings",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleEdit = (settings: any) => {
     setEditingSettings(settings);
     form.reset({
@@ -1236,24 +1257,78 @@ export default function SettingsPage() {
                 ) : (
                   <div className="space-y-6">
                     {emailSettings && (
-                      <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-                        <div className="flex items-center">
-                          <div className="flex-shrink-0">
-                            <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-                              <span className="text-green-600 text-sm font-medium">✓</span>
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <h3 className="text-lg font-medium">Saved Email Configurations</h3>
+                        </div>
+                        
+                        <div className="border rounded-lg p-4">
+                          <div className="flex items-center justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center space-x-3">
+                                <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                                  <Settings className="h-5 w-5 text-blue-600" />
+                                </div>
+                                <div>
+                                  <h4 className="font-medium text-gray-900">
+                                    {(emailSettings as any).displayName || 'Email Configuration'}
+                                  </h4>
+                                  <p className="text-sm text-gray-500">
+                                    {(emailSettings as any).provider?.toUpperCase()} • {(emailSettings as any).fromEmail}
+                                  </p>
+                                </div>
+                              </div>
+                              
+                              <div className="mt-3 flex items-center space-x-4 text-sm text-gray-600">
+                                <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                                  (emailSettings as any).isVerified 
+                                    ? 'bg-green-100 text-green-800' 
+                                    : 'bg-yellow-100 text-yellow-800'
+                                }`}>
+                                  {(emailSettings as any).isVerified ? 'Verified' : 'Not Verified'}
+                                </span>
+                                {(emailSettings as any).lastTestedAt && (
+                                  <span>Last tested: {new Date((emailSettings as any).lastTestedAt).toLocaleString()}</span>
+                                )}
+                              </div>
                             </div>
-                          </div>
-                          <div className="ml-3">
-                            <h3 className="text-sm font-medium text-green-800">
-                              Email Provider Configured
-                            </h3>
-                            <div className="mt-1 text-sm text-green-700">
-                              <p>Provider: {(emailSettings as any).provider} ({(emailSettings as any).displayName})</p>
-                              <p>From: {(emailSettings as any).fromName} &lt;{(emailSettings as any).fromEmail}&gt;</p>
-                              <p>Status: {(emailSettings as any).isVerified ? 'Verified' : 'Not verified'}</p>
-                              {(emailSettings as any).lastTestedAt && (
-                                <p>Last tested: {new Date((emailSettings as any).lastTestedAt).toLocaleString()}</p>
-                              )}
+                            
+                            <div className="flex items-center space-x-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  // Pre-fill form with existing settings
+                                  emailForm.reset({
+                                    provider: (emailSettings as any).provider,
+                                    displayName: (emailSettings as any).displayName,
+                                    host: (emailSettings as any).host || '',
+                                    port: (emailSettings as any).port || 587,
+                                    secure: (emailSettings as any).secure || false,
+                                    username: (emailSettings as any).username || '',
+                                    password: '', // Don't pre-fill password for security
+                                    fromEmail: (emailSettings as any).fromEmail,
+                                    fromName: (emailSettings as any).fromName,
+                                    verificationTestEmail: '',
+                                  });
+                                }}
+                              >
+                                <Edit className="h-4 w-4 mr-1" />
+                                Edit
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  if (confirm('Are you sure you want to delete this email configuration?')) {
+                                    deleteEmailSettingsMutation.mutate();
+                                  }
+                                }}
+                                disabled={deleteEmailSettingsMutation.isPending}
+                              >
+                                <Trash2 className="h-4 w-4 mr-1" />
+                                {deleteEmailSettingsMutation.isPending ? 'Deleting...' : 'Delete'}
+                              </Button>
                             </div>
                           </div>
                         </div>

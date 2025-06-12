@@ -3406,10 +3406,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Delete email settings (admin only)
-  app.delete("/api/email-settings/:id", checkRole("admin"), async (req, res) => {
+  app.delete("/api/email-settings", checkRole("admin"), async (req, res) => {
     try {
-      const id = parseInt(req.params.id);
-      const deleted = await storage.deleteEmailSettings(id);
+      const deleted = await storage.deleteEmailSettings();
       if (!deleted) {
         return res.status(404).json({ message: "Email settings not found" });
       }

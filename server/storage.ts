@@ -263,7 +263,7 @@ export interface IStorage {
   getEmailSettings(): Promise<EmailSettings | undefined>;
   createEmailSettings(settings: InsertEmailSettings): Promise<EmailSettings>;
   updateEmailSettings(id: number, settings: Partial<InsertEmailSettings>): Promise<EmailSettings | undefined>;
-  deleteEmailSettings(id: number): Promise<boolean>;
+  deleteEmailSettings(): Promise<boolean>;
   getActiveEmailSettings(): Promise<EmailSettings | undefined>;
   markEmailSettingsAsVerified(id: number): Promise<EmailSettings | undefined>;
 
@@ -2335,11 +2335,9 @@ export class DatabaseStorage implements IStorage {
     return updatedSettings;
   }
 
-  async deleteEmailSettings(id: number): Promise<boolean> {
-    const [deleted] = await db.delete(emailSettings)
-      .where(eq(emailSettings.id, id))
-      .returning();
-    return !!deleted;
+  async deleteEmailSettings(): Promise<boolean> {
+    const result = await db.delete(emailSettings).returning();
+    return result.length > 0;
   }
 
   async getActiveEmailSettings(): Promise<EmailSettings | undefined> {
