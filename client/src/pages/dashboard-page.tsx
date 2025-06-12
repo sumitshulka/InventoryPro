@@ -84,6 +84,37 @@ export default function DashboardPage() {
         )}
       </div>
 
+      {/* Pending Approvals Notification Strip */}
+      {pendingApprovalsCount > 0 && (user?.role === 'admin' || user?.role === 'manager') && (
+        <div className="mb-6">
+          <div className="bg-gradient-to-r from-orange-500 to-red-500 text-white p-4 rounded-lg shadow-lg border-l-4 border-orange-600">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <div className="flex-shrink-0">
+                  <Bell className="h-6 w-6 text-white animate-pulse" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold">
+                    {pendingApprovalsCount} Approval{pendingApprovalsCount !== 1 ? 's' : ''} Pending
+                  </h3>
+                  <p className="text-orange-100 text-sm">
+                    You have {pendingApprovalsCount} request{pendingApprovalsCount !== 1 ? 's' : ''} waiting for your approval
+                  </p>
+                </div>
+              </div>
+              <Button
+                onClick={() => setLocation('/approval-management')}
+                variant="secondary"
+                className="bg-white/20 hover:bg-white/30 text-white border-white/30 hover:border-white/50"
+              >
+                Review Now
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Dashboard Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <MetricCard
