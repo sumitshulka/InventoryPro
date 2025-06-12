@@ -205,7 +205,7 @@ export default function InventoryValuationReportPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {currencySymbol}{filteredAndSortedData.length > 0 ? (totalInventoryValue / filteredAndSortedData.reduce((sum, item) => sum + item.currentStock, 0)).toFixed(2) : '0.00'}
+                {filteredAndSortedData.length > 0 ? formatCurrency(totalInventoryValue / filteredAndSortedData.reduce((sum, item) => sum + item.currentStock, 0)) : formatCurrency(0)}
               </div>
               <p className="text-xs text-muted-foreground">
                 Per unit across all items
