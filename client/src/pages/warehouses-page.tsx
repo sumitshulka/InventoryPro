@@ -125,9 +125,17 @@ export default function WarehousesPage() {
       resetForm();
     },
     onError: (error: Error) => {
+      let userMessage = error.message;
+      
+      if (error.message.includes("Cannot assign user as warehouse manager")) {
+        userMessage = "This user cannot be assigned as warehouse manager because they are not assigned to this warehouse.";
+      } else if (error.message.includes("Warehouse already exists")) {
+        userMessage = "A warehouse with this name already exists.";
+      }
+      
       toast({
-        title: "Error",
-        description: error.message,
+        title: isEditMode ? "Failed to update warehouse" : "Failed to create warehouse",
+        description: userMessage,
         variant: "destructive",
       });
     },

@@ -147,9 +147,22 @@ export default function UsersManagementPage() {
       resetForm();
     },
     onError: (error: Error) => {
+      // Format error messages to be more user-friendly
+      let userMessage = error.message;
+      
+      if (error.message.includes("Cannot change warehouse assignment")) {
+        userMessage = "Cannot change warehouse assignment - this user manages a warehouse and must remain assigned to it.";
+      } else if (error.message.includes("Cannot assign user as warehouse manager")) {
+        userMessage = "This user cannot be assigned as a warehouse manager because they are not assigned to that warehouse.";
+      } else if (error.message.includes("Username already exists")) {
+        userMessage = "This username is already taken. Please choose a different username.";
+      } else if (error.message.includes("Email already exists")) {
+        userMessage = "This email address is already registered. Please use a different email.";
+      }
+      
       toast({
-        title: "Error",
-        description: error.message,
+        title: isEditMode ? "Failed to update user" : "Failed to create user",
+        description: userMessage,
         variant: "destructive",
       });
     },
@@ -170,9 +183,17 @@ export default function UsersManagementPage() {
       setUserToDelete(null);
     },
     onError: (error: Error) => {
+      let userMessage = error.message;
+      
+      if (error.message.includes("Cannot delete your own account")) {
+        userMessage = "You cannot delete your own account.";
+      } else if (error.message.includes("User not found")) {
+        userMessage = "The user you're trying to delete was not found.";
+      }
+      
       toast({
-        title: "Error",
-        description: error.message,
+        title: "Failed to delete user",
+        description: userMessage,
         variant: "destructive",
       });
     },
