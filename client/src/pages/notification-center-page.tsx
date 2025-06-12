@@ -643,58 +643,65 @@ export default function NotificationCenterPage() {
                               Reply
                             </Button>
                           </DialogTrigger>
-                          <DialogContent>
+                          <DialogContent className="max-w-md">
                             <DialogHeader>
                               <DialogTitle>Reply to: {selectedNotification.subject}</DialogTitle>
                             </DialogHeader>
-                            <Form {...replyForm}>
-                              <form onSubmit={replyForm.handleSubmit(handleReply)} className="space-y-4">
-                                <FormField
-                                  control={replyForm.control}
-                                  name="priority"
-                                  render={({ field }) => (
-                                    <FormItem>
-                                      <FormLabel>Priority</FormLabel>
-                                      <Select onValueChange={field.onChange} value={field.value}>
+                            <div className="space-y-4 py-4">
+                              <Form {...replyForm}>
+                                <form onSubmit={replyForm.handleSubmit(handleReply)} className="space-y-4">
+                                  <FormField
+                                    control={replyForm.control}
+                                    name="message"
+                                    render={({ field }) => (
+                                      <FormItem>
+                                        <FormLabel>Reply Message</FormLabel>
                                         <FormControl>
-                                          <SelectTrigger>
-                                            <SelectValue />
-                                          </SelectTrigger>
+                                          <Textarea 
+                                            {...field} 
+                                            placeholder="Type your reply here..." 
+                                            rows={6}
+                                            className="min-h-[120px]"
+                                          />
                                         </FormControl>
-                                        <SelectContent>
-                                          <SelectItem value="low">Low</SelectItem>
-                                          <SelectItem value="normal">Normal</SelectItem>
-                                          <SelectItem value="high">High</SelectItem>
-                                          <SelectItem value="urgent">Urgent</SelectItem>
-                                        </SelectContent>
-                                      </Select>
-                                      <FormMessage />
-                                    </FormItem>
-                                  )}
-                                />
-                                <FormField
-                                  control={replyForm.control}
-                                  name="message"
-                                  render={({ field }) => (
-                                    <FormItem>
-                                      <FormLabel>Reply Message</FormLabel>
-                                      <FormControl>
-                                        <Textarea {...field} placeholder="Enter your reply" rows={6} />
-                                      </FormControl>
-                                      <FormMessage />
-                                    </FormItem>
-                                  )}
-                                />
-                                <div className="flex justify-end gap-2">
-                                  <Button type="button" variant="outline" onClick={() => setShowReplyDialog(false)}>
-                                    Cancel
-                                  </Button>
-                                  <Button type="submit" disabled={replyMutation.isPending}>
-                                    {replyMutation.isPending ? "Sending..." : "Send Reply"}
-                                  </Button>
-                                </div>
-                              </form>
-                            </Form>
+                                        <FormMessage />
+                                      </FormItem>
+                                    )}
+                                  />
+                                  <FormField
+                                    control={replyForm.control}
+                                    name="priority"
+                                    render={({ field }) => (
+                                      <FormItem>
+                                        <FormLabel>Priority</FormLabel>
+                                        <Select onValueChange={field.onChange} value={field.value}>
+                                          <FormControl>
+                                            <SelectTrigger>
+                                              <SelectValue placeholder="Select priority" />
+                                            </SelectTrigger>
+                                          </FormControl>
+                                          <SelectContent>
+                                            <SelectItem value="low">Low</SelectItem>
+                                            <SelectItem value="normal">Normal</SelectItem>
+                                            <SelectItem value="high">High</SelectItem>
+                                            <SelectItem value="urgent">Urgent</SelectItem>
+                                          </SelectContent>
+                                        </Select>
+                                        <FormMessage />
+                                      </FormItem>
+                                    )}
+                                  />
+                                  <div className="flex justify-end gap-2 pt-4">
+                                    <Button type="button" variant="outline" onClick={() => setShowReplyDialog(false)}>
+                                      Cancel
+                                    </Button>
+                                    <Button type="submit" disabled={replyMutation.isPending}>
+                                      {replyMutation.isPending ? "Sending..." : "Send Reply"}
+                                    </Button>
+                                  </div>
+                                </form>
+                              </Form>
+                            </div>
                           </DialogContent>
                         </Dialog>
                         
