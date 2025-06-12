@@ -43,7 +43,7 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { apiRequest, queryClient, invalidateRelatedQueries } from "@/lib/queryClient";
-import { Loader2, Plus, Edit, Users, Trash } from "lucide-react";
+import { Loader2, Plus, Edit, Users, Trash, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 
@@ -226,6 +226,13 @@ export default function UsersManagementPage() {
     createUserMutation.mutate(values);
   };
 
+  const handleRefresh = () => {
+    queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/warehouses"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/departments"] });
+    refetchUsers();
+  };
+
   if (isLoading) {
     return (
       <AppLayout>
@@ -249,12 +256,22 @@ export default function UsersManagementPage() {
               }
             </p>
           </div>
-          {canEdit && (
-            <Button onClick={() => setIsDialogOpen(true)}>
-              <Plus className="mr-2 h-4 w-4" />
-              Add User
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={handleRefresh}
+              disabled={isLoading}
+            >
+              <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+              Refresh
             </Button>
-          )}
+            {canEdit && (
+              <Button onClick={() => setIsDialogOpen(true)}>
+                <Plus className="mr-2 h-4 w-4" />
+                Add User
+              </Button>
+            )}
+          </div>
         </div>
 
         {isManager && (
@@ -592,37 +609,39 @@ export default function UsersManagementPage() {
           <AlertDialogContent className="max-w-md">
             <AlertDialogHeader>
               <AlertDialogTitle className="text-red-600">⚠️ Permanently Delete User</AlertDialogTitle>
-              <AlertDialogDescription className="space-y-3">
-                <div className="text-sm font-medium text-gray-900">
-                  You are about to permanently delete this user from the system.
-                </div>
-                
-                {userToDelete && users && (
-                  <div className="bg-gray-50 p-3 rounded-md">
-                    <p className="font-medium text-sm">
-                      {(users as any[])?.find((u: any) => u.id === userToDelete)?.name}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      {(users as any[])?.find((u: any) => u.id === userToDelete)?.username} • {(users as any[])?.find((u: any) => u.id === userToDelete)?.role}
-                    </p>
+              <AlertDialogDescription asChild>
+                <div className="space-y-3">
+                  <div className="text-sm font-medium text-gray-900">
+                    You are about to permanently delete this user from the system.
                   </div>
-                )}
+                  
+                  {userToDelete && users && (
+                    <div className="bg-gray-50 p-3 rounded-md">
+                      <div className="font-medium text-sm">
+                        {(users as any[])?.find((u: any) => u.id === userToDelete)?.name}
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        {(users as any[])?.find((u: any) => u.id === userToDelete)?.username} • {(users as any[])?.find((u: any) => u.id === userToDelete)?.role}
+                      </div>
+                    </div>
+                  )}
 
-                <div className="text-sm text-gray-700">
-                  <strong>This will permanently:</strong>
-                  <ul className="list-disc list-inside mt-1 space-y-1 text-xs">
-                    <li>Remove the user from the database completely</li>
-                    <li>Delete all their notifications and messages</li>
-                    <li>Remove their activity history from issues</li>
-                    <li>Clear their assignments from issues and transactions</li>
-                    <li>Remove manager relationships where applicable</li>
-                  </ul>
-                </div>
+                  <div className="text-sm text-gray-700">
+                    <div className="font-medium">This will permanently:</div>
+                    <ul className="list-disc list-inside mt-1 space-y-1 text-xs">
+                      <li>Remove the user from the database completely</li>
+                      <li>Delete all their notifications and messages</li>
+                      <li>Remove their activity history from issues</li>
+                      <li>Clear their assignments from issues and transactions</li>
+                      <li>Remove manager relationships where applicable</li>
+                    </ul>
+                  </div>
 
-                <div className="bg-red-50 p-3 rounded-md border border-red-200">
-                  <p className="text-xs font-medium text-red-800">
-                    ⚠️ This action cannot be undone and the user data will not be recoverable.
-                  </p>
+                  <div className="bg-red-50 p-3 rounded-md border border-red-200">
+                    <div className="text-xs font-medium text-red-800">
+                      ⚠️ This action cannot be undone and the user data will not be recoverable.
+                    </div>
+                  </div>
                 </div>
               </AlertDialogDescription>
             </AlertDialogHeader>
