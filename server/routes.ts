@@ -3341,9 +3341,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Test email configuration (admin only)
   app.post("/api/email-settings/test", checkRole("admin"), async (req, res) => {
     try {
-      const { testEmail, settingsId, ...tempSettings } = req.body;
+      const { testEmail, verificationTestEmail, settingsId, ...tempSettings } = req.body;
       
-      if (!testEmail) {
+      // Use either testEmail or verificationTestEmail
+      const emailToTest = testEmail || verificationTestEmail;
+      
+      if (!emailToTest) {
         return res.status(400).json({ message: "Test email address is required" });
       }
 
@@ -3381,7 +3384,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Send test email
-      const testResult = await emailService.sendTestEmail(testEmail);
+      const testResult = await emailService.sendTestEmail(emailToTest);
       
       if (testResult) {
         // Mark as verified if this is an existing configuration
