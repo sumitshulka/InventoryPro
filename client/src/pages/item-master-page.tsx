@@ -72,6 +72,7 @@ const formSchema = z.object({
   minStockLevel: z.coerce.number().min(0),
   categoryId: z.coerce.number().nullable(),
   unit: z.string().default("pcs"),
+  status: z.enum(["active", "inactive"]).default("active"),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -84,6 +85,12 @@ export default function ItemMasterPage() {
   const [editItemId, setEditItemId] = useState<number | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
+  
+  // Actions column state
+  const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
+  const [isCheckInHistoryOpen, setIsCheckInHistoryOpen] = useState(false);
+  const [selectedItem, setSelectedItem] = useState<Item | null>(null);
+  const [checkInHistory, setCheckInHistory] = useState<any[]>([]);
 
   const { data: items = [], isLoading: itemsLoading, refetch: refetchItems } = useQuery<Item[]>({
     queryKey: ["/api/items"]
@@ -117,6 +124,7 @@ export default function ItemMasterPage() {
       minStockLevel: 10,
       categoryId: null,
       unit: "pcs",
+      status: "active",
     },
   });
 
@@ -130,6 +138,7 @@ export default function ItemMasterPage() {
         minStockLevel: data.minStockLevel,
         categoryId: data.categoryId,
         unit: data.unit,
+        status: data.status,
       };
       
       console.log("Submitting item data:", payload);
@@ -170,6 +179,44 @@ export default function ItemMasterPage() {
     },
   });
 
+  // Mutation for updating item status (activate/deactivate)
+  const updateStatusMutation = useMutation({
+    mutationFn: async ({ itemId, status }: { itemId: number; status: "active" | "inactive" }) => {
+      const res = await apiRequest("PATCH", `/api/items/${itemId}/status`, { status });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/items"] });
+      toast({
+        title: "Status updated",
+        description: "Item status has been updated successfully.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Function to fetch check-in history
+  const fetchCheckInHistory = async (itemId: number) => {
+    try {
+      const res = await apiRequest("GET", `/api/items/${itemId}/checkin-history`);
+      const history = await res.json();
+      setCheckInHistory(history);
+      setIsCheckInHistoryOpen(true);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to fetch check-in history",
+        variant: "destructive",
+      });
+    }
+  };
+
   const resetForm = () => {
     form.reset({
       name: "",
@@ -178,6 +225,7 @@ export default function ItemMasterPage() {
       minStockLevel: 10,
       categoryId: null,
       unit: "pcs",
+      status: "active",
     });
     setIsEditMode(false);
     setEditItemId(null);
@@ -192,6 +240,7 @@ export default function ItemMasterPage() {
       minStockLevel: item.minStockLevel,
       categoryId: item.categoryId || null,
       unit: item.unit,
+      status: item.status,
     });
     setIsEditMode(true);
     setEditItemId(item.id);
@@ -304,7 +353,8 @@ export default function ItemMasterPage() {
                   <TableHead>Min Stock</TableHead>
                   <TableHead>Total Available</TableHead>
                   <TableHead>Unit</TableHead>
-                  {isManager && <TableHead>Actions</TableHead>}
+                  <TableHead>Status</TableHead>
+                  <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
