@@ -12,6 +12,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Download, Filter, BarChart3, DollarSign, CalendarIcon } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+import { useCurrency } from "@/hooks/use-currency";
 
 interface InventoryValuationItem {
   id: number;
@@ -35,6 +36,13 @@ export default function InventoryValuationReportPage() {
   const [sortBy, setSortBy] = useState("name");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
   const [asOfDate, setAsOfDate] = useState<Date>(new Date());
+  
+  const { formatCurrency } = useCurrency();
+  
+  // Number formatting with commas
+  const formatNumberWithCommas = (value: number): string => {
+    return value.toLocaleString();
+  };
 
   const { data: inventoryValuation = [], isLoading } = useQuery({
     queryKey: ['/api/reports/inventory-valuation', asOfDate?.toISOString()],
@@ -112,10 +120,10 @@ export default function InventoryValuationReportPage() {
         item.sku,
         item.category,
         item.warehouse,
-        item.currentStock.toString(),
+        formatNumberWithCommas(item.currentStock),
         item.unit,
-        item.unitValue.toFixed(2),
-        item.totalValue.toFixed(2),
+        formatCurrency(item.unitValue),
+        formatCurrency(item.totalValue),
         item.valuationMethod
       ])
     ];
@@ -168,7 +176,7 @@ export default function InventoryValuationReportPage() {
               <BarChart3 className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{filteredAndSortedData.length}</div>
+              <div className="text-2xl font-bold">{formatNumberWithCommas(filteredAndSortedData.length)}</div>
               <p className="text-xs text-muted-foreground">
                 Items in inventory
               </p>
@@ -182,7 +190,7 @@ export default function InventoryValuationReportPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {currencySymbol}{totalInventoryValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                {formatCurrency(totalInventoryValue)}
               </div>
               <p className="text-xs text-muted-foreground">
                 Based on {valuationMethod.toLowerCase()}
@@ -368,13 +376,13 @@ export default function InventoryValuationReportPage() {
                         <TableCell>{item.sku}</TableCell>
                         <TableCell>{item.category}</TableCell>
                         <TableCell>{item.warehouse}</TableCell>
-                        <TableCell className="text-right">{item.currentStock}</TableCell>
+                        <TableCell className="text-right">{formatNumberWithCommas(item.currentStock)}</TableCell>
                         <TableCell>{item.unit}</TableCell>
                         <TableCell className="text-right">
-                          {currencySymbol}{item.unitValue.toFixed(2)}
+                          {formatCurrency(item.unitValue)}
                         </TableCell>
                         <TableCell className="text-right font-semibold">
-                          {currencySymbol}{item.totalValue.toFixed(2)}
+                          {formatCurrency(item.totalValue)}
                         </TableCell>
                         <TableCell>
                           {item.lastCheckInDate ? format(new Date(item.lastCheckInDate), 'MMM dd, yyyy') : 'N/A'}
