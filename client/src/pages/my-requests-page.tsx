@@ -14,6 +14,7 @@ import { Link } from "wouter";
 interface Request {
   id: number;
   requestCode: string;
+  userId: number;
   status: string;
   priority: string;
   justification: string;
@@ -51,7 +52,7 @@ export default function MyRequestsPage() {
   const [selectedRequest, setSelectedRequest] = useState<Request | null>(null);
 
   // Fetch user's requests
-  const { data: allRequests = [], isLoading: requestsLoading } = useQuery({
+  const { data: allRequests = [], isLoading: requestsLoading } = useQuery<Request[]>({
     queryKey: ["/api/requests"],
   });
 
@@ -60,11 +61,9 @@ export default function MyRequestsPage() {
 
   // Fetch request items for selected request
   const { data: requestItems = [], isLoading: requestItemsLoading } = useQuery<RequestItem[]>({
-    queryKey: ["/api/requests", selectedRequest?.id, "items"],
+    queryKey: [`/api/requests/${selectedRequest?.id}/items`],
     enabled: !!selectedRequest?.id,
   });
-
-  console.log('Request items data:', requestItems);
 
   // Fetch items and warehouses for reference
   const { data: items = [] } = useQuery<Item[]>({
@@ -107,9 +106,8 @@ export default function MyRequestsPage() {
   };
 
   const getItemName = (itemId: number) => {
-    console.log('Looking up item:', itemId, 'from items:', items);
     const item = items.find(i => i.id === itemId);
-    return item ? `${item.name} (${item.sku})` : `Item #${itemId || 'unknown'}`;
+    return item ? `${item.name} (${item.sku})` : `Item #${itemId}`;
   };
 
   const getWarehouseName = (warehouseId: number) => {
