@@ -595,9 +595,9 @@ export default function CheckInPage() {
                               <TableCell>{item?.name || "Unknown Item"}</TableCell>
                               <TableCell>{transaction.quantity}</TableCell>
                               <TableCell>
-                                {transaction.cost ? 
-                                  formatCurrencyFull(Number(transaction.cost)) : 
-                                  "-"
+                                {transaction.rate ? 
+                                  formatCurrencyFull(Number(transaction.rate)) : 
+                                  (transaction.cost ? formatCurrencyFull(Number(transaction.cost)) : "-")
                                 }
                               </TableCell>
                               <TableCell>{warehouse?.name || "Unknown Warehouse"}</TableCell>
@@ -615,7 +615,7 @@ export default function CheckInPage() {
                         })
                       ) : (
                         <TableRow>
-                          <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                          <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
                             No check-in transactions found
                           </TableCell>
                         </TableRow>
