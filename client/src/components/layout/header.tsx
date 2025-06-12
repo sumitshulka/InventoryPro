@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { User } from "@shared/schema";
 import { getUserInitials } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -24,9 +25,15 @@ export default function Header({ user, onMenuClick }: HeaderProps) {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
 
+  const { data: organizationSettings } = useQuery({
+    queryKey: ["/api/organization-settings"],
+  });
+
   const handleLogout = () => {
     logoutMutation.mutate();
   };
+
+  const logoSrc = (organizationSettings as any)?.logo;
 
   return (
     <header className="bg-white shadow-sm z-10">
@@ -38,6 +45,22 @@ export default function Header({ user, onMenuClick }: HeaderProps) {
           >
             <span className="material-icons">menu</span>
           </button>
+          
+          {/* Company Logo or Placeholder */}
+          <div className="hidden md:flex items-center mr-6">
+            {logoSrc ? (
+              <img 
+                src={logoSrc} 
+                alt="Company Logo" 
+                className="h-8 w-auto max-w-[120px] object-contain"
+              />
+            ) : (
+              <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+                <span className="text-white font-semibold text-sm">S</span>
+              </div>
+            )}
+          </div>
+          
           <div className="relative">
             <span className="material-icons absolute left-3 top-2 text-gray-400">search</span>
             <input 

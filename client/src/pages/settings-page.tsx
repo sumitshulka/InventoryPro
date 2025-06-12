@@ -853,6 +853,60 @@ export default function SettingsPage() {
                       </div>
 
                       <div className="space-y-2">
+                        <Label htmlFor="logo">Company Logo</Label>
+                        <div className="flex items-center space-x-4">
+                          {orgForm.watch("logo") && (
+                            <div className="w-16 h-16 border rounded-lg overflow-hidden bg-gray-50 flex items-center justify-center">
+                              <img 
+                                src={orgForm.watch("logo")} 
+                                alt="Logo preview" 
+                                className="max-w-full max-h-full object-contain"
+                              />
+                            </div>
+                          )}
+                          <div className="flex-1">
+                            <Input
+                              type="file"
+                              accept=".png,.jpg,.jpeg"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) {
+                                  if (file.size > 2 * 1024 * 1024) {
+                                    toast({
+                                      title: "File too large",
+                                      description: "Please select an image smaller than 2MB.",
+                                      variant: "destructive",
+                                    });
+                                    return;
+                                  }
+                                  
+                                  const reader = new FileReader();
+                                  reader.onload = (event) => {
+                                    const base64 = event.target?.result as string;
+                                    orgForm.setValue("logo", base64);
+                                  };
+                                  reader.readAsDataURL(file);
+                                }
+                              }}
+                            />
+                            <p className="text-xs text-gray-500 mt-1">
+                              PNG, JPG, or JPEG. Max file size 2MB.
+                            </p>
+                          </div>
+                          {orgForm.watch("logo") && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => orgForm.setValue("logo", "")}
+                            >
+                              Remove
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
                         <Label htmlFor="timezone">Default Timezone</Label>
                         <Select
                           onValueChange={(value) => orgForm.setValue("timezone", value)}
