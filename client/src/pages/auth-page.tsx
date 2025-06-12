@@ -3,39 +3,34 @@ import { useLocation } from "wouter";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
+import { useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/hooks/use-auth";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 import { Loader2 } from "lucide-react";
 
 const loginSchema = z.object({
-  username: z.string().min(1, { message: "Username is required" }),
+  usernameOrEmail: z.string().min(1, { message: "Username or email is required" }),
   password: z.string().min(1, { message: "Password is required" }),
 });
 
-const registerSchema = z.object({
-  name: z.string().min(2, { message: "Name must be at least 2 characters" }),
-  username: z.string().min(3, { message: "Username must be at least 3 characters" }),
-  email: z.string().email({ message: "Invalid email address" }),
-  password: z.string().min(6, { message: "Password must be at least 6 characters" }),
-  confirmPassword: z.string(),
-}).refine((data) => data.password === data.confirmPassword, {
-  message: "Passwords do not match",
-  path: ["confirmPassword"],
+const forgotPasswordSchema = z.object({
+  email: z.string().email({ message: "Valid email is required" }),
 });
 
 type LoginFormValues = z.infer<typeof loginSchema>;
-type RegisterFormValues = z.infer<typeof registerSchema>;
+type ForgotPasswordFormValues = z.infer<typeof forgotPasswordSchema>;
 
 export default function AuthPage() {
-  const [activeTab, setActiveTab] = useState<string>("login");
-  const { user, loginMutation, registerMutation } = useAuth();
+  const [activeView, setActiveView] = useState<"login" | "forgot-password">("login");
+  const { user, loginMutation } = useAuth();
   const [_, setLocation] = useLocation();
+  const { toast } = useToast();
   
-  // If user is already logged in, redirect to dashboard
   useEffect(() => {
     console.log("AuthPage effect, user:", user);
     if (user) {
@@ -47,28 +42,50 @@ export default function AuthPage() {
   const loginForm = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      username: "",
+      usernameOrEmail: "",
       password: "",
     },
   });
   
-  const registerForm = useForm<RegisterFormValues>({
-    resolver: zodResolver(registerSchema),
+  const forgotPasswordForm = useForm<ForgotPasswordFormValues>({
+    resolver: zodResolver(forgotPasswordSchema),
     defaultValues: {
-      name: "",
-      username: "",
       email: "",
-      password: "",
-      confirmPassword: "",
+    },
+  });
+
+  const forgotPasswordMutation = useMutation({
+    mutationFn: async (data: ForgotPasswordFormValues) => {
+      const res = await apiRequest("POST", "/api/forgot-password", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Password Reset Email Sent",
+        description: "Check your email for password reset instructions.",
+      });
+      setActiveView("login");
+      forgotPasswordForm.reset();
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
     },
   });
   
   const onLoginSubmit = (data: LoginFormValues) => {
-    loginMutation.mutate(data);
+    const loginData = {
+      username: data.usernameOrEmail,
+      password: data.password,
+    };
+    loginMutation.mutate(loginData);
   };
-  
-  const onRegisterSubmit = (data: RegisterFormValues) => {
-    registerMutation.mutate(data);
+
+  const onForgotPasswordSubmit = (data: ForgotPasswordFormValues) => {
+    forgotPasswordMutation.mutate(data);
   };
   
   return (
@@ -161,176 +178,117 @@ export default function AuthPage() {
         <div>
           <Card className="w-full">
             <CardHeader>
-              <CardTitle className="text-2xl text-center">Inventory Management</CardTitle>
+              <CardTitle className="text-2xl text-center">
+                {activeView === "login" ? "Sign In" : "Reset Password"}
+              </CardTitle>
               <CardDescription className="text-center">
-                Log in to your account or create a new one
+                {activeView === "login" 
+                  ? "Enter your credentials to access your account" 
+                  : "Enter your email to receive a password reset link"
+                }
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <Tabs defaultValue="login" value={activeTab} onValueChange={setActiveTab}>
-                <TabsList className="grid w-full grid-cols-2 mb-6">
-                  <TabsTrigger value="login">Login</TabsTrigger>
-                  <TabsTrigger value="register">Register</TabsTrigger>
-                </TabsList>
-                
-                <TabsContent value="login">
-                  <form onSubmit={loginForm.handleSubmit(onLoginSubmit)} className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="username">Username</Label>
-                      <Input
-                        id="username"
-                        placeholder="Enter your username"
-                        {...loginForm.register("username")}
-                      />
-                      {loginForm.formState.errors.username && (
-                        <p className="text-sm text-red-500">{loginForm.formState.errors.username.message}</p>
-                      )}
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="password">Password</Label>
-                      <Input
-                        id="password"
-                        type="password"
-                        placeholder="Enter your password"
-                        {...loginForm.register("password")}
-                      />
-                      {loginForm.formState.errors.password && (
-                        <p className="text-sm text-red-500">{loginForm.formState.errors.password.message}</p>
-                      )}
-                    </div>
-                    
+              {activeView === "login" ? (
+                <form onSubmit={loginForm.handleSubmit(onLoginSubmit)} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="usernameOrEmail">Username or Email</Label>
+                    <Input
+                      id="usernameOrEmail"
+                      placeholder="Enter your username or email"
+                      {...loginForm.register("usernameOrEmail")}
+                    />
+                    {loginForm.formState.errors.usernameOrEmail && (
+                      <p className="text-sm text-red-500">
+                        {loginForm.formState.errors.usernameOrEmail.message}
+                      </p>
+                    )}
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="password">Password</Label>
+                    <Input
+                      id="password"
+                      type="password"
+                      placeholder="Enter your password"
+                      {...loginForm.register("password")}
+                    />
+                    {loginForm.formState.errors.password && (
+                      <p className="text-sm text-red-500">
+                        {loginForm.formState.errors.password.message}
+                      </p>
+                    )}
+                  </div>
+                  
+                  <div className="flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => setActiveView("forgot-password")}
+                      className="text-sm text-primary hover:underline"
+                    >
+                      Forgot password?
+                    </button>
+                  </div>
+                  
+                  <Button
+                    type="submit"
+                    className="w-full"
+                    disabled={loginMutation.isPending}
+                  >
+                    {loginMutation.isPending ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Signing in...
+                      </>
+                    ) : (
+                      "Sign In"
+                    )}
+                  </Button>
+                </form>
+              ) : (
+                <form onSubmit={forgotPasswordForm.handleSubmit(onForgotPasswordSubmit)} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="email">Email Address</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      placeholder="Enter your email address"
+                      {...forgotPasswordForm.register("email")}
+                    />
+                    {forgotPasswordForm.formState.errors.email && (
+                      <p className="text-sm text-red-500">
+                        {forgotPasswordForm.formState.errors.email.message}
+                      </p>
+                    )}
+                  </div>
+                  
+                  <div className="flex space-x-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="flex-1"
+                      onClick={() => setActiveView("login")}
+                    >
+                      Back to Login
+                    </Button>
                     <Button
                       type="submit"
-                      className="w-full"
-                      disabled={loginMutation.isPending}
+                      className="flex-1"
+                      disabled={forgotPasswordMutation.isPending}
                     >
-                      {loginMutation.isPending ? (
+                      {forgotPasswordMutation.isPending ? (
                         <>
                           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Logging in...
+                          Sending...
                         </>
                       ) : (
-                        "Login"
+                        "Send Reset Link"
                       )}
                     </Button>
-                  </form>
-                </TabsContent>
-                
-                <TabsContent value="register">
-                  <form onSubmit={registerForm.handleSubmit(onRegisterSubmit)} className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="name">Full Name</Label>
-                      <Input
-                        id="name"
-                        placeholder="Enter your full name"
-                        {...registerForm.register("name")}
-                      />
-                      {registerForm.formState.errors.name && (
-                        <p className="text-sm text-red-500">{registerForm.formState.errors.name.message}</p>
-                      )}
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="reg-username">Username</Label>
-                      <Input
-                        id="reg-username"
-                        placeholder="Choose a username"
-                        {...registerForm.register("username")}
-                      />
-                      {registerForm.formState.errors.username && (
-                        <p className="text-sm text-red-500">{registerForm.formState.errors.username.message}</p>
-                      )}
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="email">Email</Label>
-                      <Input
-                        id="email"
-                        type="email"
-                        placeholder="Enter your email"
-                        {...registerForm.register("email")}
-                      />
-                      {registerForm.formState.errors.email && (
-                        <p className="text-sm text-red-500">{registerForm.formState.errors.email.message}</p>
-                      )}
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="reg-password">Password</Label>
-                      <Input
-                        id="reg-password"
-                        type="password"
-                        placeholder="Create a password"
-                        {...registerForm.register("password")}
-                      />
-                      {registerForm.formState.errors.password && (
-                        <p className="text-sm text-red-500">{registerForm.formState.errors.password.message}</p>
-                      )}
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="confirmPassword">Confirm Password</Label>
-                      <Input
-                        id="confirmPassword"
-                        type="password"
-                        placeholder="Confirm your password"
-                        {...registerForm.register("confirmPassword")}
-                      />
-                      {registerForm.formState.errors.confirmPassword && (
-                        <p className="text-sm text-red-500">{registerForm.formState.errors.confirmPassword.message}</p>
-                      )}
-                    </div>
-                    
-                    <Button
-                      type="submit"
-                      className="w-full"
-                      disabled={registerMutation.isPending}
-                    >
-                      {registerMutation.isPending ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Creating account...
-                        </>
-                      ) : (
-                        "Create Account"
-                      )}
-                    </Button>
-                  </form>
-                </TabsContent>
-              </Tabs>
+                  </div>
+                </form>
+              )}
             </CardContent>
-            <CardFooter className="flex flex-col items-center justify-center p-6 border-t">
-              <div className="text-xs text-gray-500">
-                {activeTab === "login" ? (
-                  <p>
-                    Don't have an account?{" "}
-                    <button
-                      onClick={() => setActiveTab("register")}
-                      className="text-primary hover:underline"
-                    >
-                      Register
-                    </button>
-                  </p>
-                ) : (
-                  <p>
-                    Already have an account?{" "}
-                    <button
-                      onClick={() => setActiveTab("login")}
-                      className="text-primary hover:underline"
-                    >
-                      Login
-                    </button>
-                  </p>
-                )}
-              </div>
-              <div className="mt-4 text-xs text-gray-500 text-center">
-                <p className="mb-1">Demo credentials:</p>
-                <p><strong>Admin:</strong> username: admin, password: admin</p>
-                <p><strong>Manager:</strong> username: manager, password: manager</p>
-                <p><strong>User:</strong> username: user, password: user</p>
-              </div>
-            </CardFooter>
           </Card>
         </div>
       </div>

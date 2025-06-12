@@ -7,6 +7,7 @@ import { promisify } from "util";
 import { storage } from "./storage";
 import { User as SelectUser, insertUserSchema } from "@shared/schema";
 import { z } from "zod";
+import sgMail from "@sendgrid/mail";
 
 declare global {
   namespace Express {
@@ -65,7 +66,14 @@ export function setupAuth(app: Express) {
   passport.use(
     new LocalStrategy(async (username, password, done) => {
       try {
-        const user = await storage.getUserByUsername(username);
+        // Try to find user by username first
+        let user = await storage.getUserByUsername(username);
+        
+        // If not found by username, try to find by email
+        if (!user) {
+          user = await storage.getUserByEmail(username);
+        }
+        
         if (!user || !(await comparePasswords(password, user.password))) {
           return done(null, false, { message: "Invalid username or password" });
         } else {
