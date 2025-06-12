@@ -210,12 +210,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Delete user (admin only)
   app.delete("/api/users/:id", checkRole("admin"), async (req, res) => {
-    const userId = parseInt(req.params.id, 10);
-    const success = await storage.deleteUser(userId);
-    if (!success) {
-      return res.status(404).json({ message: "User not found" });
+    try {
+      const userId = parseInt(req.params.id, 10);
+
+      // Prevent deleting your own account
+      if (req.user?.id === userId) {
+        return res.status(400).json({ message: "Cannot delete your own account" });
+      }
+
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const success = await storage.deleteUser(userId);
+      if (!success) {
+        return res.status(500).json({ message: "Failed to delete user" });
+      }
+
+      res.json({ message: "User deleted successfully" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
     }
-    res.status(204).send();
   });
 
   // ==== Category Routes ====

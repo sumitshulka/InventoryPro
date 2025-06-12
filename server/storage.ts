@@ -1368,10 +1368,49 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteUser(id: number): Promise<boolean> {
-    const [deletedUser] = await db.delete(users)
-      .where(eq(users.id, id))
-      .returning();
-    return !!deletedUser;
+    try {
+      // Delete related data first to handle foreign key constraints
+      
+      // Delete notifications where user is sender or recipient
+      await db.delete(notifications).where(eq(notifications.senderId, id));
+      await db.delete(notifications).where(eq(notifications.recipientId, id));
+      
+      // Delete issue activities created by this user
+      await db.delete(issueActivities).where(eq(issueActivities.userId, id));
+      
+      // Update issues to remove user references (set to null instead of deleting issues)
+      await db.update(issues)
+        .set({ 
+          assignedTo: null,
+          closedBy: null,
+          reopenedBy: null
+        })
+        .where(or(
+          eq(issues.assignedTo, id),
+          eq(issues.closedBy, id),
+          eq(issues.reopenedBy, id)
+        ));
+      
+      // Update transactions to remove user references
+      await db.update(transactions)
+        .set({ userId: null })
+        .where(eq(transactions.userId, id));
+      
+      // Update users who have this user as manager
+      await db.update(users)
+        .set({ managerId: null })
+        .where(eq(users.managerId, id));
+      
+      // Finally delete the user
+      const [deletedUser] = await db.delete(users)
+        .where(eq(users.id, id))
+        .returning();
+        
+      return !!deletedUser;
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      return false;
+    }
   }
 
   // Department operations
