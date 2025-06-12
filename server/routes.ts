@@ -3351,8 +3351,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       let settings;
-      if (settingsId) {
-        settings = await storage.getEmailSettings();
+      let existingSettings = await storage.getEmailSettings();
+      
+      if (settingsId || existingSettings) {
+        // Use existing settings if available
+        settings = existingSettings;
       } else {
         // Test with provided settings without saving
         const validatedSettings = insertEmailSettingsSchema.parse(tempSettings);
@@ -3388,12 +3391,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (testResult) {
         // Mark as verified if this is an existing configuration
-        if (settingsId && settings.id) {
-          await storage.markEmailSettingsAsVerified(settings.id);
+        if (existingSettings && existingSettings.id) {
+          await storage.markEmailSettingsAsVerified(existingSettings.id);
         }
         res.json({ 
           success: true, 
-          message: "Test email sent successfully. Please check your inbox." 
+          message: "Test email sent successfully. Configuration verified!" 
         });
       } else {
         res.status(400).json({ 
