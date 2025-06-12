@@ -25,6 +25,16 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -33,7 +43,7 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { apiRequest, queryClient, invalidateRelatedQueries } from "@/lib/queryClient";
-import { Loader2, Plus, Edit, Users } from "lucide-react";
+import { Loader2, Plus, Edit, Users, Trash } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 
@@ -57,6 +67,8 @@ export default function UsersManagementPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [editUserId, setEditUserId] = useState<number | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [userToDelete, setUserToDelete] = useState<number | null>(null);
 
   const isAdmin = user?.role === "admin";
   const isManager = user?.role === "manager";
@@ -142,6 +154,29 @@ export default function UsersManagementPage() {
     },
   });
 
+  const deleteUserMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await apiRequest("DELETE", `/api/users/${id}`);
+      return res;
+    },
+    onSuccess: async () => {
+      await invalidateRelatedQueries('user', 'delete');
+      toast({
+        title: "User deleted",
+        description: "The user has been deleted successfully.",
+      });
+      setDeleteDialogOpen(false);
+      setUserToDelete(null);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const resetForm = () => {
     form.reset({
       username: "",
@@ -174,6 +209,17 @@ export default function UsersManagementPage() {
     setIsEditMode(true);
     setEditUserId(userData.id);
     setIsDialogOpen(true);
+  };
+
+  const handleDeleteUser = (id: number) => {
+    setUserToDelete(id);
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDeleteUser = () => {
+    if (userToDelete) {
+      deleteUserMutation.mutate(userToDelete);
+    }
   };
 
   const handleSubmit = (values: FormValues) => {
@@ -296,13 +342,25 @@ export default function UsersManagementPage() {
                         </TableCell>
                         {canEdit && (
                           <TableCell>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleEditUser(userData)}
-                            >
-                              <Edit className="h-4 w-4" />
-                            </Button>
+                            <div className="flex items-center space-x-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleEditUser(userData)}
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              {userData.id !== user?.id && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="text-red-600 hover:text-red-700"
+                                  onClick={() => handleDeleteUser(userData.id)}
+                                >
+                                  <Trash className="h-4 w-4" />
+                                </Button>
+                              )}
+                            </div>
                           </TableCell>
                         )}
                       </TableRow>
