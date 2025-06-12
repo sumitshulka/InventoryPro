@@ -2512,13 +2512,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const sourceWarehouseId = parseInt(req.body.sourceWarehouseId);
       
       // Only admin can create transfers from any warehouse
-      // Managers and operators can only create transfers from their allocated warehouse
+      // Managers and operators can only create transfers from warehouses they manage or are assigned to
       if (user.role !== 'admin') {
-        if (!user.warehouseId) {
-          return res.status(403).json({ message: "You are not assigned to any warehouse" });
+        // Get warehouses the user can transfer from
+        const managedWarehouses = await storage.getWarehousesByManager(user.id);
+        const assignedWarehouse = user.warehouseId ? await storage.getWarehouse(user.warehouseId) : null;
+        
+        const allowedWarehouses = [...managedWarehouses];
+        if (assignedWarehouse) {
+          allowedWarehouses.push(assignedWarehouse);
         }
-        if (user.warehouseId !== sourceWarehouseId) {
-          return res.status(403).json({ message: "You can only create transfers from your allocated warehouse" });
+        
+        // Remove duplicates
+        const uniqueAllowedWarehouses = allowedWarehouses.filter((warehouse, index, self) => 
+          index === self.findIndex(w => w.id === warehouse.id)
+        );
+        
+        if (uniqueAllowedWarehouses.length === 0) {
+          return res.status(403).json({ message: "You are not assigned to manage any warehouse" });
+        }
+        
+        const canTransferFromSource = uniqueAllowedWarehouses.some(w => w.id === sourceWarehouseId);
+        if (!canTransferFromSource) {
+          return res.status(403).json({ 
+            message: "You can only create transfers from warehouses you manage or are assigned to" 
+          });
         }
       }
 

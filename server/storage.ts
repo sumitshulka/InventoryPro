@@ -128,6 +128,7 @@ export interface IStorage {
   createWarehouse(warehouse: InsertWarehouse): Promise<Warehouse>;
   getAllWarehouses(): Promise<Warehouse[]>;
   getActiveWarehouses(): Promise<Warehouse[]>;
+  getWarehousesByManager(managerId: number): Promise<Warehouse[]>;
   updateWarehouse(id: number, warehouseData: Partial<InsertWarehouse>): Promise<Warehouse | undefined>;
   deleteWarehouse(id: number): Promise<boolean>;
   archiveWarehouse(id: number): Promise<Warehouse | undefined>;
@@ -1596,6 +1597,10 @@ export class DatabaseStorage implements IStorage {
       .where(eq(warehouses.id, id))
       .returning();
     return !!deletedWarehouse;
+  }
+
+  async getWarehousesByManager(managerId: number): Promise<Warehouse[]> {
+    return await db.select().from(warehouses).where(eq(warehouses.managerId, managerId));
   }
 
   async archiveWarehouse(id: number): Promise<Warehouse | undefined> {

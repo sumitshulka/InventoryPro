@@ -681,7 +681,7 @@ export default function EnhancedTransfersPage() {
                           Transfer Permissions
                         </h3>
                         <div className="mt-2 text-sm text-blue-700">
-                          You can only create transfers from your allocated warehouse ({user?.warehouseId ? warehouses?.find((w: any) => w.id === user.warehouseId)?.name : 'None assigned'}) to other warehouses in the organization.
+                          You can only create transfers from warehouses you manage or are assigned to. Available warehouses will be shown in the source warehouse dropdown.
                         </div>
                       </div>
                     </div>
@@ -706,16 +706,19 @@ export default function EnhancedTransfersPage() {
                             // Admin can select any warehouse as source
                             if (user?.role === 'admin') return true;
                             
-                            // Non-admin users can only select their allocated warehouse as source
-                            return user?.warehouseId === w.id;
+                            // Non-admin users can only select warehouses they manage or are assigned to
+                            return user?.warehouseId === w.id || w.managerId === user?.id;
                           });
                           
                           return availableWarehouses?.length > 0 ? (
                             availableWarehouses.map((warehouse: any) => (
                               <SelectItem key={warehouse.id} value={warehouse.id.toString()}>
                                 {warehouse.name} - {warehouse.location}
-                                {user?.role !== 'admin' && user?.warehouseId === warehouse.id && (
-                                  <span className="ml-2 text-xs text-blue-600">(Your Warehouse)</span>
+                                {user?.role !== 'admin' && (
+                                  <span className="ml-2 text-xs text-blue-600">
+                                    {user?.warehouseId === warehouse.id && "(Assigned)"}
+                                    {warehouse.managerId === user?.id && "(Manager)"}
+                                  </span>
                                 )}
                               </SelectItem>
                             ))
@@ -723,7 +726,7 @@ export default function EnhancedTransfersPage() {
                             <div className="p-2 text-sm text-gray-500">
                               {user?.role === 'admin' 
                                 ? "No active warehouses available"
-                                : "You are not assigned to any warehouse"
+                                : "You are not assigned to manage any warehouse"
                               }
                             </div>
                           );
