@@ -135,21 +135,22 @@ export default function WarehousesPage() {
   const [editWarehouseId, setEditWarehouseId] = useState<number | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState("active");
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const { data: warehouses, isLoading } = useQuery({
-    queryKey: ["/api/warehouses"],
+    queryKey: ["/api/warehouses", refreshKey],
   });
 
   const { data: locations } = useQuery({
-    queryKey: ["/api/locations"],
+    queryKey: ["/api/locations", refreshKey],
   });
 
   const { data: users } = useQuery({
-    queryKey: ["/api/users"],
+    queryKey: ["/api/users", refreshKey],
   });
 
   const { data: inventory } = useQuery({
-    queryKey: ["/api/reports/inventory-stock"],
+    queryKey: ["/api/reports/inventory-stock", refreshKey],
   });
 
   // Helper function to calculate total items in a warehouse
@@ -313,35 +314,17 @@ export default function WarehousesPage() {
   };
 
   const handleRefresh = async () => {
-    // Clear cache and aggressively refetch all queries
-    queryClient.clear();
-    
-    // Immediately trigger fresh data fetch
-    await Promise.all([
-      queryClient.fetchQuery({ queryKey: ["/api/warehouses"], staleTime: 0 }),
-      queryClient.fetchQuery({ queryKey: ["/api/locations"], staleTime: 0 }),
-      queryClient.fetchQuery({ queryKey: ["/api/users"], staleTime: 0 }),
-      queryClient.fetchQuery({ queryKey: ["/api/reports/inventory-stock"], staleTime: 0 }),
-      queryClient.fetchQuery({ queryKey: ["/api/warehouses/stats"], staleTime: 0 }),
-    ]);
+    // Force complete component re-render by incrementing refresh key
+    setRefreshKey(prev => prev + 1);
   };
 
   const performRefresh = async () => {
     setIsRefreshing(true);
     try {
-      // Clear all cached data first
-      queryClient.clear();
+      // Force complete component re-render by incrementing refresh key
+      setRefreshKey(prev => prev + 1);
       
-      // Force fresh fetch of all warehouse-related data
-      await Promise.all([
-        queryClient.fetchQuery({ queryKey: ["/api/warehouses"], staleTime: 0 }),
-        queryClient.fetchQuery({ queryKey: ["/api/locations"], staleTime: 0 }),
-        queryClient.fetchQuery({ queryKey: ["/api/users"], staleTime: 0 }),
-        queryClient.fetchQuery({ queryKey: ["/api/reports/inventory-stock"], staleTime: 0 }),
-        queryClient.fetchQuery({ queryKey: ["/api/warehouses/stats"], staleTime: 0 }),
-      ]);
-      
-      // Allow brief moment for UI state update
+      // Brief delay for UI state update
       await new Promise(resolve => setTimeout(resolve, 300));
     } finally {
       setIsRefreshing(false);
