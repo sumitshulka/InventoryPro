@@ -54,7 +54,7 @@ const formSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters" }),
   locationId: z.string().min(1, { message: "Location is required" }),
   managerId: z.string().optional(),
-  capacity: z.number().min(1, { message: "Capacity is required" }),
+  capacity: z.coerce.number().min(1, { message: "Capacity must be at least 1" }),
   isActive: z.boolean().default(true),
 });
 
@@ -488,7 +488,7 @@ export default function WarehousesPage() {
                   type="number"
                   min="1"
                   placeholder="Enter warehouse capacity"
-                  {...form.register("capacity")}
+                  {...form.register("capacity", { valueAsNumber: true })}
                 />
                 {form.formState.errors.capacity && (
                   <p className="text-sm text-red-500">{form.formState.errors.capacity.message}</p>
