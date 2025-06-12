@@ -862,17 +862,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ==== Request Routes ====
-  // Get all requests
+  // Get all requests with user names included
   app.get("/api/requests", async (req, res) => {
+    let requests;
+    
     // Regular users can only see their own requests
     if (req.user!.role === "user") {
-      const requests = await storage.getRequestsByUser(req.user!.id);
-      return res.json(requests);
+      requests = await storage.getRequestsByUser(req.user!.id);
+    } else {
+      // Managers and admins can see all requests
+      requests = await storage.getAllRequests();
     }
     
-    // Managers and admins can see all requests
-    const requests = await storage.getAllRequests();
-    res.json(requests);
+    // Get all users to include user names in response
+    const allUsers = await storage.getAllUsers();
+    const userMap = new Map();
+    allUsers.forEach(user => userMap.set(user.id, user));
+    
+    // Enrich requests with user names
+    const enrichedRequests = requests.map(request => ({
+      ...request,
+      userName: userMap.get(request.userId)?.name || 'Unknown User',
+      userRole: userMap.get(request.userId)?.role || 'unknown'
+    }));
+    
+    res.json(enrichedRequests);
   });
 
   // Get requests by status

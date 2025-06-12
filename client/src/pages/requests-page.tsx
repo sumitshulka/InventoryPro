@@ -224,7 +224,11 @@ export default function RequestsPage() {
       })
     : [];
 
-  const getUserName = (userId: number) => {
+  const getUserName = (userId: number, request?: any) => {
+    // If request object is provided and has userName, use it
+    if (request?.userName) return request.userName;
+    
+    // Fallback to user lookup if users data is available
     if (!users) return `User #${userId}`;
     const user = users.find((u: any) => u.id === userId);
     return user ? user.name : `User #${userId}`;
@@ -342,7 +346,7 @@ export default function RequestsPage() {
                       paginatedRequests.map((request: any) => (
                         <TableRow key={request.id}>
                           <TableCell className="font-medium">{request.requestCode}</TableCell>
-                          <TableCell>{getUserName(request.userId)}</TableCell>
+                          <TableCell>{getUserName(request.userId, request)}</TableCell>
                           <TableCell>{getWarehouseName(request.warehouseId)}</TableCell>
                           <TableCell className="max-w-[200px] truncate">{request.notes || "—"}</TableCell>
                           <TableCell>{formatDateTime(request.createdAt)}</TableCell>
