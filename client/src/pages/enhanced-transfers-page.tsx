@@ -113,22 +113,23 @@ export default function EnhancedTransfersPage() {
   const [auditDialogOpen, setAuditDialogOpen] = useState(false);
   const [selectedTransfer, setSelectedTransfer] = useState<any>(null);
   const [activeTab, setActiveTab] = useState("all");
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const { data: transfers, isLoading: transfersLoading } = useQuery({
-    queryKey: ["/api/transfers"],
+    queryKey: ["/api/transfers", refreshKey],
     refetchInterval: 30000, // Refresh every 30 seconds
   });
 
   const { data: items, isLoading: itemsLoading } = useQuery({
-    queryKey: ["/api/items"],
+    queryKey: ["/api/items", refreshKey],
   });
 
   const { data: inventory } = useQuery({
-    queryKey: ["/api/inventory"],
+    queryKey: ["/api/inventory", refreshKey],
   });
 
   const { data: warehouses, isLoading: warehousesLoading } = useQuery({
-    queryKey: ["/api/warehouses"],
+    queryKey: ["/api/warehouses", refreshKey],
   });
 
   const form = useForm<FormValues>({
@@ -198,11 +199,8 @@ export default function EnhancedTransfersPage() {
       return response.json();
     },
     onSuccess: async () => {
-      // Force immediate cache invalidation and refetch
-      await queryClient.invalidateQueries({ queryKey: ["/api/transfers"] });
-      await queryClient.invalidateQueries({ queryKey: ["/api/items"] });
-      await queryClient.invalidateQueries({ queryKey: ["/api/warehouses"] });
-      await queryClient.refetchQueries({ queryKey: ["/api/transfers"], type: 'active' });
+      // Force complete component re-render with fresh data
+      setRefreshKey(prev => prev + 1);
       
       setIsDialogOpen(false);
       form.reset();
