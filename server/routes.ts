@@ -135,6 +135,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(users);
   });
 
+  // Get active users only (for dropdowns and selections)
+  app.get("/api/users/active", async (req, res) => {
+    if (!req.user) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    let users;
+    if (req.user.role === 'admin') {
+      users = await storage.getActiveUsers();
+    } else if (req.user.role === 'manager') {
+      const allActiveUsers = await storage.getActiveUsers();
+      users = allActiveUsers.filter(u => u.managerId === req.user!.id);
+    } else {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+
+    res.json(users);
+  });
+
   // Create new user (admin only)
   app.post("/api/users", checkRole("admin"), async (req, res) => {
     try {
