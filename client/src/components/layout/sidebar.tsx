@@ -36,7 +36,6 @@ export default function Sidebar({ user, isOpen, onClose }: SidebarProps) {
 
   const { data: organizationSettings } = useQuery({
     queryKey: ['/api/organization-settings'],
-    enabled: user?.role === 'admin' || user?.role === 'manager',
   });
 
   return (

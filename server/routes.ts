@@ -44,6 +44,14 @@ import {
 import { db } from "./db";
 import { eq, desc, and, lte, exists, isNotNull, or } from "drizzle-orm";
 
+// Utility function to check authentication
+const requireAuth = (req: Request, res: Response, next: Function) => {
+  if (!req.isAuthenticated()) {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+  next();
+};
+
 // Utility function to check required role
 const checkRole = (requiredRole: string) => {
   return (req: Request, res: Response, next: Function) => {
@@ -1610,8 +1618,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Organization settings routes (Admin only)
-  app.get("/api/organization-settings", checkRole("admin"), async (req, res) => {
+  // Organization settings routes (Read access for all authenticated users, Write access admin only)
+  app.get("/api/organization-settings", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    
     try {
       const settings = await db.select().from(organizationSettings).limit(1);
       if (settings.length === 0) {
