@@ -165,7 +165,7 @@ export default function IssuesPage() {
 
   const createIssueMutation = useMutation({
     mutationFn: (data: z.infer<typeof issueSchema>) =>
-      apiRequest('/api/issues', 'POST', data),
+      apiRequest('POST', '/api/issues', data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/issues'] });
       setShowNewIssueDialog(false);
@@ -186,7 +186,7 @@ export default function IssuesPage() {
 
   const createNotificationMutation = useMutation({
     mutationFn: (data: z.infer<typeof notificationSchema>) =>
-      apiRequest('/api/notifications', 'POST', data),
+      apiRequest('POST', '/api/notifications', data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/notifications'] });
       queryClient.invalidateQueries({ queryKey: ['/api/notifications/unread-count'] });
@@ -266,7 +266,7 @@ export default function IssuesPage() {
 
   const updateIssueStatusMutation = useMutation({
     mutationFn: ({ id, status }: { id: number; status: string }) =>
-      apiRequest(`/api/issues/${id}/status`, 'PATCH', { status }),
+      apiRequest('PATCH', `/api/issues/${id}/status`, { status }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/issues'] });
       toast({

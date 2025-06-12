@@ -140,7 +140,7 @@ export default function NotificationCenterPage() {
   // Create notification mutation
   const createNotificationMutation = useMutation({
     mutationFn: (data: z.infer<typeof newNotificationSchema>) =>
-      apiRequest('/api/notifications', 'POST', data),
+      apiRequest('POST', '/api/notifications', data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/notifications'] });
       queryClient.invalidateQueries({ queryKey: ['/api/notifications/unread-count'] });
@@ -163,7 +163,7 @@ export default function NotificationCenterPage() {
   // Reply mutation
   const replyMutation = useMutation({
     mutationFn: ({ notificationId, data }: { notificationId: number; data: z.infer<typeof replySchema> }) =>
-      apiRequest(`/api/notifications/${notificationId}/reply`, 'POST', data),
+      apiRequest('POST', `/api/notifications/${notificationId}/reply`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/notifications'] });
       queryClient.invalidateQueries({ queryKey: ['/api/notifications/unread-count'] });
@@ -186,7 +186,7 @@ export default function NotificationCenterPage() {
   // Mark as read mutation
   const markAsReadMutation = useMutation({
     mutationFn: (notificationId: number) =>
-      apiRequest(`/api/notifications/${notificationId}/read`, 'PATCH'),
+      apiRequest('PATCH', `/api/notifications/${notificationId}/read`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/notifications'] });
       queryClient.invalidateQueries({ queryKey: ['/api/notifications/unread-count'] });
