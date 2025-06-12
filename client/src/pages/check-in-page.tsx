@@ -168,6 +168,7 @@ export default function CheckInPage() {
           cost: item.cost ? parseFloat(item.cost) : null,
           rate: item.cost ? parseFloat(item.cost) : null,
           poNumber: values.purchaseOrderNumber || null,
+          deliveryChallanNumber: values.deliveryChallanNumber || null,
           supplierName: values.supplierName || null,
           checkInDate: values.checkInDate.toISOString(),
           status: "completed"
