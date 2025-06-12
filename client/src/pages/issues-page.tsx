@@ -142,20 +142,20 @@ export default function IssuesPage() {
   const [fullTextContent, setFullTextContent] = useState("");
 
   // Helper function to truncate text and show "View More" button
-  const TruncatedText = ({ text, maxLength = 150 }: { text: string; maxLength?: number }) => {
+  const TruncatedText = ({ text, maxLength = 30 }: { text: string; maxLength?: number }) => {
     if (text.length <= maxLength) {
-      return <div className="text-sm bg-gray-50 rounded p-3">{text}</div>;
+      return <div className="text-sm bg-gray-50 rounded p-3 break-words">{text}</div>;
     }
 
     const truncated = text.substring(0, maxLength);
     
     return (
       <div className="text-sm bg-gray-50 rounded p-3">
-        <div className="mb-2">{truncated}...</div>
+        <div className="mb-2 break-words">{truncated}...</div>
         <Button 
           variant="link" 
           size="sm" 
-          className="h-auto p-0 text-blue-600 hover:text-blue-800"
+          className="h-auto p-0 text-blue-600 hover:text-blue-800 underline"
           onClick={() => {
             setFullTextContent(text);
             setShowFullTextModal(true);
