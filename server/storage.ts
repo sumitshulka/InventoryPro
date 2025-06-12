@@ -38,6 +38,8 @@ import {
   InsertRejectedGoods,
   Notification,
   InsertNotification,
+  Issue,
+  InsertIssue,
   AuditLog,
   InsertAuditLog,
   EmailSettings,
@@ -61,6 +63,7 @@ import {
   transferUpdates,
   rejectedGoods,
   notifications,
+  issues,
   auditLogs,
   emailSettings
 } from "@shared/schema";
@@ -255,6 +258,18 @@ export interface IStorage {
   deleteNotification(id: number): Promise<boolean>;
   getUnreadNotificationCount(recipientId: number): Promise<number>;
   cleanupArchivedNotifications(): Promise<number>;
+
+  // Issue operations
+  getIssue(id: number): Promise<Issue | undefined>;
+  getAllIssues(): Promise<Issue[]>;
+  getIssuesByReporter(reportedBy: number): Promise<Issue[]>;
+  getIssuesByAssignee(assignedTo: number): Promise<Issue[]>;
+  getIssuesByWarehouse(warehouseId: number): Promise<Issue[]>;
+  getIssuesByStatus(status: string): Promise<Issue[]>;
+  getIssuesByCategory(category: string): Promise<Issue[]>;
+  createIssue(issue: InsertIssue): Promise<Issue>;
+  updateIssue(id: number, issueData: Partial<InsertIssue>): Promise<Issue | undefined>;
+  deleteIssue(id: number): Promise<boolean>;
 
   // Audit Log operations
   createAuditLog(auditLog: InsertAuditLog): Promise<AuditLog>;
