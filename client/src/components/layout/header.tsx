@@ -85,8 +85,7 @@ export default function Header({ user, onMenuClick }: HeaderProps) {
                   className="cursor-pointer"
                   onClick={() => {
                     setIsUserMenuOpen(false);
-                    // Placeholder for profile page
-                    // navigate('/profile');
+                    navigate('/my-profile');
                   }}
                 >
                   <span className="material-icons text-gray-500 mr-2 text-sm">account_circle</span>
