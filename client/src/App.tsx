@@ -45,6 +45,7 @@ function Router() {
       <Route path="/auth">
         {user ? <Route path="/" component={DashboardPage} /> : <AuthPage />}
       </Route>
+      <ProtectedRoute path="/my-profile" component={MyProfilePage} />
       <ProtectedRoute path="/" component={DashboardPage} />
       <ProtectedRoute path="/inventory" component={InventoryPage} />
       <ProtectedRoute path="/items" component={ItemMasterPage} />
@@ -67,7 +68,6 @@ function Router() {
       <ProtectedRoute path="/audit-trail" component={AuditTrailPage} />
       <ProtectedRoute path="/notifications" component={NotificationCenterPage} />
       <ProtectedRoute path="/settings" component={SettingsPage} />
-      <ProtectedRoute path="/my-profile" component={MyProfilePage} />
       <Route component={NotFound} />
     </Switch>
   );
