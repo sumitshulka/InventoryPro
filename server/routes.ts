@@ -2644,9 +2644,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const sourceWarehouse = await storage.getWarehouse(transfer.sourceWarehouseId);
       const destinationWarehouse = await storage.getWarehouse(transfer.destinationWarehouseId);
       
-      // Check if user manages source or destination warehouse
-      const managesSourceWarehouse = user.role === 'admin' || sourceWarehouse?.managerId === user.id;
-      const managesDestinationWarehouse = user.role === 'admin' || destinationWarehouse?.managerId === user.id;
+      // Check if user manages or is assigned to source or destination warehouse
+      const managesSourceWarehouse = user.role === 'admin' || 
+        sourceWarehouse?.managerId === user.id || 
+        user.warehouseId === transfer.sourceWarehouseId;
+      const managesDestinationWarehouse = user.role === 'admin' || 
+        destinationWarehouse?.managerId === user.id || 
+        user.warehouseId === transfer.destinationWarehouseId;
       
       // Define field permissions based on role and warehouse management
       const sourceWarehouseFields = [
