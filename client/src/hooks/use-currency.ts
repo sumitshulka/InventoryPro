@@ -19,6 +19,13 @@ export function useCurrency() {
   const currencySymbol = organizationSettings?.currencySymbol || '$';
 
   const formatCurrency = (value: number): string => {
+    return currencySymbol + value.toLocaleString(undefined, { 
+      minimumFractionDigits: 2, 
+      maximumFractionDigits: 2 
+    });
+  };
+
+  const formatCurrencyCompact = (value: number): string => {
     if (value >= 1000000) {
       return currencySymbol + (value / 1000000).toFixed(1) + 'M';
     } else if (value >= 1000) {
@@ -35,6 +42,7 @@ export function useCurrency() {
     currency,
     currencySymbol,
     formatCurrency,
+    formatCurrencyCompact,
     formatCurrencyFull,
   };
 }
