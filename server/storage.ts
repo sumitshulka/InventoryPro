@@ -2374,6 +2374,68 @@ export class DatabaseStorage implements IStorage {
     return updatedSettings;
   }
 
+  // Issue operations
+  async getIssue(id: number): Promise<Issue | undefined> {
+    const result = await db.select().from(issues).where(eq(issues.id, id));
+    return result[0];
+  }
+
+  async getAllIssues(): Promise<Issue[]> {
+    return await db.select().from(issues).orderBy(desc(issues.createdAt));
+  }
+
+  async getIssuesByReporter(reportedBy: number): Promise<Issue[]> {
+    return await db.select().from(issues)
+      .where(eq(issues.reportedBy, reportedBy))
+      .orderBy(desc(issues.createdAt));
+  }
+
+  async getIssuesByAssignee(assignedTo: number): Promise<Issue[]> {
+    return await db.select().from(issues)
+      .where(eq(issues.assignedTo, assignedTo))
+      .orderBy(desc(issues.createdAt));
+  }
+
+  async getIssuesByWarehouse(warehouseId: number): Promise<Issue[]> {
+    return await db.select().from(issues)
+      .where(eq(issues.warehouseId, warehouseId))
+      .orderBy(desc(issues.createdAt));
+  }
+
+  async getIssuesByStatus(status: string): Promise<Issue[]> {
+    return await db.select().from(issues)
+      .where(eq(issues.status, status))
+      .orderBy(desc(issues.createdAt));
+  }
+
+  async getIssuesByCategory(category: string): Promise<Issue[]> {
+    return await db.select().from(issues)
+      .where(eq(issues.category, category))
+      .orderBy(desc(issues.createdAt));
+  }
+
+  async createIssue(issue: InsertIssue): Promise<Issue> {
+    const [newIssue] = await db.insert(issues).values({
+      ...issue,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    }).returning();
+    return newIssue;
+  }
+
+  async updateIssue(id: number, issueData: Partial<InsertIssue>): Promise<Issue | undefined> {
+    const [updatedIssue] = await db.update(issues)
+      .set({ ...issueData, updatedAt: new Date() })
+      .where(eq(issues.id, id))
+      .returning();
+    return updatedIssue;
+  }
+
+  async deleteIssue(id: number): Promise<boolean> {
+    const result = await db.delete(issues).where(eq(issues.id, id)).returning();
+    return result.length > 0;
+  }
+
   // Audit Log operations
   async createAuditLog(auditLog: InsertAuditLog): Promise<AuditLog> {
     const [newAuditLog] = await db

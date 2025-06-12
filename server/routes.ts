@@ -3052,10 +3052,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Not authenticated" });
       }
 
-      // For now, return empty array since issues functionality is not yet implemented in storage
-      // In a real system, this would fetch from an issues table
-      const issues: any[] = [];
-
+      const issues = await storage.getAllIssues();
       res.json(issues);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -3262,16 +3259,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Not authenticated" });
       }
 
-      // For now, return a mock response since issues functionality is not yet implemented
-      const newIssue = {
-        id: Date.now(),
+      const issueData = {
         ...req.body,
         reportedBy: req.user.id,
-        status: 'open',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
+        status: 'open'
       };
 
+      const newIssue = await storage.createIssue(issueData);
       res.status(201).json(newIssue);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -3288,12 +3282,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { id } = req.params;
       const { status } = req.body;
 
-      // For now, return a mock response since issues functionality is not yet implemented
-      const updatedIssue = {
-        id: parseInt(id),
-        status,
-        updatedAt: new Date().toISOString()
-      };
+      const updatedIssue = await storage.updateIssue(parseInt(id), { status });
+      
+      if (!updatedIssue) {
+        return res.status(404).json({ message: "Issue not found" });
+      }
 
       res.json(updatedIssue);
     } catch (error: any) {
