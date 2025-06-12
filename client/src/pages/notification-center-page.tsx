@@ -196,7 +196,7 @@ export default function NotificationCenterPage() {
   // Close notification mutation
   const closeNotificationMutation = useMutation({
     mutationFn: (notificationId: number) =>
-      apiRequest(`/api/notifications/${notificationId}/close`, 'PATCH'),
+      apiRequest('PATCH', `/api/notifications/${notificationId}/close`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/notifications'] });
       setSelectedNotification(null);
@@ -210,7 +210,7 @@ export default function NotificationCenterPage() {
   // Archive notification mutation
   const archiveNotificationMutation = useMutation({
     mutationFn: (notificationId: number) =>
-      apiRequest(`/api/notifications/${notificationId}/archive`, 'PATCH'),
+      apiRequest('PATCH', `/api/notifications/${notificationId}/archive`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/notifications'] });
       setSelectedNotification(null);
