@@ -105,8 +105,9 @@ export default function MyRequestsPage() {
   };
 
   const getItemName = (itemId: number) => {
+    console.log('Looking up item:', itemId, 'from items:', items);
     const item = items.find(i => i.id === itemId);
-    return item ? `${item.name} (${item.sku})` : `Item #${itemId}`;
+    return item ? `${item.name} (${item.sku})` : `Item #${itemId || 'unknown'}`;
   };
 
   const getWarehouseName = (warehouseId: number) => {

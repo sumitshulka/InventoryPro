@@ -882,6 +882,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
+  // Get request items separately
+  app.get("/api/requests/:id/items", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    const requestId = parseInt(req.params.id, 10);
+    
+    if (isNaN(requestId)) {
+      return res.status(400).json({ message: "Invalid request ID" });
+    }
+    
+    const request = await storage.getRequest(requestId);
+    if (!request) {
+      return res.status(404).json({ message: "Request not found" });
+    }
+    
+    // Regular users can only see their own requests
+    if (req.user!.role === "user" && request.userId !== req.user!.id) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+    
+    // Get items in request
+    const requestItems = await storage.getRequestItemsByRequest(requestId);
+    
+    res.json(requestItems);
+  });
+
   // Create request (all authenticated users)
   app.post("/api/requests", async (req, res) => {
     if (!req.isAuthenticated()) {
