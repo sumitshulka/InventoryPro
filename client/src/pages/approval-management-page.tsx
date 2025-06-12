@@ -79,7 +79,7 @@ export default function ApprovalManagementPage() {
       action: 'approve' | 'reject'; 
       notes?: string;
     }) => {
-      return await apiRequest(`/api/approvals/${approvalId}/${action}`, "PATCH", {
+      return await apiRequest("PATCH", `/api/approvals/${approvalId}/${action}`, {
         notes: notes || null
       });
     },
