@@ -396,23 +396,7 @@ export default function WarehousesPage() {
 
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle>Active Warehouses</CardTitle>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={async () => {
-                    await handleRefresh();
-                    toast({
-                      title: "Data Refreshed",
-                      description: "All warehouse data has been reloaded successfully",
-                    });
-                  }}
-                  className="ml-2"
-                >
-                  <RefreshCw className="h-4 w-4" />
-                </Button>
-              </div>
+              <CardTitle>Active Warehouses</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="overflow-x-auto">
@@ -528,23 +512,7 @@ export default function WarehousesPage() {
 
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle>Archived Warehouses</CardTitle>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={async () => {
-                    await handleRefresh();
-                    toast({
-                      title: "Data Refreshed",
-                      description: "All warehouse data has been reloaded successfully",
-                    });
-                  }}
-                  className="ml-2"
-                >
-                  <RefreshCw className="h-4 w-4" />
-                </Button>
-              </div>
+              <CardTitle>Archived Warehouses</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="overflow-x-auto">
