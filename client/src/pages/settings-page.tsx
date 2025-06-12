@@ -34,7 +34,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { apiRequest, queryClient, invalidateRelatedQueries } from "@/lib/queryClient";
-import { Loader2, Plus, Edit, Trash2, Settings } from "lucide-react";
+import { Loader2, Plus, Edit, Trash2, Settings, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 const approvalSettingsSchema = z.object({
@@ -835,14 +835,29 @@ export default function SettingsPage() {
                     Manage office locations for warehouses and operations
                   </p>
                 </div>
-                <Button onClick={() => {
-                  setEditingLocation(null);
-                  locationForm.reset();
-                  setIsLocationDialogOpen(true);
-                }}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Location
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={async () => {
+                      await queryClient.refetchQueries({ queryKey: ['/api/locations'] });
+                      toast({
+                        title: "Refreshed",
+                        description: "Office locations table has been refreshed",
+                      });
+                    }}
+                  >
+                    <RefreshCw className="h-4 w-4" />
+                  </Button>
+                  <Button onClick={() => {
+                    setEditingLocation(null);
+                    locationForm.reset();
+                    setIsLocationDialogOpen(true);
+                  }}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Location
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent>
                 {locationsLoading ? (
