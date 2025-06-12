@@ -3294,6 +3294,93 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Close issue with resolution comments
+  app.patch("/api/issues/:id/close", async (req, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const { id } = req.params;
+      const { resolutionNotes } = req.body;
+
+      if (!resolutionNotes || resolutionNotes.trim() === '') {
+        return res.status(400).json({ message: "Resolution comments are required when closing an issue" });
+      }
+
+      const closedIssue = await storage.closeIssue(parseInt(id), req.user.id, resolutionNotes);
+      
+      if (!closedIssue) {
+        return res.status(404).json({ message: "Issue not found" });
+      }
+
+      res.json(closedIssue);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Reopen issue (only for original reporter)
+  app.patch("/api/issues/:id/reopen", async (req, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const { id } = req.params;
+      const issue = await storage.getIssue(parseInt(id));
+      
+      if (!issue) {
+        return res.status(404).json({ message: "Issue not found" });
+      }
+
+      // Only the original reporter can reopen the issue
+      if (issue.reportedBy !== req.user.id) {
+        return res.status(403).json({ message: "Only the original reporter can reopen this issue" });
+      }
+
+      if (issue.status !== 'closed') {
+        return res.status(400).json({ message: "Issue is not closed" });
+      }
+
+      const reopenedIssue = await storage.reopenIssue(parseInt(id), req.user.id);
+      
+      if (!reopenedIssue) {
+        return res.status(404).json({ message: "Issue not found" });
+      }
+
+      res.json(reopenedIssue);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get issue activity log
+  app.get("/api/issues/:id/activities", async (req, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const { id } = req.params;
+      const issue = await storage.getIssue(parseInt(id));
+      
+      if (!issue) {
+        return res.status(404).json({ message: "Issue not found" });
+      }
+
+      // Only admin or the reporter can see the activity log
+      if (req.user.role !== 'admin' && issue.reportedBy !== req.user.id) {
+        return res.status(403).json({ message: "Not authorized to view issue activities" });
+      }
+
+      const activities = await storage.getIssueActivityWithUser(parseInt(id));
+      res.json(activities);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // ==== Email Configuration Routes ====
   // Get email settings (admin only)
   app.get("/api/email-settings", checkRole("admin"), async (req, res) => {

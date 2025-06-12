@@ -2430,6 +2430,16 @@ export class DatabaseStorage implements IStorage {
       createdAt: new Date(),
       updatedAt: new Date()
     }).returning();
+
+    // Create activity log for issue creation
+    await this.createIssueActivity({
+      issueId: newIssue.id,
+      userId: issue.reportedBy,
+      action: 'created',
+      newValue: 'open',
+      comment: `Issue created: ${issue.title}`
+    });
+
     return newIssue;
   }
 
@@ -2441,9 +2451,102 @@ export class DatabaseStorage implements IStorage {
     return updatedIssue;
   }
 
+  async closeIssue(id: number, userId: number, resolutionNotes: string): Promise<Issue | undefined> {
+    const currentIssue = await this.getIssue(id);
+    if (!currentIssue) return undefined;
+
+    const [closedIssue] = await db.update(issues)
+      .set({ 
+        status: 'closed',
+        resolutionNotes,
+        closedBy: userId,
+        closedAt: new Date(),
+        actualResolutionDate: new Date(),
+        updatedAt: new Date()
+      })
+      .where(eq(issues.id, id))
+      .returning();
+
+    // Create activity log for issue closure
+    await this.createIssueActivity({
+      issueId: id,
+      userId,
+      action: 'closed',
+      previousValue: currentIssue.status,
+      newValue: 'closed',
+      comment: resolutionNotes
+    });
+
+    return closedIssue;
+  }
+
+  async reopenIssue(id: number, userId: number): Promise<Issue | undefined> {
+    const currentIssue = await this.getIssue(id);
+    if (!currentIssue) return undefined;
+
+    const [reopenedIssue] = await db.update(issues)
+      .set({ 
+        status: 'open',
+        reopenedBy: userId,
+        reopenedAt: new Date(),
+        updatedAt: new Date()
+      })
+      .where(eq(issues.id, id))
+      .returning();
+
+    // Create activity log for issue reopening
+    await this.createIssueActivity({
+      issueId: id,
+      userId,
+      action: 'reopened',
+      previousValue: currentIssue.status,
+      newValue: 'open',
+      comment: 'Issue reopened'
+    });
+
+    return reopenedIssue;
+  }
+
   async deleteIssue(id: number): Promise<boolean> {
     const result = await db.delete(issues).where(eq(issues.id, id)).returning();
     return result.length > 0;
+  }
+
+  // Issue Activity operations
+  async getIssueActivities(issueId: number): Promise<IssueActivity[]> {
+    return await db.select().from(issueActivities)
+      .where(eq(issueActivities.issueId, issueId))
+      .orderBy(issueActivities.createdAt);
+  }
+
+  async createIssueActivity(activity: InsertIssueActivity): Promise<IssueActivity> {
+    const [newActivity] = await db.insert(issueActivities).values({
+      ...activity,
+      createdAt: new Date()
+    }).returning();
+    return newActivity;
+  }
+
+  async getIssueActivityWithUser(issueId: number): Promise<any[]> {
+    const result = await db.select({
+      id: issueActivities.id,
+      action: issueActivities.action,
+      previousValue: issueActivities.previousValue,
+      newValue: issueActivities.newValue,
+      comment: issueActivities.comment,
+      createdAt: issueActivities.createdAt,
+      user: {
+        id: users.id,
+        name: users.name,
+        username: users.username
+      }
+    })
+    .from(issueActivities)
+    .leftJoin(users, eq(issueActivities.userId, users.id))
+    .where(eq(issueActivities.issueId, issueId))
+    .orderBy(issueActivities.createdAt);
+
+    return result;
   }
 
   // Audit Log operations

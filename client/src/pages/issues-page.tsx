@@ -32,6 +32,11 @@ interface Issue {
   assignedTo?: number;
   warehouseId?: number;
   itemId?: number;
+  resolutionNotes?: string;
+  closedBy?: number;
+  closedAt?: string;
+  reopenedBy?: number;
+  reopenedAt?: string;
   createdAt: string;
   updatedAt: string;
   resolvedAt?: string;
@@ -50,6 +55,20 @@ interface Issue {
   item?: {
     id: number;
     name: string;
+  };
+}
+
+interface IssueActivity {
+  id: number;
+  action: string;
+  previousValue?: string;
+  newValue?: string;
+  comment?: string;
+  createdAt: string;
+  user: {
+    id: number;
+    name: string;
+    username: string;
   };
 }
 
@@ -99,6 +118,10 @@ const replySchema = z.object({
   priority: z.enum(['low', 'normal', 'high', 'urgent']).default('normal'),
 });
 
+const closeIssueSchema = z.object({
+  resolutionNotes: z.string().min(1, "Resolution comments are required when closing an issue").max(1000, "Comments too long"),
+});
+
 export default function IssuesPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -112,6 +135,9 @@ export default function IssuesPage() {
   const [notificationFilter, setNotificationFilter] = useState("all");
   const [selectedNotification, setSelectedNotification] = useState<Notification | null>(null);
   const [showReplyDialog, setShowReplyDialog] = useState(false);
+  const [selectedIssue, setSelectedIssue] = useState<Issue | null>(null);
+  const [showCloseIssueDialog, setShowCloseIssueDialog] = useState(false);
+  const [showActivityDialog, setShowActivityDialog] = useState(false);
 
   const { data: issues = [], isLoading } = useQuery({
     queryKey: ['/api/issues'],
@@ -177,6 +203,20 @@ export default function IssuesPage() {
     },
   });
 
+  const closeIssueForm = useForm<z.infer<typeof closeIssueSchema>>({
+    resolver: zodResolver(closeIssueSchema),
+    defaultValues: {
+      resolutionNotes: "",
+    },
+  });
+
+  // Issue activity query
+  const { data: issueActivities = [] } = useQuery({
+    queryKey: ['/api/issues', selectedIssue?.id, 'activities'],
+    queryFn: () => selectedIssue ? fetch(`/api/issues/${selectedIssue.id}/activities`).then(res => res.json()).catch(() => []) : [],
+    enabled: !!selectedIssue && showActivityDialog,
+  });
+
   const createIssueMutation = useMutation({
     mutationFn: (data: z.infer<typeof issueSchema>) =>
       apiRequest('POST', '/api/issues', data),
@@ -215,6 +255,46 @@ export default function IssuesPage() {
       toast({
         title: "Error",
         description: error.message || "Failed to send notification",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const closeIssueMutation = useMutation({
+    mutationFn: (data: { issueId: number; resolutionNotes: string }) =>
+      apiRequest('PATCH', `/api/issues/${data.issueId}/close`, { resolutionNotes: data.resolutionNotes }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/issues'] });
+      setShowCloseIssueDialog(false);
+      closeIssueForm.reset();
+      toast({
+        title: "Success",
+        description: "Issue closed successfully with resolution comments",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to close issue",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const reopenIssueMutation = useMutation({
+    mutationFn: (issueId: number) =>
+      apiRequest('PATCH', `/api/issues/${issueId}/reopen`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/issues'] });
+      toast({
+        title: "Success",
+        description: "Issue reopened successfully",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to reopen issue",
         variant: "destructive",
       });
     },
