@@ -2680,7 +2680,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Unauthorized" });
       }
 
-      const { warehouseId, itemId, dateFrom, dateTo, disposalReason } = req.query;
+      const { warehouseId, itemId, dateFrom, dateTo, approvedBy } = req.query;
 
       // Get all disposed transfers
       const disposedTransfers = await storage.getTransfersByStatus("disposed");

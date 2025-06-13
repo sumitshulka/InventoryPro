@@ -25,7 +25,7 @@ export default function DisposedInventoryReportPage() {
     itemId: "all",
     dateFrom: "",
     dateTo: "",
-    disposalReason: ""
+    approvedBy: "all"
   });
 
   // Fetch disposed inventory data
@@ -53,6 +53,10 @@ export default function DisposedInventoryReportPage() {
 
   const { data: organizationSettings } = useQuery({
     queryKey: ["/api/organization-settings"]
+  });
+
+  const { data: users } = useQuery({
+    queryKey: ["/api/users"]
   });
 
   const currencySymbol = organizationSettings?.currencySymbol || "$";
@@ -101,7 +105,7 @@ export default function DisposedInventoryReportPage() {
       itemId: "all",
       dateFrom: "",
       dateTo: "",
-      disposalReason: ""
+      approvedBy: "all"
     });
   };
 
@@ -177,20 +181,19 @@ export default function DisposedInventoryReportPage() {
           </div>
         </div>
 
-        {/* Filters */}
+        {/* Compact Filters */}
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Filter className="h-5 w-5" />
-              Filters
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
-              <div>
-                <Label htmlFor="warehouse">Warehouse</Label>
+          <CardContent className="pt-6">
+            <div className="flex flex-wrap items-end gap-4">
+              <div className="flex items-center gap-2">
+                <Filter className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm font-medium">Filters:</span>
+              </div>
+              
+              <div className="min-w-[150px]">
+                <Label htmlFor="warehouse" className="text-xs">Warehouse</Label>
                 <Select value={filters.warehouseId} onValueChange={(value) => handleFilterChange("warehouseId", value)}>
-                  <SelectTrigger>
+                  <SelectTrigger className="h-8">
                     <SelectValue placeholder="All warehouses" />
                   </SelectTrigger>
                   <SelectContent>
@@ -204,10 +207,10 @@ export default function DisposedInventoryReportPage() {
                 </Select>
               </div>
 
-              <div>
-                <Label htmlFor="item">Item</Label>
+              <div className="min-w-[150px]">
+                <Label htmlFor="item" className="text-xs">Item</Label>
                 <Select value={filters.itemId} onValueChange={(value) => handleFilterChange("itemId", value)}>
-                  <SelectTrigger>
+                  <SelectTrigger className="h-8">
                     <SelectValue placeholder="All items" />
                   </SelectTrigger>
                   <SelectContent>
@@ -221,38 +224,46 @@ export default function DisposedInventoryReportPage() {
                 </Select>
               </div>
 
-              <div>
-                <Label htmlFor="dateFrom">From Date</Label>
+              <div className="min-w-[120px]">
+                <Label htmlFor="dateFrom" className="text-xs">From Date</Label>
                 <Input
                   id="dateFrom"
                   type="date"
+                  className="h-8"
                   value={filters.dateFrom}
                   onChange={(e) => handleFilterChange("dateFrom", e.target.value)}
                 />
               </div>
 
-              <div>
-                <Label htmlFor="dateTo">To Date</Label>
+              <div className="min-w-[120px]">
+                <Label htmlFor="dateTo" className="text-xs">To Date</Label>
                 <Input
                   id="dateTo"
                   type="date"
+                  className="h-8"
                   value={filters.dateTo}
                   onChange={(e) => handleFilterChange("dateTo", e.target.value)}
                 />
               </div>
 
-              <div>
-                <Label htmlFor="disposalReason">Disposal Reason</Label>
-                <Input
-                  id="disposalReason"
-                  placeholder="Enter disposal reason"
-                  value={filters.disposalReason}
-                  onChange={(e) => handleFilterChange("disposalReason", e.target.value)}
-                />
+              <div className="min-w-[150px]">
+                <Label htmlFor="approvedBy" className="text-xs">Approved By</Label>
+                <Select value={filters.approvedBy} onValueChange={(value) => handleFilterChange("approvedBy", value)}>
+                  <SelectTrigger className="h-8">
+                    <SelectValue placeholder="All approvers" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All approvers</SelectItem>
+                    {users?.map((user: any) => (
+                      <SelectItem key={user.id} value={user.id.toString()}>
+                        {user.name || user.username}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
-            </div>
-            <div className="flex justify-end mt-4">
-              <Button variant="outline" onClick={clearFilters}>
+
+              <Button variant="outline" size="sm" onClick={clearFilters} className="h-8">
                 Clear Filters
               </Button>
             </div>
