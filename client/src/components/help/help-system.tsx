@@ -326,6 +326,221 @@ Monitor email delivery status, bounce handling, and notification effectiveness w
     category: "notifications",
     tags: ["email", "alerts", "communication", "settings"],
     difficulty: "intermediate"
+  },
+  {
+    id: "user-management",
+    title: "User Management and Administration",
+    content: `Comprehensive user management system for controlling access and managing team members across the inventory system.
+
+**User Creation and Setup:**
+- Add new users with complete profile information
+- Assign appropriate roles based on job responsibilities
+- Set warehouse and department associations
+- Configure initial passwords and security settings
+- Enable or disable user accounts as needed
+
+**User Roles and Permissions:**
+- Admin: Full system access including user management and system configuration
+- Manager: Department-level oversight with reporting and approval capabilities
+- Warehouse Operator: Location-specific inventory operations and transactions
+- Employee: Basic inventory requests and transaction viewing
+- Viewer: Read-only access to designated inventory information
+
+**User Profile Management:**
+- Update contact information and personal details
+- Modify role assignments and permissions
+- Change warehouse and department associations
+- Reset passwords and manage authentication settings
+- Track user activity and last login information
+
+**Bulk Operations:**
+- Import users from CSV or Excel files
+- Bulk role assignments and updates
+- Mass password resets for security purposes
+- Batch user activation or deactivation
+- Export user lists for compliance reporting
+
+**Access Control Features:**
+- Warehouse-specific access restrictions
+- Department-based permission inheritance
+- Temporary access grants for contractors
+- Manager hierarchies and reporting structures
+- Emergency access procedures for critical situations
+
+**User Activity Monitoring:**
+Track user login patterns, transaction history, and system usage for security and compliance purposes.`,
+    category: "administration",
+    tags: ["users", "permissions", "roles", "access"],
+    difficulty: "intermediate"
+  },
+  {
+    id: "audit-trail",
+    title: "Audit Trail and Activity Logging",
+    content: `Comprehensive audit trail system for tracking all system activities, changes, and transactions for compliance and security monitoring.
+
+**Audit Log Coverage:**
+- All user login and logout activities
+- Inventory transactions and stock movements
+- System configuration changes
+- User management actions and role modifications
+- Data exports and report generation
+- Failed login attempts and security events
+
+**Detailed Activity Tracking:**
+- User identification and IP address logging
+- Timestamp recording with timezone information
+- Before and after values for all data changes
+- Transaction reference numbers and batch operations
+- Integration with external system activities
+- Mobile and web access differentiation
+
+**Audit Search and Filtering:**
+- Search by user, date range, or activity type
+- Filter by warehouse, department, or transaction type
+- Advanced queries for compliance reporting
+- Export filtered results for external analysis
+- Real-time monitoring dashboards
+- Automated anomaly detection and alerts
+
+**Compliance Features:**
+- Immutable audit log storage
+- Digital signatures for critical transactions
+- Regulatory compliance reporting templates
+- Data retention policy enforcement
+- Automatic backup and archival processes
+- Integration with external compliance systems
+
+**Security Monitoring:**
+- Failed access attempt tracking
+- Unusual activity pattern detection
+- Privilege escalation monitoring
+- Data access pattern analysis
+- Integration with security information systems
+- Real-time alert generation for suspicious activities
+
+**Reporting and Analytics:**
+Generate comprehensive audit reports for internal reviews, external audits, and regulatory compliance requirements.`,
+    category: "administration",
+    tags: ["audit", "compliance", "logging", "security"],
+    difficulty: "advanced"
+  },
+  {
+    id: "system-settings",
+    title: "System Settings and Configuration",
+    content: `Complete system configuration management for customizing the inventory management system to meet organizational requirements.
+
+**Organization Settings:**
+- Company name and branding configuration
+- Currency settings and exchange rate management
+- Time zone and regional format preferences
+- Business rules and workflow customization
+- Default values and system behaviors
+- Integration with corporate identity systems
+
+**Inventory Configuration:**
+- Item numbering schemes and SKU formats
+- Category and classification hierarchies
+- Unit of measure definitions and conversions
+- Pricing structures and cost calculation methods
+- Stock level thresholds and reorder points
+- Barcode format specifications and printing
+
+**Warehouse Settings:**
+- Location hierarchies and naming conventions
+- Storage capacity configurations
+- Picking and packing workflow rules
+- Temperature and environmental monitoring
+- Security access controls per location
+- Integration with warehouse management systems
+
+**Workflow Customization:**
+- Approval process definitions and routing
+- Transfer workflow configurations
+- Request processing rules and timelines
+- Notification trigger conditions
+- Escalation procedures and timeouts
+- Custom fields and data collection forms
+
+**Integration Settings:**
+- API endpoint configurations
+- Third-party system connections
+- Data synchronization schedules
+- Authentication and security protocols
+- Error handling and retry mechanisms
+- Performance monitoring and optimization
+
+**System Maintenance:**
+- Database optimization and cleanup procedures
+- Backup and recovery configurations
+- Performance monitoring and alerting
+- Security patch management
+- User session management
+- System health monitoring dashboards
+
+**Customization Options:**
+Configure dashboard layouts, report templates, and user interface preferences to match organizational needs.`,
+    category: "administration",
+    tags: ["configuration", "settings", "customization", "integration"],
+    difficulty: "advanced"
+  },
+  {
+    id: "department-management",
+    title: "Department Management and Organization",
+    content: `Comprehensive department management system for organizing users, inventory, and workflows across different organizational units.
+
+**Department Structure:**
+- Create hierarchical department structures
+- Define department codes and naming conventions
+- Set up parent-child relationships between departments
+- Configure cost centers and budget allocations
+- Establish reporting hierarchies and management chains
+- Map departments to physical locations and warehouses
+
+**Department Configuration:**
+- Assign department managers and supervisors
+- Define department-specific workflows and procedures
+- Set up approval hierarchies for requests and transfers
+- Configure budget limits and spending authorities
+- Establish inventory allocation rules per department
+- Create department-specific item catalogs and restrictions
+
+**User Assignment:**
+- Assign users to primary and secondary departments
+- Configure cross-departmental access permissions
+- Set up temporary department assignments
+- Manage department transfer procedures for users
+- Define manager and supervisor relationships
+- Control department-based data visibility
+
+**Inventory Allocation:**
+- Department-specific inventory budgets and limits
+- Allocation rules for shared inventory items
+- Department cost center assignment for transactions
+- Transfer approval requirements between departments
+- Department-specific pricing and discount structures
+- Inventory reservation and allocation tracking
+
+**Reporting and Analytics:**
+- Department-wise inventory consumption reports
+- Cost analysis and budget utilization tracking
+- Department performance metrics and KPIs
+- Cross-departmental transfer analysis
+- Manager dashboards with department insights
+- Compliance reporting for departmental activities
+
+**Workflow Integration:**
+- Department-based request routing and approvals
+- Automated escalation to department managers
+- Department-specific notification preferences
+- Integration with HR systems for organizational updates
+- Department budget controls and spending limits
+- Custom workflow rules per department type
+
+**Access Control:**
+Configure department-based permissions ensuring users only access inventory and functions relevant to their departmental responsibilities.`,
+    category: "administration",
+    tags: ["departments", "organization", "hierarchy", "management"],
+    difficulty: "intermediate"
   }
 ];
 
