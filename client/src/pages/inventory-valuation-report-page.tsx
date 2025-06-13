@@ -9,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Download, Filter, BarChart3, DollarSign, CalendarIcon } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -49,13 +50,13 @@ export default function InventoryValuationReportPage() {
     queryFn: () => {
       const params = new URLSearchParams();
       if (asOfDate) {
-        params.append('asOfDate', asOfDate.toISOString().split('T')[0]);
+        params.append('asOfDate', asOfDate.toISOString());
       }
       return fetch(`/api/reports/inventory-valuation?${params}`).then(res => res.json());
-    },
+    }
   });
 
-  const { data: organizationSettings } = useQuery({
+  const { data: organizationSettings = {} } = useQuery({
     queryKey: ['/api/organization-settings'],
   });
 
@@ -100,6 +101,32 @@ export default function InventoryValuationReportPage() {
 
   const totalInventoryValue = useMemo(() => {
     return filteredAndSortedData.reduce((sum, item) => sum + item.totalValue, 0);
+  }, [filteredAndSortedData]);
+
+  // Summary data - group by item and sum quantities across warehouses
+  const summaryData = useMemo(() => {
+    const itemGroups = new Map();
+    
+    filteredAndSortedData.forEach(item => {
+      if (!itemGroups.has(item.sku)) {
+        itemGroups.set(item.sku, {
+          sku: item.sku,
+          name: item.name,
+          category: item.category,
+          unit: item.unit,
+          unitValue: item.unitValue,
+          totalQuantity: 0,
+          totalValue: 0,
+          valuationMethod: item.valuationMethod
+        });
+      }
+      
+      const group = itemGroups.get(item.sku);
+      group.totalQuantity += item.currentStock;
+      group.totalValue += item.totalValue;
+    });
+    
+    return Array.from(itemGroups.values()).sort((a, b) => a.name.localeCompare(b.name));
   }, [filteredAndSortedData]);
 
   const handleSort = (column: string) => {
@@ -313,88 +340,194 @@ export default function InventoryValuationReportPage() {
           </CardContent>
         </Card>
 
-        {/* Data Table */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Inventory Valuation Details</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {filteredAndSortedData.length === 0 ? (
-              <div className="text-center py-8">
-                <p className="text-gray-500">No inventory items found matching your criteria.</p>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead 
-                        className="cursor-pointer hover:bg-gray-50"
-                        onClick={() => handleSort('name')}
-                      >
-                        Item Name {sortBy === 'name' && (sortOrder === 'asc' ? '↑' : '↓')}
-                      </TableHead>
-                      <TableHead>SKU</TableHead>
-                      <TableHead 
-                        className="cursor-pointer hover:bg-gray-50"
-                        onClick={() => handleSort('category')}
-                      >
-                        Category {sortBy === 'category' && (sortOrder === 'asc' ? '↑' : '↓')}
-                      </TableHead>
-                      <TableHead 
-                        className="cursor-pointer hover:bg-gray-50"
-                        onClick={() => handleSort('warehouse')}
-                      >
-                        Warehouse {sortBy === 'warehouse' && (sortOrder === 'asc' ? '↑' : '↓')}
-                      </TableHead>
-                      <TableHead 
-                        className="cursor-pointer hover:bg-gray-50 text-right"
-                        onClick={() => handleSort('currentStock')}
-                      >
-                        Current Stock {sortBy === 'currentStock' && (sortOrder === 'asc' ? '↑' : '↓')}
-                      </TableHead>
-                      <TableHead>Unit</TableHead>
-                      <TableHead 
-                        className="cursor-pointer hover:bg-gray-50 text-right"
-                        onClick={() => handleSort('unitValue')}
-                      >
-                        Unit Value {sortBy === 'unitValue' && (sortOrder === 'asc' ? '↑' : '↓')}
-                      </TableHead>
-                      <TableHead 
-                        className="cursor-pointer hover:bg-gray-50 text-right"
-                        onClick={() => handleSort('totalValue')}
-                      >
-                        Total Value {sortBy === 'totalValue' && (sortOrder === 'asc' ? '↑' : '↓')}
-                      </TableHead>
-                      <TableHead>Last Check-in</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredAndSortedData.map((item) => (
-                      <TableRow key={item.id}>
-                        <TableCell className="font-medium">{item.name}</TableCell>
-                        <TableCell>{item.sku}</TableCell>
-                        <TableCell>{item.category}</TableCell>
-                        <TableCell>{item.warehouse}</TableCell>
-                        <TableCell className="text-right">{formatNumberWithCommas(item.currentStock)}</TableCell>
-                        <TableCell>{item.unit}</TableCell>
-                        <TableCell className="text-right">
-                          {formatCurrency(item.unitValue)}
-                        </TableCell>
-                        <TableCell className="text-right font-semibold">
-                          {formatCurrency(item.totalValue)}
-                        </TableCell>
-                        <TableCell>
-                          {item.lastCheckInDate ? format(new Date(item.lastCheckInDate), 'MMM dd, yyyy') : 'N/A'}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        {/* Tabs for Summary and Details */}
+        <Tabs defaultValue="summary" className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="summary">Summary View</TabsTrigger>
+            <TabsTrigger value="details">Details View</TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="summary" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Item-Level Summary</CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Total quantities and values across all warehouses by item
+                </p>
+              </CardHeader>
+              <CardContent>
+                {summaryData.length === 0 ? (
+                  <div className="text-center py-8">
+                    <p className="text-muted-foreground">No items found matching your criteria.</p>
+                  </div>
+                ) : (
+                  <div className="rounded-md border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead 
+                            className="cursor-pointer hover:bg-muted/50"
+                            onClick={() => handleSort('sku')}
+                          >
+                            Item Code
+                            {sortBy === 'sku' && (
+                              <span className="ml-1">{sortOrder === 'asc' ? '↑' : '↓'}</span>
+                            )}
+                          </TableHead>
+                          <TableHead 
+                            className="cursor-pointer hover:bg-muted/50"
+                            onClick={() => handleSort('name')}
+                          >
+                            Item Name
+                            {sortBy === 'name' && (
+                              <span className="ml-1">{sortOrder === 'asc' ? '↑' : '↓'}</span>
+                            )}
+                          </TableHead>
+                          <TableHead 
+                            className="cursor-pointer hover:bg-muted/50 text-right"
+                            onClick={() => handleSort('totalQuantity')}
+                          >
+                            Total Qty
+                            {sortBy === 'totalQuantity' && (
+                              <span className="ml-1">{sortOrder === 'asc' ? '↑' : '↓'}</span>
+                            )}
+                          </TableHead>
+                          <TableHead 
+                            className="cursor-pointer hover:bg-muted/50 text-right"
+                            onClick={() => handleSort('unitValue')}
+                          >
+                            Unit Price
+                            {sortBy === 'unitValue' && (
+                              <span className="ml-1">{sortOrder === 'asc' ? '↑' : '↓'}</span>
+                            )}
+                          </TableHead>
+                          <TableHead 
+                            className="cursor-pointer hover:bg-muted/50 text-right"
+                            onClick={() => handleSort('totalValue')}
+                          >
+                            Total Price
+                            {sortBy === 'totalValue' && (
+                              <span className="ml-1">{sortOrder === 'asc' ? '↑' : '↓'}</span>
+                            )}
+                          </TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {summaryData.map((item, index) => (
+                          <TableRow key={index}>
+                            <TableCell className="font-medium">{item.sku}</TableCell>
+                            <TableCell>
+                              <div>
+                                <div className="font-medium">{item.name}</div>
+                                <div className="text-sm text-muted-foreground">{item.category}</div>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {formatNumberWithCommas(item.totalQuantity)} {item.unit}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {formatCurrency(item.unitValue)}
+                            </TableCell>
+                            <TableCell className="text-right font-medium">
+                              {formatCurrency(item.totalValue)}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+          
+          <TabsContent value="details" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Warehouse-wise Inventory Valuation</CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Detailed breakdown by warehouse location
+                </p>
+              </CardHeader>
+              <CardContent>
+                {filteredAndSortedData.length === 0 ? (
+                  <div className="text-center py-8">
+                    <p className="text-muted-foreground">No inventory items found matching your criteria.</p>
+                  </div>
+                ) : (
+                  <div className="rounded-md border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead 
+                            className="cursor-pointer hover:bg-muted/50"
+                            onClick={() => handleSort('name')}
+                          >
+                            Item Name {sortBy === 'name' && (sortOrder === 'asc' ? '↑' : '↓')}
+                          </TableHead>
+                          <TableHead>SKU</TableHead>
+                          <TableHead 
+                            className="cursor-pointer hover:bg-muted/50"
+                            onClick={() => handleSort('category')}
+                          >
+                            Category {sortBy === 'category' && (sortOrder === 'asc' ? '↑' : '↓')}
+                          </TableHead>
+                          <TableHead 
+                            className="cursor-pointer hover:bg-muted/50"
+                            onClick={() => handleSort('warehouse')}
+                          >
+                            Warehouse {sortBy === 'warehouse' && (sortOrder === 'asc' ? '↑' : '↓')}
+                          </TableHead>
+                          <TableHead 
+                            className="cursor-pointer hover:bg-muted/50 text-right"
+                            onClick={() => handleSort('currentStock')}
+                          >
+                            Current Stock {sortBy === 'currentStock' && (sortOrder === 'asc' ? '↑' : '↓')}
+                          </TableHead>
+                          <TableHead>Unit</TableHead>
+                          <TableHead 
+                            className="cursor-pointer hover:bg-muted/50 text-right"
+                            onClick={() => handleSort('unitValue')}
+                          >
+                            Unit Value {sortBy === 'unitValue' && (sortOrder === 'asc' ? '↑' : '↓')}
+                          </TableHead>
+                          <TableHead 
+                            className="cursor-pointer hover:bg-muted/50 text-right"
+                            onClick={() => handleSort('totalValue')}
+                          >
+                            Total Value {sortBy === 'totalValue' && (sortOrder === 'asc' ? '↑' : '↓')}
+                          </TableHead>
+                          <TableHead>Last Check-in</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredAndSortedData.map((item) => (
+                          <TableRow key={item.id}>
+                            <TableCell className="font-medium">{item.name}</TableCell>
+                            <TableCell>{item.sku}</TableCell>
+                            <TableCell>{item.category}</TableCell>
+                            <TableCell>{item.warehouse}</TableCell>
+                            <TableCell className="text-right">{formatNumberWithCommas(item.currentStock)}</TableCell>
+                            <TableCell>{item.unit}</TableCell>
+                            <TableCell className="text-right">
+                              {formatCurrency(item.unitValue)}
+                            </TableCell>
+                            <TableCell className="text-right font-semibold">
+                              {formatCurrency(item.totalValue)}
+                            </TableCell>
+                            <TableCell>
+                              {item.lastCheckInDate ? format(new Date(item.lastCheckInDate), 'MMM dd, yyyy') : 'N/A'}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </div>
     </AppLayout>
   );
