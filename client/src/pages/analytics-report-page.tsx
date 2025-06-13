@@ -97,7 +97,10 @@ export default function AnalyticsReportPage() {
 
   const isLoading = loadingFastest || loadingOrdered || loadingDepartments || loadingUsers || loadingPrices;
 
-  const formatNumberWithCommas = (value: number): string => {
+  const formatNumberWithCommas = (value: number | null | undefined): string => {
+    if (value === null || value === undefined || isNaN(value)) {
+      return '0';
+    }
     return value.toLocaleString();
   };
 
@@ -337,7 +340,7 @@ export default function AnalyticsReportPage() {
                               </TableCell>
                               <TableCell className="text-right">{formatNumberWithCommas(item.orderCount)}</TableCell>
                               <TableCell className="text-right">{formatNumberWithCommas(item.totalQuantity)}</TableCell>
-                              <TableCell className="text-right">{Math.round(item.totalQuantity / item.orderCount)}</TableCell>
+                              <TableCell className="text-right">{item.orderCount > 0 ? Math.round(item.totalQuantity / item.orderCount) : 0}</TableCell>
                             </TableRow>
                           ))}
                         </TableBody>

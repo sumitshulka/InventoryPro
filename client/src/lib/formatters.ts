@@ -1,9 +1,15 @@
 // Number formatting utilities
-export function formatNumber(value: number): string {
+export function formatNumber(value: number | null | undefined): string {
+  if (value === null || value === undefined || isNaN(value)) {
+    return '0';
+  }
   return value.toLocaleString();
 }
 
-export function formatNumberCompact(value: number): string {
+export function formatNumberCompact(value: number | null | undefined): string {
+  if (value === null || value === undefined || isNaN(value)) {
+    return '0';
+  }
   if (value >= 1000000) {
     return (value / 1000000).toFixed(1) + 'M';
   } else if (value >= 1000) {
@@ -12,7 +18,7 @@ export function formatNumberCompact(value: number): string {
   return value.toString();
 }
 
-export function formatCapacity(value: number): string {
+export function formatCapacity(value: number | null | undefined): string {
   return formatNumber(value);
 }
 
