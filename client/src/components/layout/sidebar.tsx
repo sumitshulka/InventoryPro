@@ -324,6 +324,20 @@ export default function Sidebar({ user, isOpen, onClose }: SidebarProps) {
                       <span className="whitespace-nowrap">Low Stock Report</span>
                     </Link>
                   </li>
+                  <li>
+                    <Link 
+                      href="/reports/disposed-inventory"
+                      className={cn(
+                        "flex items-center px-3 py-2 rounded-md",
+                        isActive("/reports/disposed-inventory") 
+                          ? "bg-primary/10 border-l-4 border-primary text-primary" 
+                          : "text-gray-700 hover:text-primary hover:bg-primary/5"
+                      )}
+                    >
+                      <span className="material-icons mr-3">delete_forever</span>
+                      <span className="whitespace-nowrap">Disposed Inventory</span>
+                    </Link>
+                  </li>
                   </ul>
                 </div>
               )}
