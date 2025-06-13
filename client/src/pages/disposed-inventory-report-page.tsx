@@ -51,6 +51,12 @@ export default function DisposedInventoryReportPage() {
     queryKey: ["/api/items"]
   });
 
+  const { data: organizationSettings } = useQuery({
+    queryKey: ["/api/organization-settings"]
+  });
+
+  const baseCurrency = organizationSettings?.baseCurrency || "USD";
+
   // Calculate summary statistics
   const summaryStats = disposedItems?.reduce((acc: any, item: any) => {
     acc.totalItems += item.quantity;
@@ -282,7 +288,7 @@ export default function DisposedInventoryReportPage() {
                     <CalendarIcon className="h-4 w-4 text-muted-foreground" />
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold">{formatCurrencyFull(summaryStats.totalValue, "USD")}</div>
+                    <div className="text-2xl font-bold">{formatCurrencyFull(summaryStats.totalValue, baseCurrency)}</div>
                     <p className="text-xs text-muted-foreground">
                       Estimated market value
                     </p>
@@ -296,7 +302,7 @@ export default function DisposedInventoryReportPage() {
                   </CardHeader>
                   <CardContent>
                     <div className="text-2xl font-bold">
-                      {formatCurrencyFull(summaryStats.totalItems > 0 ? summaryStats.totalValue / summaryStats.totalItems : 0, "USD")}
+                      {formatCurrencyFull(summaryStats.totalItems > 0 ? summaryStats.totalValue / summaryStats.totalItems : 0, baseCurrency)}
                     </div>
                     <p className="text-xs text-muted-foreground">
                       Per disposed item
@@ -339,7 +345,7 @@ export default function DisposedInventoryReportPage() {
                         <TableRow key={warehouseId}>
                           <TableCell className="font-medium">{data.name}</TableCell>
                           <TableCell>{data.quantity}</TableCell>
-                          <TableCell>{formatCurrencyFull(data.value, "USD")}</TableCell>
+                          <TableCell>{formatCurrencyFull(data.value, baseCurrency)}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
