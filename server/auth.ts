@@ -2,8 +2,7 @@ import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
 import { Express } from "express";
 import session from "express-session";
-import { scrypt, randomBytes, timingSafeEqual } from "crypto";
-import { promisify } from "util";
+import { createHash, randomBytes } from "crypto";
 import { storage } from "./storage";
 import { User as SelectUser, insertUserSchema } from "@shared/schema";
 import { z } from "zod";
@@ -15,30 +14,27 @@ declare global {
   }
 }
 
-const scryptAsync = promisify(scrypt);
-
-async function hashPassword(password: string) {
+async function hashPassword(password: string): Promise<string> {
   const salt = randomBytes(16).toString("hex");
-  const buf = (await scryptAsync(password, salt, 64)) as Buffer;
-  return `${buf.toString("hex")}.${salt}`;
+  const hashedPassword = createHash('md5').update(password + salt).digest('hex');
+  return `${hashedPassword}.${salt}`;
 }
 
-async function comparePasswords(supplied: string, stored: string) {
-  // Check if stored password has the expected format
+async function comparePasswords(supplied: string, stored: string): Promise<boolean> {
+  // Check if stored password has the expected format (MD5 hash + salt)
   if (!stored || !stored.includes('.')) {
-    // For demo accounts or improperly formatted passwords, do direct comparison
+    // For legacy plain text passwords, do direct comparison (backward compatibility)
     return supplied === stored;
   }
   
-  const [hashed, salt] = stored.split(".");
-  if (!hashed || !salt) {
+  const [hashedPassword, salt] = stored.split(".");
+  if (!hashedPassword || !salt) {
     return false;
   }
   
   try {
-    const hashedBuf = Buffer.from(hashed, "hex");
-    const suppliedBuf = (await scryptAsync(supplied, salt, 64)) as Buffer;
-    return timingSafeEqual(hashedBuf, suppliedBuf);
+    const suppliedHash = createHash('md5').update(supplied + salt).digest('hex');
+    return suppliedHash === hashedPassword;
   } catch (error) {
     console.error('Password comparison error:', error);
     return false;
@@ -312,4 +308,40 @@ export function setupAuth(app: Express) {
       res.status(500).json({ message: "Failed to reset password" });
     }
   });
+
+  // Password migration route - one-time use to hash existing plain text passwords
+  app.post("/api/migrate-passwords", async (req, res) => {
+    try {
+      const { adminKey } = req.body;
+      
+      // Security check - require admin key
+      if (adminKey !== "MIGRATE_PASSWORDS_2024") {
+        return res.status(403).json({ message: "Unauthorized" });
+      }
+      
+      const users = await storage.getAllUsers();
+      let migratedCount = 0;
+      
+      for (const user of users) {
+        // Check if password is already hashed (contains a dot)
+        if (!user.password.includes('.')) {
+          console.log(`Migrating password for user: ${user.username}`);
+          const hashedPassword = await hashPassword(user.password);
+          await storage.updateUser(user.id, { password: hashedPassword });
+          migratedCount++;
+        }
+      }
+      
+      res.json({ 
+        message: `Password migration completed. ${migratedCount} passwords updated.`,
+        migratedCount 
+      });
+    } catch (error: any) {
+      console.error("Password migration error:", error);
+      res.status(500).json({ message: "Migration failed", error: error.message });
+    }
+  });
 }
+
+// Export hash function for external use
+export { hashPassword };
