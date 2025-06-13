@@ -2617,6 +2617,135 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Reject transfer (Admin or transfer creator)
+  app.post("/api/transfers/:transferId/reject", async (req: Request, res: Response) => {
+    try {
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const transferId = parseInt(req.params.transferId);
+      const { rejectionReason } = req.body;
+      const user = req.user!;
+      
+      // Get transfer details
+      const transfer = await storage.getTransfer(transferId);
+      if (!transfer) {
+        return res.status(404).json({ message: "Transfer not found" });
+      }
+
+      // Check if transfer is in pending status
+      if (transfer.status !== "pending") {
+        return res.status(400).json({ message: "Only pending transfers can be rejected" });
+      }
+
+      // Check if user is admin or the one who initiated the transfer
+      if (user.role !== "admin" && transfer.initiatedBy !== user.id) {
+        return res.status(403).json({ message: "Only admins or transfer creators can reject transfers" });
+      }
+
+      // Update transfer status to rejected
+      const updatedTransfer = await storage.updateTransfer(transferId, {
+        status: "rejected",
+        rejectionReason,
+        rejectedBy: user.id,
+        rejectedDate: new Date(),
+        updatedAt: new Date()
+      });
+
+      // Create audit log
+      await storage.createAuditLog({
+        action: "transfer_rejected",
+        entityType: "transfer",
+        entityId: transferId,
+        userId: user.id,
+        details: {
+          transferCode: transfer.transferCode,
+          rejectionReason,
+          rejectedBy: user.name || user.username
+        }
+      });
+
+      res.json(updatedTransfer);
+    } catch (error) {
+      console.error("Error rejecting transfer:", error);
+      res.status(500).json({ message: "Failed to reject transfer" });
+    }
+  });
+
+  // Get disposed inventory with filtering
+  app.get("/api/disposed-inventory", async (req: Request, res: Response) => {
+    try {
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const { warehouseId, itemId, dateFrom, dateTo, disposalReason } = req.query;
+
+      // Get all disposed transfers
+      const disposedTransfers = await storage.getTransfersByStatus("disposed");
+      
+      let disposedItems: any[] = [];
+
+      // Get items from disposed transfers
+      for (const transfer of disposedTransfers) {
+        const transferItems = await storage.getTransferItemsByTransfer(transfer.id);
+        
+        for (const transferItem of transferItems) {
+          const item = await storage.getItem(transferItem.itemId);
+          const warehouse = await storage.getWarehouse(transfer.destinationWarehouseId);
+          
+          disposedItems.push({
+            transferId: transfer.id,
+            transferCode: transfer.transferCode,
+            itemId: transferItem.itemId,
+            item,
+            warehouse,
+            warehouseId: transfer.destinationWarehouseId,
+            quantity: transferItem.requestedQuantity,
+            disposalDate: transfer.disposalDate,
+            disposalReason: transfer.disposalReason
+          });
+        }
+      }
+
+      // Apply filters
+      if (warehouseId) {
+        disposedItems = disposedItems.filter(item => item.warehouseId === parseInt(warehouseId as string));
+      }
+
+      if (itemId) {
+        disposedItems = disposedItems.filter(item => item.itemId === parseInt(itemId as string));
+      }
+
+      if (dateFrom) {
+        const fromDate = new Date(dateFrom as string);
+        disposedItems = disposedItems.filter(item => 
+          item.disposalDate && new Date(item.disposalDate) >= fromDate
+        );
+      }
+
+      if (dateTo) {
+        const toDate = new Date(dateTo as string);
+        toDate.setHours(23, 59, 59, 999); // End of day
+        disposedItems = disposedItems.filter(item => 
+          item.disposalDate && new Date(item.disposalDate) <= toDate
+        );
+      }
+
+      if (disposalReason) {
+        disposedItems = disposedItems.filter(item => 
+          item.disposalReason && item.disposalReason.toLowerCase().includes((disposalReason as string).toLowerCase())
+        );
+      }
+
+      res.json(disposedItems);
+    } catch (error) {
+      console.error("Error fetching disposed inventory:", error);
+      res.status(500).json({ message: "Failed to fetch disposed inventory" });
+    }
+  });
+
   // Enhanced Transfer Management Routes
   
   // Get all transfers with enriched data
