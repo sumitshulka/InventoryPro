@@ -1100,7 +1100,7 @@ export default function IssuesPage() {
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              {items.map((item: any) => (
+                              {Array.isArray(items) && items.map((item: any) => (
                                 <SelectItem key={item.id} value={item.id.toString()}>
                                   {item.name}
                                 </SelectItem>
