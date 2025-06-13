@@ -480,6 +480,8 @@ export default function HelpSystem({ open, onOpenChange }: HelpSystemProps) {
     setCurrentActionsPage(1);
   };
 
+
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-7xl w-[95vw] h-[90vh] sm:h-[80vh] p-0" aria-describedby="help-system-description">
@@ -621,16 +623,16 @@ export default function HelpSystem({ open, onOpenChange }: HelpSystemProps) {
                 </div>
               </div>
             ) : (
-              <div className="flex flex-col h-full">
-                <Tabs defaultValue="topics" className="flex-1 flex flex-col">
+              <div className="h-full">
+                <Tabs defaultValue="topics" className="h-full">
                   <TabsList className="grid w-full grid-cols-2 mb-4">
                     <TabsTrigger value="topics">Help Topics</TabsTrigger>
                     <TabsTrigger value="quick-actions">Quick Actions</TabsTrigger>
                   </TabsList>
 
-                  <TabsContent value="topics" className="flex-1 flex flex-col">
-                    <div className="flex-1 overflow-hidden">
-                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 max-h-[calc(100vh-400px)] lg:max-h-[calc(80vh-300px)] overflow-y-auto">
+                  <TabsContent value="topics" className="space-y-4 h-[calc(100%-80px)]">
+                    <ScrollArea className="h-full">
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 p-2">
                         {currentArticles.map((article) => (
                           <Card 
                             key={article.id} 
@@ -662,7 +664,7 @@ export default function HelpSystem({ open, onOpenChange }: HelpSystemProps) {
                           </Card>
                         ))}
                       </div>
-                    </div>
+                    </ScrollArea>
                     
                     {/* Articles Pagination */}
                     {totalArticlePages > 1 && (
@@ -697,9 +699,9 @@ export default function HelpSystem({ open, onOpenChange }: HelpSystemProps) {
                     )}
                   </TabsContent>
 
-                  <TabsContent value="quick-actions" className="flex-1 flex flex-col">
-                    <div className="flex-1 overflow-hidden">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[calc(100vh-400px)] lg:max-h-[calc(80vh-300px)] overflow-y-auto">
+                  <TabsContent value="quick-actions" className="space-y-4 h-[calc(100%-80px)]">
+                    <ScrollArea className="h-full">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-2">
                         {currentActions.map((action) => {
                           const Icon = action.icon;
                           return (
@@ -731,7 +733,7 @@ export default function HelpSystem({ open, onOpenChange }: HelpSystemProps) {
                           );
                         })}
                       </div>
-                    </div>
+                    </ScrollArea>
                     
                     {/* Quick Actions Pagination */}
                     {totalActionPages > 1 && (
