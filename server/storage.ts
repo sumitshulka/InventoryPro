@@ -74,7 +74,7 @@ import session from "express-session";
 import connectPg from "connect-pg-simple";
 import createMemoryStore from "memorystore";
 import { db, pool } from "./db";
-import { eq, and, desc, or, ne } from "drizzle-orm";
+import { eq, and, desc, or, ne, sql } from "drizzle-orm";
 
 const MemoryStore = createMemoryStore(session);
 const PostgresSessionStore = connectPg(session);
@@ -795,6 +795,125 @@ export class DatabaseStorage implements IStorage {
   async recordReturnDelivery(transferId: number, data: any): Promise<boolean> {
     await this.updateTransfer(transferId, { status: 'return_delivered', ...data });
     return true;
+  }
+
+  // Issues operations
+  async getAllIssues(): Promise<any[]> {
+    try {
+      const result = await db.select().from(issues).orderBy(desc(issues.createdAt));
+      return result;
+    } catch (error) {
+      console.error('Error fetching issues:', error);
+      return [];
+    }
+  }
+
+  async createIssue(issue: any): Promise<any> {
+    try {
+      const result = await db.insert(issues).values({
+        title: issue.title,
+        description: issue.description,
+        category: issue.category,
+        priority: issue.priority,
+        reporterId: issue.reporterId,
+        warehouseId: issue.warehouseId || null,
+        itemId: issue.itemId || null,
+        status: 'open'
+      }).returning();
+      return result[0];
+    } catch (error) {
+      console.error('Error creating issue:', error);
+      throw error;
+    }
+  }
+
+  async updateIssue(id: number, data: any): Promise<any> {
+    try {
+      const result = await db.update(issues)
+        .set({ status: data.status, updatedAt: new Date() })
+        .where(eq(issues.id, id))
+        .returning();
+      return result[0];
+    } catch (error) {
+      console.error('Error updating issue:', error);
+      throw error;
+    }
+  }
+
+  async getIssue(id: number): Promise<any> {
+    try {
+      const result = await db.select().from(issues).where(eq(issues.id, id));
+      return result[0];
+    } catch (error) {
+      console.error('Error fetching issue:', error);
+      return null;
+    }
+  }
+
+  async deleteIssue(id: number): Promise<boolean> {
+    try {
+      await db.delete(issues).where(eq(issues.id, id));
+      return true;
+    } catch (error) {
+      console.error('Error deleting issue:', error);
+      return false;
+    }
+  }
+
+  // Notifications operations
+  async getNotificationsByRecipient(recipientId: number): Promise<any[]> {
+    try {
+      const result = await db.select().from(notifications)
+        .where(eq(notifications.recipientId, recipientId))
+        .orderBy(desc(notifications.createdAt));
+      return result;
+    } catch (error) {
+      console.error('Error fetching notifications:', error);
+      return [];
+    }
+  }
+
+  async getUnreadNotificationCount(userId: number): Promise<number> {
+    try {
+      const result = await db.select({ count: sql<number>`count(*)` })
+        .from(notifications)
+        .where(and(eq(notifications.recipientId, userId), eq(notifications.status, 'unread')));
+      return result[0]?.count || 0;
+    } catch (error) {
+      console.error('Error fetching unread count:', error);
+      return 0;
+    }
+  }
+
+  async createNotification(notification: any): Promise<any> {
+    try {
+      const result = await db.insert(notifications).values({
+        senderId: notification.senderId,
+        recipientId: notification.recipientId,
+        subject: notification.subject,
+        message: notification.message,
+        category: notification.category,
+        priority: notification.priority,
+        status: 'unread'
+      }).returning();
+      return result[0];
+    } catch (error) {
+      console.error('Error creating notification:', error);
+      throw error;
+    }
+  }
+
+  async markNotificationAsRead(id: number): Promise<any> {
+    try {
+      const result = await db.update(notifications)
+        .set({ status: 'read', readAt: new Date() })
+        .where(eq(notifications.id, id))
+        .returning();
+      return result[0];
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
+      throw error;
+    }
   }
 }
 
