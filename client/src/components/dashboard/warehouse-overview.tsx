@@ -1,8 +1,11 @@
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { useLocation } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import { getPercentageColor } from "@/lib/utils";
+import { Archive, CheckCircle, XCircle } from "lucide-react";
 
 type WarehouseProps = {
   warehouses: any[];
@@ -10,18 +13,55 @@ type WarehouseProps = {
 
 export default function WarehouseOverview({ warehouses }: WarehouseProps) {
   const [selectedWarehouse, setSelectedWarehouse] = useState("all");
+  const [showArchived, setShowArchived] = useState(false);
   const [_, navigate] = useLocation();
 
+  // Fetch warehouses with archived option when needed
+  const { data: allWarehouses } = useQuery({
+    queryKey: ["/api/warehouses/stats", { includeArchived: showArchived }],
+    enabled: showArchived,
+  });
+
+  // Use appropriate warehouse data
+  const warehouseData = showArchived ? (allWarehouses || warehouses) : warehouses;
+  const warehousesArray = Array.isArray(warehouseData) ? warehouseData : [];
+  
   const filteredWarehouses = selectedWarehouse === "all" 
-    ? warehouses 
-    : warehouses.filter(w => w.id.toString() === selectedWarehouse);
+    ? warehousesArray 
+    : warehousesArray.filter((w: any) => w.id.toString() === selectedWarehouse);
+
+  const getStatusBadge = (warehouse: any) => {
+    if (!warehouse.isActive || warehouse.status !== 'active') {
+      return (
+        <span className="bg-red-100 text-red-800 text-xs px-2 py-1 rounded-full flex items-center gap-1">
+          <Archive className="h-3 w-3" />
+          Archived
+        </span>
+      );
+    }
+    return (
+      <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full flex items-center gap-1">
+        <CheckCircle className="h-3 w-3" />
+        Active
+      </span>
+    );
+  };
 
   return (
     <Card>
       <CardHeader className="p-6 border-b">
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-medium text-gray-800">Warehouse Overview</h3>
-          <div className="flex space-x-2">
+          <div className="flex items-center space-x-2">
+            <Button
+              variant={showArchived ? "default" : "outline"}
+              size="sm"
+              onClick={() => setShowArchived(!showArchived)}
+              className="text-xs"
+            >
+              <Archive className="h-3 w-3 mr-1" />
+              {showArchived ? "Hide Archived" : "Show Archived"}
+            </Button>
             <Select
               value={selectedWarehouse}
               onValueChange={setSelectedWarehouse}
@@ -31,9 +71,10 @@ export default function WarehouseOverview({ warehouses }: WarehouseProps) {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Warehouses</SelectItem>
-                {warehouses.map(warehouse => (
+                {warehousesArray.map((warehouse: any) => (
                   <SelectItem key={warehouse.id} value={warehouse.id.toString()}>
                     {warehouse.name}
+                    {(!warehouse.isActive || warehouse.status !== 'active') && " (Archived)"}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -49,7 +90,7 @@ export default function WarehouseOverview({ warehouses }: WarehouseProps) {
               No warehouses found
             </div>
           ) : (
-            filteredWarehouses.map(warehouse => (
+            filteredWarehouses.map((warehouse: any) => (
               <div 
                 key={warehouse.id} 
                 className="border rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"
@@ -57,9 +98,7 @@ export default function WarehouseOverview({ warehouses }: WarehouseProps) {
               >
                 <div className="flex items-center justify-between mb-3">
                   <h4 className="font-medium text-gray-800">{warehouse.name}</h4>
-                  <span className={`${warehouse.isActive ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"} text-xs px-2 py-1 rounded-full`}>
-                    {warehouse.isActive ? "Active" : "Inactive"}
-                  </span>
+                  {getStatusBadge(warehouse)}
                 </div>
                 <div className="flex items-center text-sm text-gray-600 mb-2">
                   <span className="material-icons text-gray-500 text-sm mr-1">location_on</span>

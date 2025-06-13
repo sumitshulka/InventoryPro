@@ -1733,7 +1733,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get warehouse statistics
   app.get("/api/warehouses/stats", async (req, res) => {
     try {
-      const warehouses = await storage.getAllWarehouses();
+      // Only get active warehouses by default
+      const includeArchived = req.query.includeArchived === 'true';
+      const allWarehouses = await storage.getAllWarehouses();
+      const warehouses = includeArchived ? allWarehouses : allWarehouses.filter(w => w.isActive && w.status === 'active');
+      
       const allInventory = await storage.getAllInventory();
       const allItems = await storage.getAllItems();
       const allUsers = await storage.getAllUsers();
