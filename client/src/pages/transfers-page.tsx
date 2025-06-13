@@ -51,29 +51,30 @@ export default function TransfersPage() {
   const { toast } = useToast();
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState("all");
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const { data: transfers, isLoading: transfersLoading } = useQuery({
-    queryKey: ["/api/transactions/type/transfer"],
-    refetchInterval: 5000, // Refresh every 5 seconds
+    queryKey: ["/api/transactions/type/transfer", refreshKey],
+    refetchInterval: 30000,
     refetchIntervalInBackground: true,
   });
 
   const { data: items, isLoading: itemsLoading } = useQuery({
-    queryKey: ["/api/items"],
+    queryKey: ["/api/items", refreshKey],
   });
 
   const { data: warehouses, isLoading: warehousesLoading } = useQuery({
-    queryKey: ["/api/warehouses"],
+    queryKey: ["/api/warehouses", refreshKey],
   });
 
   const { data: userOperatedWarehouses = [], isLoading: operatedWarehousesLoading } = useQuery<number[]>({
-    queryKey: ["/api/users", user?.id, "operated-warehouses"],
+    queryKey: ["/api/users", user?.id, "operated-warehouses", refreshKey],
     enabled: !!user?.id,
   });
 
   const { data: inventory, isLoading: inventoryLoading } = useQuery({
-    queryKey: ["/api/reports/inventory-stock"],
-    refetchInterval: 5000,
+    queryKey: ["/api/reports/inventory-stock", refreshKey],
+    refetchInterval: 30000,
     refetchIntervalInBackground: true,
   });
 
@@ -135,22 +136,8 @@ export default function TransfersPage() {
       });
       return res.json();
     },
-    onSuccess: (updatedTransfer, transferId) => {
-      // Immediately update the transfer status in cache
-      queryClient.setQueryData(["/api/transactions/type/transfer"], (oldData: any) => {
-        if (!oldData || !Array.isArray(oldData)) return oldData;
-        return oldData.map((transfer: any) => 
-          transfer.id === transferId 
-            ? { ...transfer, status: "completed" }
-            : transfer
-        );
-      });
-      
-      // Force refetch without waiting
-      queryClient.refetchQueries({ queryKey: ["/api/transactions/type/transfer"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/reports/inventory-stock"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
-      
+    onSuccess: () => {
+      setRefreshKey(prev => prev + 1);
       toast({
         title: "Transfer completed",
         description: "The inventory transfer has been completed successfully.",

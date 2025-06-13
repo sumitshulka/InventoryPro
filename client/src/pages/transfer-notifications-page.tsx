@@ -51,25 +51,27 @@ interface Request {
 export default function TransferNotificationsPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [refreshKey, setRefreshKey] = useState(0);
 
   // Fetch transfer notifications
   const { data: notifications = [], isLoading: notificationsLoading } = useQuery({
-    queryKey: ["/api/transfer-notifications"],
+    queryKey: ["/api/transfer-notifications", refreshKey],
+    refetchInterval: 30000,
   });
 
   // Fetch items for reference
   const { data: items = [] } = useQuery<Item[]>({
-    queryKey: ["/api/items"],
+    queryKey: ["/api/items", refreshKey],
   });
 
   // Fetch warehouses for reference
   const { data: warehouses = [] } = useQuery<Warehouse[]>({
-    queryKey: ["/api/warehouses"],
+    queryKey: ["/api/warehouses", refreshKey],
   });
 
   // Fetch requests for reference
   const { data: requests = [] } = useQuery<Request[]>({
-    queryKey: ["/api/requests"],
+    queryKey: ["/api/requests", refreshKey],
   });
 
   const updateNotificationMutation = useMutation({
@@ -81,7 +83,7 @@ export default function TransferNotificationsPage() {
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/transfer-notifications"] });
+      setRefreshKey(prev => prev + 1);
       toast({
         title: "Success",
         description: "Transfer notification updated successfully",

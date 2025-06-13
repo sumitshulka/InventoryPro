@@ -57,6 +57,7 @@ type DisposalFormValues = z.infer<typeof disposalFormSchema>;
 export default function InventoryPage() {
   const { toast } = useToast();
   const { user } = useAuth();
+  const [refreshKey, setRefreshKey] = useState(0);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [warehouseFilter, setWarehouseFilter] = useState("all");
@@ -67,20 +68,21 @@ export default function InventoryPage() {
   const [disposalItem, setDisposalItem] = useState<any>(null);
 
   const { data: inventory, isLoading: inventoryLoading } = useQuery({
-    queryKey: ["/api/reports/inventory-stock"],
+    queryKey: ["/api/reports/inventory-stock", refreshKey],
+    refetchInterval: 30000,
   });
 
   const { data: items, isLoading: itemsLoading } = useQuery({
-    queryKey: ["/api/items"],
+    queryKey: ["/api/items", refreshKey],
   });
 
   const { data: warehouses, isLoading: warehousesLoading } = useQuery({
-    queryKey: ["/api/warehouses"],
+    queryKey: ["/api/warehouses", refreshKey],
   });
 
   // Fetch movement history for selected item
   const { data: movementHistory, isLoading: movementLoading } = useQuery({
-    queryKey: ["/api/reports/inventory-movement"],
+    queryKey: ["/api/reports/inventory-movement", refreshKey],
     enabled: isSheetOpen,
   });
 
@@ -253,10 +255,12 @@ export default function InventoryPage() {
             <Button
               variant="outline"
               size="sm"
-              onClick={async () => {
-                await queryClient.refetchQueries({ queryKey: ['/api/reports/inventory-stock'] });
-                await queryClient.refetchQueries({ queryKey: ['/api/items'] });
-                await queryClient.refetchQueries({ queryKey: ['/api/warehouses'] });
+              onClick={() => {
+                setRefreshKey(prev => prev + 1);
+                toast({
+                  title: "Data refreshed",
+                  description: "Inventory data has been updated successfully.",
+                });
               }}
               className="ml-2"
             >
