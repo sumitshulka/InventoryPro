@@ -4645,49 +4645,80 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const allTransactions = await storage.getAllTransactions();
       const allItems = await storage.getAllItems();
       
-      // Filter transactions by date
-      const filteredTransactions = allTransactions.filter(txn => {
-        const txnDate = new Date(txn.createdAt || '');
-        const start = new Date(startDate as string);
-        const end = new Date(endDate as string);
-        return txnDate >= start && txnDate <= end && txn.unitPrice;
-      });
-
-      // Group by item and analyze price variations
+      // Get valuation as of start and end dates to compare price changes
+      const startDateObj = new Date(startDate as string);
+      const endDateObj = new Date(endDate as string);
+      
+      // Calculate item unit values using the same logic as inventory valuation
+      const startValuationResult = await calculateItemUnitValues(startDateObj);
+      const endValuationResult = await calculateItemUnitValues(endDateObj);
+      
+      // Extract the itemUnitValues Map from the results
+      const startValues = Array.from(startValuationResult.itemUnitValues.entries()).map(([itemId, data]) => ({
+        itemId,
+        unitValue: data.unitValue,
+        name: data.name,
+        sku: data.sku
+      }));
+      
+      const endValues = Array.from(endValuationResult.itemUnitValues.entries()).map(([itemId, data]) => ({
+        itemId,
+        unitValue: data.unitValue,
+        name: data.name,
+        sku: data.sku
+      }));
+      
+      // Build price variation analysis
       const priceAnalysis = new Map();
       
-      filteredTransactions.forEach(txn => {
-        const item = allItems.find(i => i.id === txn.itemId);
-        if (!item || !txn.unitPrice) return;
-        
-        if (!priceAnalysis.has(txn.itemId)) {
-          priceAnalysis.set(txn.itemId, {
-            itemId: txn.itemId,
+      // Process start values
+      startValues.forEach(item => {
+        priceAnalysis.set(item.itemId, {
+          itemId: item.itemId,
+          itemName: item.name,
+          sku: item.sku,
+          startPrice: item.unitValue,
+          endPrice: 0,
+          avgPrice: item.unitValue,
+          minPrice: item.unitValue,
+          maxPrice: item.unitValue,
+          variationPercent: 0,
+          priceChange: 0
+        });
+      });
+      
+      // Process end values
+      endValues.forEach(item => {
+        if (priceAnalysis.has(item.itemId)) {
+          const analysis = priceAnalysis.get(item.itemId);
+          analysis.endPrice = item.unitValue;
+          analysis.maxPrice = Math.max(analysis.startPrice, item.unitValue);
+          analysis.minPrice = Math.min(analysis.startPrice, item.unitValue);
+          analysis.avgPrice = (analysis.startPrice + item.unitValue) / 2;
+          analysis.priceChange = item.unitValue - analysis.startPrice;
+          analysis.variationPercent = analysis.startPrice > 0 ? 
+            Math.round(((analysis.maxPrice - analysis.minPrice) / analysis.minPrice) * 100) : 0;
+        } else {
+          // Item only exists in end period
+          priceAnalysis.set(item.itemId, {
+            itemId: item.itemId,
             itemName: item.name,
             sku: item.sku,
-            prices: [],
-            minPrice: txn.unitPrice,
-            maxPrice: txn.unitPrice,
-            avgPrice: 0,
-            variationPercent: 0
+            startPrice: 0,
+            endPrice: item.unitValue,
+            avgPrice: item.unitValue,
+            minPrice: 0,
+            maxPrice: item.unitValue,
+            variationPercent: 100,
+            priceChange: item.unitValue
           });
         }
-        
-        const analysis = priceAnalysis.get(txn.itemId);
-        analysis.prices.push(txn.unitPrice);
-        analysis.minPrice = Math.min(analysis.minPrice, txn.unitPrice);
-        analysis.maxPrice = Math.max(analysis.maxPrice, txn.unitPrice);
       });
 
-      // Calculate averages and variations
-      const priceVariationData = Array.from(priceAnalysis.values()).map(item => {
-        const sum = item.prices.reduce((a, b) => a + b, 0);
-        item.avgPrice = item.prices.length > 0 ? sum / item.prices.length : 0;
-        item.variationPercent = item.minPrice > 0 ? 
-          Math.round(((item.maxPrice - item.minPrice) / item.minPrice) * 100) : 0;
-        delete item.prices; // Remove prices array from response
-        return item;
-      }).sort((a, b) => b.variationPercent - a.variationPercent);
+      // Filter to show only items with actual price variations
+      const priceVariationData = Array.from(priceAnalysis.values())
+        .filter(item => item.variationPercent > 0 || Math.abs(item.priceChange) > 0.01)
+        .sort((a, b) => b.variationPercent - a.variationPercent);
 
       res.json(priceVariationData);
     } catch (error: any) {

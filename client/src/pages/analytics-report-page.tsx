@@ -498,17 +498,16 @@ export default function AnalyticsReportPage() {
               <CardContent>
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   <div className="space-y-4">
-                    <h3 className="text-lg font-semibold">Price Trends</h3>
+                    <h3 className="text-lg font-semibold">Price Changes</h3>
                     <ResponsiveContainer width="100%" height={300}>
-                      <LineChart data={priceVariationAnalysis.slice(0, 8)}>
+                      <BarChart data={priceVariationAnalysis.slice(0, 8)}>
                         <CartesianGrid strokeDasharray="3 3" />
                         <XAxis dataKey="itemName" />
                         <YAxis />
                         <Tooltip formatter={(value) => formatCurrency(Number(value))} />
-                        <Line type="monotone" dataKey="minPrice" stroke="#ff7300" name="Min Price" />
-                        <Line type="monotone" dataKey="maxPrice" stroke="#387908" name="Max Price" />
-                        <Line type="monotone" dataKey="avgPrice" stroke="#8884d8" name="Avg Price" />
-                      </LineChart>
+                        <Bar dataKey="startPrice" fill="#8884d8" name="Start Price" />
+                        <Bar dataKey="endPrice" fill="#82ca9d" name="End Price" />
+                      </BarChart>
                     </ResponsiveContainer>
                   </div>
                   
@@ -519,8 +518,9 @@ export default function AnalyticsReportPage() {
                         <TableHeader>
                           <TableRow>
                             <TableHead>Item</TableHead>
-                            <TableHead className="text-right">Min Price</TableHead>
-                            <TableHead className="text-right">Max Price</TableHead>
+                            <TableHead className="text-right">Start Price</TableHead>
+                            <TableHead className="text-right">End Price</TableHead>
+                            <TableHead className="text-right">Change</TableHead>
                             <TableHead className="text-right">Variation</TableHead>
                           </TableRow>
                         </TableHeader>
@@ -533,8 +533,16 @@ export default function AnalyticsReportPage() {
                                   <div className="text-sm text-muted-foreground">{item.sku}</div>
                                 </div>
                               </TableCell>
-                              <TableCell className="text-right">{formatCurrency(item.minPrice)}</TableCell>
-                              <TableCell className="text-right">{formatCurrency(item.maxPrice)}</TableCell>
+                              <TableCell className="text-right">{formatCurrency(item.startPrice)}</TableCell>
+                              <TableCell className="text-right">{formatCurrency(item.endPrice)}</TableCell>
+                              <TableCell className="text-right">
+                                <span className={`font-medium ${
+                                  item.priceChange > 0 ? 'text-green-600' : 
+                                  item.priceChange < 0 ? 'text-red-600' : 'text-gray-600'
+                                }`}>
+                                  {item.priceChange > 0 ? '+' : ''}{formatCurrency(item.priceChange)}
+                                </span>
+                              </TableCell>
                               <TableCell className="text-right">
                                 <Badge variant={item.variationPercent > 20 ? "destructive" : item.variationPercent > 10 ? "secondary" : "default"}>
                                   {item.variationPercent}%
