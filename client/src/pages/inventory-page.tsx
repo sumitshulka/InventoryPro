@@ -343,6 +343,24 @@ export default function InventoryPage() {
                             )}
                           </TableCell>
                           <TableCell>{new Date(inv.lastUpdated).toLocaleDateString()}</TableCell>
+                          {user?.role === "admin" && (
+                            <TableCell>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setDisposalItem(inv);
+                                  disposalForm.setValue("quantity", inv.quantity.toString());
+                                  setIsDisposalDialogOpen(true);
+                                }}
+                                className="text-red-600 hover:text-red-700"
+                              >
+                                <Trash2 className="h-4 w-4 mr-1" />
+                                Dispose
+                              </Button>
+                            </TableCell>
+                          )}
                         </TableRow>
                       ))
                     )}
@@ -518,6 +536,96 @@ export default function InventoryPage() {
           </div>
         </SheetContent>
       </Sheet>
+
+      {/* Disposal Dialog */}
+      <Dialog open={isDisposalDialogOpen} onOpenChange={setIsDisposalDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-red-500" />
+              Dispose Inventory
+            </DialogTitle>
+            <DialogDescription>
+              {disposalItem && (
+                <div className="space-y-2">
+                  <p>You are about to dispose inventory for:</p>
+                  <div className="bg-gray-50 p-3 rounded">
+                    <p><strong>Item:</strong> {disposalItem.item?.name} ({disposalItem.item?.sku})</p>
+                    <p><strong>Warehouse:</strong> {disposalItem.warehouse?.name}</p>
+                    <p><strong>Available Quantity:</strong> {disposalItem.quantity}</p>
+                  </div>
+                  <p className="text-sm text-red-600">
+                    This action cannot be undone. The disposed items will be recorded in the disposal report.
+                  </p>
+                </div>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={disposalForm.handleSubmit((data) => disposeInventoryMutation.mutate(data))}>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="disposalQuantity">Quantity to Dispose</Label>
+                <Input
+                  id="disposalQuantity"
+                  type="number"
+                  min="1"
+                  max={disposalItem?.quantity || 0}
+                  {...disposalForm.register("quantity")}
+                  placeholder="Enter quantity"
+                />
+                {disposalForm.formState.errors.quantity && (
+                  <p className="text-sm text-red-500 mt-1">
+                    {disposalForm.formState.errors.quantity.message}
+                  </p>
+                )}
+              </div>
+              <div>
+                <Label htmlFor="disposalReason">Disposal Reason</Label>
+                <Input
+                  id="disposalReason"
+                  {...disposalForm.register("disposalReason")}
+                  placeholder="Enter reason for disposal (e.g., damaged, expired, obsolete)"
+                />
+                {disposalForm.formState.errors.disposalReason && (
+                  <p className="text-sm text-red-500 mt-1">
+                    {disposalForm.formState.errors.disposalReason.message}
+                  </p>
+                )}
+              </div>
+            </div>
+            <DialogFooter className="mt-6">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setIsDisposalDialogOpen(false);
+                  setDisposalItem(null);
+                  disposalForm.reset();
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                variant="destructive"
+                disabled={disposeInventoryMutation.isPending}
+              >
+                {disposeInventoryMutation.isPending ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Disposing...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Dispose Inventory
+                  </>
+                )}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </AppLayout>
   );
 }

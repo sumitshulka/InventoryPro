@@ -2674,6 +2674,89 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get disposed inventory with filtering
+  // Dispose inventory endpoint
+  app.post("/api/inventory/dispose", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const user = req.user as any;
+      
+      // Only admins can dispose inventory
+      if (user.role !== "admin") {
+        return res.status(403).json({ message: "Only administrators can dispose inventory" });
+      }
+
+      const { inventoryId, quantity, disposalReason } = req.body;
+
+      if (!inventoryId || !quantity || !disposalReason) {
+        return res.status(400).json({ message: "Inventory ID, quantity, and disposal reason are required" });
+      }
+
+      // Get the inventory record from all warehouses
+      const allInventory = await storage.getAllInventory();
+      const inventory = allInventory.find((inv: any) => inv.id === parseInt(inventoryId));
+      if (!inventory) {
+        return res.status(404).json({ message: "Inventory not found" });
+      }
+
+      // Validate quantity
+      if (quantity > inventory.quantity) {
+        return res.status(400).json({ message: "Cannot dispose more than available quantity" });
+      }
+
+      // Create a disposal transfer
+      const transferCode = `DISP-${Date.now()}`;
+      
+      const disposalTransfer = await storage.createTransfer({
+        sourceWarehouseId: inventory.warehouseId,
+        destinationWarehouseId: inventory.warehouseId, // Same warehouse for disposal
+        initiatedBy: user.id,
+        status: "disposed",
+        disposalReason,
+        disposalDate: new Date(),
+        approvedBy: user.id,
+        transferMode: "disposal",
+        notes: `Direct disposal from inventory by admin: ${user.name}`,
+      });
+
+      // Update the transfer with the transfer code (needed after creation)
+      await storage.updateTransfer(disposalTransfer.id, { 
+        transferMode: transferCode 
+      });
+
+      // Create transfer item
+      await storage.createTransferItem({
+        transferId: disposalTransfer.id,
+        itemId: inventory.itemId,
+        requestedQuantity: quantity,
+        approvedQuantity: quantity,
+        actualQuantity: quantity
+      });
+
+      // Update inventory quantity
+      const newQuantity = inventory.quantity - quantity;
+      await storage.updateInventory(inventoryId, { quantity: newQuantity });
+
+      // Create audit log
+      await storage.createAuditLog({
+        userId: user.id,
+        action: "dispose_inventory",
+        tableName: "inventory",
+        recordId: inventoryId,
+        oldValues: JSON.stringify({ quantity: inventory.quantity }),
+        newValues: JSON.stringify({ quantity: newQuantity }),
+        details: `Disposed ${quantity} units. Reason: ${disposalReason}`
+      });
+
+      res.json({ 
+        message: "Inventory disposed successfully",
+        disposalTransfer,
+        remainingQuantity: newQuantity 
+      });
+    } catch (error) {
+      console.error("Error disposing inventory:", error);
+      res.status(500).json({ message: "Failed to dispose inventory" });
+    }
+  });
+
   app.get("/api/disposed-inventory", async (req: Request, res: Response) => {
     try {
       if (!req.isAuthenticated()) {
