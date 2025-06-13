@@ -1361,6 +1361,397 @@ export class MemStorage implements IStorage {
   async deleteTransferNotification(id: number): Promise<boolean> {
     return this.transferNotificationsMap.delete(id);
   }
+
+  // Stub implementations for missing methods (production uses DatabaseStorage)
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    return Array.from(this.users.values()).find(user => user.email === email);
+  }
+
+  async getDepartment(id: number): Promise<Department | undefined> {
+    throw new Error("Method not implemented in MemStorage");
+  }
+
+  async getDepartmentByName(name: string): Promise<Department | undefined> {
+    throw new Error("Method not implemented in MemStorage");
+  }
+
+  async createDepartment(department: InsertDepartment): Promise<Department> {
+    throw new Error("Method not implemented in MemStorage");
+  }
+
+  async getAllDepartments(): Promise<Department[]> {
+    throw new Error("Method not implemented in MemStorage");
+  }
+
+  async getActiveDepartments(): Promise<Department[]> {
+    throw new Error("Method not implemented in MemStorage");
+  }
+
+  async updateDepartment(id: number, departmentData: Partial<InsertDepartment>): Promise<Department | undefined> {
+    throw new Error("Method not implemented in MemStorage");
+  }
+
+  async deleteDepartment(id: number): Promise<boolean> {
+    throw new Error("Method not implemented in MemStorage");
+  }
+
+  async getLocation(id: number): Promise<Location | undefined> {
+    throw new Error("Method not implemented in MemStorage");
+  }
+
+  async getLocationByName(name: string): Promise<Location | undefined> {
+    throw new Error("Method not implemented in MemStorage");
+  }
+
+  async createLocation(location: InsertLocation): Promise<Location> {
+    throw new Error("Method not implemented in MemStorage");
+  }
+
+  async getAllLocations(): Promise<Location[]> {
+    throw new Error("Method not implemented in MemStorage");
+  }
+
+  async getActiveLocations(): Promise<Location[]> {
+    throw new Error("Method not implemented in MemStorage");
+  }
+
+  async updateLocation(id: number, locationData: Partial<InsertLocation>): Promise<Location | undefined> {
+    throw new Error("Method not implemented in MemStorage");
+  }
+
+  async deleteLocation(id: number): Promise<boolean> {
+    throw new Error("Method not implemented in MemStorage");
+  }
+
+  async getWarehousesByLocation(locationId: number): Promise<Warehouse[]> {
+    throw new Error("Method not implemented in MemStorage");
+  }
+
+  // Transfer and rejected goods methods
+  async getTransfer(id: number): Promise<Transfer | undefined> {
+    return this.transfersMap.get(id);
+  }
+
+  async getAllTransfers(): Promise<Transfer[]> {
+    return Array.from(this.transfersMap.values());
+  }
+
+  async getTransfersByStatus(status: string): Promise<Transfer[]> {
+    return Array.from(this.transfersMap.values()).filter(t => t.status === status);
+  }
+
+  async getTransfersByWarehouse(warehouseId: number, type: 'source' | 'destination'): Promise<Transfer[]> {
+    return Array.from(this.transfersMap.values()).filter(t => 
+      type === 'source' ? t.sourceWarehouseId === warehouseId : t.destinationWarehouseId === warehouseId
+    );
+  }
+
+  async createTransfer(transfer: InsertTransfer): Promise<Transfer> {
+    const id = this.transferIdCounter++;
+    const newTransfer: Transfer = {
+      ...transfer,
+      id,
+      transferCode: `TRF-${String(id).padStart(4, '0')}`,
+      createdAt: new Date(),
+      updatedAt: null,
+      approvedBy: null,
+      actualShipmentDate: null,
+      actualArrivalDate: null,
+      courierName: null,
+      trackingNumber: null,
+      receiptNumber: null,
+      handoverPersonName: null,
+      handoverPersonContact: null,
+      handoverDate: null,
+      receiptDocument: null,
+      receivedBy: null,
+      receivedDate: null,
+      receiverNotes: null,
+      overallCondition: 'good',
+      notes: null,
+      returnReason: null,
+      returnCourierName: null,
+      returnTrackingNumber: null,
+      returnShippedDate: null,
+      returnDeliveredDate: null,
+      disposalReason: null,
+      disposalDate: null
+    };
+    this.transfersMap.set(id, newTransfer);
+    return newTransfer;
+  }
+
+  async updateTransfer(id: number, transferData: Partial<InsertTransfer>): Promise<Transfer | undefined> {
+    const transfer = this.transfersMap.get(id);
+    if (!transfer) return undefined;
+    
+    const updatedTransfer = { ...transfer, ...transferData, updatedAt: new Date() };
+    this.transfersMap.set(id, updatedTransfer);
+    return updatedTransfer;
+  }
+
+  async deleteTransfer(id: number): Promise<boolean> {
+    return this.transfersMap.delete(id);
+  }
+
+  async getTransferItem(id: number): Promise<TransferItem | undefined> {
+    return this.transferItemsMap.get(id);
+  }
+
+  async getTransferItemsByTransfer(transferId: number): Promise<TransferItem[]> {
+    return Array.from(this.transferItemsMap.values()).filter(item => item.transferId === transferId);
+  }
+
+  async createTransferItem(transferItem: InsertTransferItem): Promise<TransferItem> {
+    const id = this.transferItemIdCounter++;
+    const newItem: TransferItem = {
+      ...transferItem,
+      id,
+      approvedQuantity: null,
+      actualQuantity: null,
+      condition: 'good',
+      notes: null
+    };
+    this.transferItemsMap.set(id, newItem);
+    return newItem;
+  }
+
+  async updateTransferItem(id: number, transferItemData: Partial<InsertTransferItem>): Promise<TransferItem | undefined> {
+    const item = this.transferItemsMap.get(id);
+    if (!item) return undefined;
+    
+    const updatedItem = { ...item, ...transferItemData };
+    this.transferItemsMap.set(id, updatedItem);
+    return updatedItem;
+  }
+
+  async deleteTransferItem(id: number): Promise<boolean> {
+    return this.transferItemsMap.delete(id);
+  }
+
+  async getTransferUpdate(id: number): Promise<TransferUpdate | undefined> {
+    return this.transferUpdatesMap.get(id);
+  }
+
+  async getTransferUpdatesByTransfer(transferId: number): Promise<TransferUpdate[]> {
+    return Array.from(this.transferUpdatesMap.values()).filter(update => update.transferId === transferId);
+  }
+
+  async createTransferUpdate(transferUpdate: InsertTransferUpdate): Promise<TransferUpdate> {
+    const id = this.transferUpdateIdCounter++;
+    const newUpdate: TransferUpdate = {
+      ...transferUpdate,
+      id,
+      createdAt: new Date(),
+      description: transferUpdate.description || null,
+      metadata: transferUpdate.metadata || null
+    };
+    this.transferUpdatesMap.set(id, newUpdate);
+    return newUpdate;
+  }
+
+  async deleteTransferUpdate(id: number): Promise<boolean> {
+    return this.transferUpdatesMap.delete(id);
+  }
+
+  // Rejected goods stub implementations
+  async getRejectedGoods(id: number): Promise<RejectedGoods | undefined> {
+    throw new Error("Method not implemented in MemStorage");
+  }
+
+  async getAllRejectedGoods(): Promise<RejectedGoods[]> {
+    throw new Error("Method not implemented in MemStorage");
+  }
+
+  async getRejectedGoodsByWarehouse(warehouseId: number): Promise<RejectedGoods[]> {
+    throw new Error("Method not implemented in MemStorage");
+  }
+
+  async getRejectedGoodsByTransfer(transferId: number): Promise<RejectedGoods[]> {
+    throw new Error("Method not implemented in MemStorage");
+  }
+
+  async createRejectedGoods(rejectedGoods: InsertRejectedGoods): Promise<RejectedGoods> {
+    throw new Error("Method not implemented in MemStorage");
+  }
+
+  async updateRejectedGoods(id: number, rejectedGoodsData: Partial<InsertRejectedGoods>): Promise<RejectedGoods | undefined> {
+    throw new Error("Method not implemented in MemStorage");
+  }
+
+  async deleteRejectedGoods(id: number): Promise<boolean> {
+    throw new Error("Method not implemented in MemStorage");
+  }
+
+  // Return/disposal operations stub implementations
+  async approveReturn(transferId: number, returnReason: string, userId: number): Promise<Transfer | undefined> {
+    throw new Error("Method not implemented in MemStorage");
+  }
+
+  async approveDisposal(transferId: number, disposalReason: string, userId: number): Promise<Transfer | undefined> {
+    throw new Error("Method not implemented in MemStorage");
+  }
+
+  async recordReturnShipment(transferId: number, courierName: string, trackingNumber: string, userId: number): Promise<Transfer | undefined> {
+    throw new Error("Method not implemented in MemStorage");
+  }
+
+  async recordReturnDelivery(transferId: number, userId: number): Promise<Transfer | undefined> {
+    throw new Error("Method not implemented in MemStorage");
+  }
+
+  // Additional stub methods for other missing implementations
+  async getNotification(id: number): Promise<Notification | undefined> {
+    throw new Error("Method not implemented in MemStorage");
+  }
+
+  async getAllNotifications(): Promise<Notification[]> {
+    throw new Error("Method not implemented in MemStorage");
+  }
+
+  async getNotificationsByRecipient(recipientId: number): Promise<Notification[]> {
+    throw new Error("Method not implemented in MemStorage");
+  }
+
+  async getNotificationsBySender(senderId: number): Promise<Notification[]> {
+    throw new Error("Method not implemented in MemStorage");
+  }
+
+  async getUnreadNotifications(recipientId: number): Promise<Notification[]> {
+    throw new Error("Method not implemented in MemStorage");
+  }
+
+  async getNotificationsByCategory(recipientId: number, category: string): Promise<Notification[]> {
+    throw new Error("Method not implemented in MemStorage");
+  }
+
+  async getNotificationThread(parentId: number): Promise<Notification[]> {
+    throw new Error("Method not implemented in MemStorage");
+  }
+
+  async createNotification(notification: InsertNotification): Promise<Notification> {
+    throw new Error("Method not implemented in MemStorage");
+  }
+
+  async updateNotification(id: number, notificationData: Partial<InsertNotification>): Promise<Notification | undefined> {
+    throw new Error("Method not implemented in MemStorage");
+  }
+
+  async markNotificationAsRead(id: number): Promise<Notification | undefined> {
+    throw new Error("Method not implemented in MemStorage");
+  }
+
+  async markNotificationAsReplied(id: number): Promise<Notification | undefined> {
+    throw new Error("Method not implemented in MemStorage");
+  }
+
+  async markNotificationAsClosed(id: number): Promise<Notification | undefined> {
+    throw new Error("Method not implemented in MemStorage");
+  }
+
+  async archiveNotification(id: number): Promise<Notification | undefined> {
+    throw new Error("Method not implemented in MemStorage");
+  }
+
+  async deleteNotification(id: number): Promise<boolean> {
+    throw new Error("Method not implemented in MemStorage");
+  }
+
+  async getUnreadNotificationCount(recipientId: number): Promise<number> {
+    throw new Error("Method not implemented in MemStorage");
+  }
+
+  async cleanupArchivedNotifications(): Promise<number> {
+    throw new Error("Method not implemented in MemStorage");
+  }
+
+  async getIssue(id: number): Promise<Issue | undefined> {
+    throw new Error("Method not implemented in MemStorage");
+  }
+
+  async getAllIssues(): Promise<Issue[]> {
+    throw new Error("Method not implemented in MemStorage");
+  }
+
+  async getIssuesByReporter(reportedBy: number): Promise<Issue[]> {
+    throw new Error("Method not implemented in MemStorage");
+  }
+
+  async getIssuesByAssignee(assignedTo: number): Promise<Issue[]> {
+    throw new Error("Method not implemented in MemStorage");
+  }
+
+  async getIssuesByWarehouse(warehouseId: number): Promise<Issue[]> {
+    throw new Error("Method not implemented in MemStorage");
+  }
+
+  async getIssuesByStatus(status: string): Promise<Issue[]> {
+    throw new Error("Method not implemented in MemStorage");
+  }
+
+  async getIssuesByCategory(category: string): Promise<Issue[]> {
+    throw new Error("Method not implemented in MemStorage");
+  }
+
+  async createIssue(issue: InsertIssue): Promise<Issue> {
+    throw new Error("Method not implemented in MemStorage");
+  }
+
+  async updateIssue(id: number, issueData: Partial<InsertIssue>): Promise<Issue | undefined> {
+    throw new Error("Method not implemented in MemStorage");
+  }
+
+  async closeIssue(id: number, userId: number, resolutionNotes: string): Promise<Issue | undefined> {
+    throw new Error("Method not implemented in MemStorage");
+  }
+
+  async reopenIssue(id: number, userId: number): Promise<Issue | undefined> {
+    throw new Error("Method not implemented in MemStorage");
+  }
+
+  async deleteIssue(id: number): Promise<boolean> {
+    throw new Error("Method not implemented in MemStorage");
+  }
+
+  async getIssueActivities(issueId: number): Promise<IssueActivity[]> {
+    throw new Error("Method not implemented in MemStorage");
+  }
+
+  async createIssueActivity(activity: InsertIssueActivity): Promise<IssueActivity> {
+    throw new Error("Method not implemented in MemStorage");
+  }
+
+  async getIssueActivityWithUser(issueId: number): Promise<any[]> {
+    throw new Error("Method not implemented in MemStorage");
+  }
+
+  async createAuditLog(auditLog: InsertAuditLog): Promise<AuditLog> {
+    throw new Error("Method not implemented in MemStorage");
+  }
+
+  async getEmailSettings(): Promise<EmailSettings | undefined> {
+    throw new Error("Method not implemented in MemStorage");
+  }
+
+  async createEmailSettings(settings: InsertEmailSettings): Promise<EmailSettings> {
+    throw new Error("Method not implemented in MemStorage");
+  }
+
+  async updateEmailSettings(id: number, settings: Partial<InsertEmailSettings>): Promise<EmailSettings | undefined> {
+    throw new Error("Method not implemented in MemStorage");
+  }
+
+  async deleteEmailSettings(): Promise<boolean> {
+    throw new Error("Method not implemented in MemStorage");
+  }
+
+  async getActiveEmailSettings(): Promise<EmailSettings | undefined> {
+    throw new Error("Method not implemented in MemStorage");
+  }
+
+  async markEmailSettingsAsVerified(id: number): Promise<EmailSettings | undefined> {
+    throw new Error("Method not implemented in MemStorage");
+  }
 }
 
 

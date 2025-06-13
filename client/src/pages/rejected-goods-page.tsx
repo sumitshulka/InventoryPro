@@ -47,7 +47,7 @@ interface RejectedGoods {
 export default function RejectedGoodsPage() {
   const [selectedItem, setSelectedItem] = useState<RejectedGoods | null>(null);
   const [actionDialogOpen, setActionDialogOpen] = useState(false);
-  const [actionType, setActionType] = useState<'dispose' | 'return' | 'restock'>('dispose');
+  const [actionType, setActionType] = useState<'dispose' | 'return'>('dispose');
   const [actionNotes, setActionNotes] = useState('');
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -55,6 +55,84 @@ export default function RejectedGoodsPage() {
   const { data: rejectedGoods = [], isLoading } = useQuery({
     queryKey: ['/api/rejected-goods'],
   });
+
+  const approveReturnMutation = useMutation({
+    mutationFn: async ({ transferId, returnReason }: { transferId: number; returnReason: string }) => {
+      const response = await fetch(`/api/transfers/${transferId}/approve-return`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ returnReason }),
+      });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to approve return');
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/rejected-goods'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/transfers'] });
+      
+      toast({
+        title: "Return Approved Successfully",
+        description: "The rejected goods have been approved for return to source warehouse.",
+      });
+      setActionDialogOpen(false);
+      setSelectedItem(null);
+      setActionNotes('');
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to approve return",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const approveDisposalMutation = useMutation({
+    mutationFn: async ({ transferId, disposalReason }: { transferId: number; disposalReason: string }) => {
+      return apiRequest(`/api/transfers/${transferId}/approve-disposal`, {
+        method: 'POST',
+        body: { disposalReason },
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/rejected-goods'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/transfers'] });
+      
+      toast({
+        title: "Disposal Approved Successfully",
+        description: "The rejected goods have been approved for disposal.",
+      });
+      setActionDialogOpen(false);
+      setSelectedItem(null);
+      setActionNotes('');
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to approve disposal",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleAction = () => {
+    if (!selectedItem || !actionNotes.trim()) return;
+
+    if (actionType === 'return') {
+      approveReturnMutation.mutate({
+        transferId: selectedItem.transferId,
+        returnReason: actionNotes.trim()
+      });
+    } else if (actionType === 'dispose') {
+      approveDisposalMutation.mutate({
+        transferId: selectedItem.transferId,
+        disposalReason: actionNotes.trim()
+      });
+    }
+  };
 
   const updateStatusMutation = useMutation({
     mutationFn: async ({ id, status, notes }: { id: number; status: string; notes?: string }) => {
@@ -70,21 +148,12 @@ export default function RejectedGoodsPage() {
       return response.json();
     },
     onSuccess: () => {
-      // Invalidate multiple cache keys to ensure data consistency
       queryClient.invalidateQueries({ queryKey: ['/api/rejected-goods'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/inventory'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/transactions'] });
       queryClient.invalidateQueries({ queryKey: ['/api/transfers'] });
-      
-      const actionLabels = {
-        'restocked': 'restocked into warehouse inventory',
-        'returned': 'returned to source warehouse',
-        'disposed': 'marked as disposed'
-      };
       
       toast({
         title: "Action Completed Successfully",
-        description: `The rejected goods have been ${actionLabels[actionType as keyof typeof actionLabels] || 'updated'}.`,
+        description: "The rejected goods status has been updated.",
       });
       setActionDialogOpen(false);
       setSelectedItem(null);
@@ -122,25 +191,10 @@ export default function RejectedGoodsPage() {
     }
   };
 
-  const handleAction = (item: RejectedGoods, action: 'dispose' | 'return' | 'restock') => {
+  const handleActionDialog = (item: RejectedGoods, action: 'dispose' | 'return') => {
     setSelectedItem(item);
     setActionType(action);
     setActionDialogOpen(true);
-  };
-
-  const handleStatusUpdate = () => {
-    if (!selectedItem) return;
-
-    let newStatus: string = actionType;
-    if (actionType === 'dispose') newStatus = 'disposed';
-    if (actionType === 'return') newStatus = 'returned';
-    if (actionType === 'restock') newStatus = 'restocked';
-
-    updateStatusMutation.mutate({
-      id: selectedItem.id,
-      status: newStatus,
-      notes: actionNotes,
-    });
   };
 
   const filteredGoods = (rejectedGoods as RejectedGoods[]).filter(item => item.status === 'rejected');

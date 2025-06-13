@@ -2494,6 +2494,129 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // NEW TRANSFER RETURN/DISPOSAL WORKFLOW ENDPOINTS
+
+  // Approve return for rejected goods (Admin only)
+  app.post("/api/transfers/:transferId/approve-return", checkRole("admin"), async (req: Request, res: Response) => {
+    try {
+      const transferId = parseInt(req.params.transferId);
+      const { returnReason } = req.body;
+      
+      if (!returnReason || returnReason.trim() === '') {
+        return res.status(400).json({ message: "Return reason is required" });
+      }
+
+      const user = req.user;
+      const updatedTransfer = await storage.approveReturn(transferId, returnReason, user.id);
+      
+      if (!updatedTransfer) {
+        return res.status(404).json({ message: "Transfer not found" });
+      }
+
+      res.json(updatedTransfer);
+    } catch (error) {
+      console.error("Error approving return:", error);
+      res.status(500).json({ message: "Failed to approve return" });
+    }
+  });
+
+  // Approve disposal for rejected goods (Admin only)
+  app.post("/api/transfers/:transferId/approve-disposal", checkRole("admin"), async (req: Request, res: Response) => {
+    try {
+      const transferId = parseInt(req.params.transferId);
+      const { disposalReason } = req.body;
+      
+      if (!disposalReason || disposalReason.trim() === '') {
+        return res.status(400).json({ message: "Disposal reason is required" });
+      }
+
+      const user = req.user;
+      const updatedTransfer = await storage.approveDisposal(transferId, disposalReason, user.id);
+      
+      if (!updatedTransfer) {
+        return res.status(404).json({ message: "Transfer not found" });
+      }
+
+      res.json(updatedTransfer);
+    } catch (error) {
+      console.error("Error approving disposal:", error);
+      res.status(500).json({ message: "Failed to approve disposal" });
+    }
+  });
+
+  // Record return shipment details (Destination warehouse manager)
+  app.post("/api/transfers/:transferId/return-shipment", async (req: Request, res: Response) => {
+    try {
+      const transferId = parseInt(req.params.transferId);
+      const { courierName, trackingNumber } = req.body;
+      
+      if (!courierName || courierName.trim() === '') {
+        return res.status(400).json({ message: "Courier name is required" });
+      }
+
+      if (!trackingNumber || trackingNumber.trim() === '') {
+        return res.status(400).json({ message: "Tracking number is required" });
+      }
+
+      const user = req.user;
+      
+      // Verify user has permission to update this transfer
+      const transfer = await storage.getTransfer(transferId);
+      if (!transfer) {
+        return res.status(404).json({ message: "Transfer not found" });
+      }
+
+      // Check if user is destination warehouse manager or admin
+      const destinationWarehouse = await storage.getWarehouse(transfer.destinationWarehouseId);
+      if (user.role !== "admin" && 
+          (user.role !== "manager" || user.warehouseId !== transfer.destinationWarehouseId)) {
+        return res.status(403).json({ message: "Only destination warehouse manager can record return shipment" });
+      }
+
+      const updatedTransfer = await storage.recordReturnShipment(transferId, courierName, trackingNumber, user.id);
+      
+      if (!updatedTransfer) {
+        return res.status(404).json({ message: "Transfer not found" });
+      }
+
+      res.json(updatedTransfer);
+    } catch (error) {
+      console.error("Error recording return shipment:", error);
+      res.status(500).json({ message: "Failed to record return shipment" });
+    }
+  });
+
+  // Record return delivery (Source warehouse manager or admin)
+  app.post("/api/transfers/:transferId/return-delivery", async (req: Request, res: Response) => {
+    try {
+      const transferId = parseInt(req.params.transferId);
+      const user = req.user;
+      
+      // Verify user has permission to update this transfer
+      const transfer = await storage.getTransfer(transferId);
+      if (!transfer) {
+        return res.status(404).json({ message: "Transfer not found" });
+      }
+
+      // Check if user is source warehouse manager or admin
+      if (user.role !== "admin" && 
+          (user.role !== "manager" || user.warehouseId !== transfer.sourceWarehouseId)) {
+        return res.status(403).json({ message: "Only source warehouse manager can confirm return delivery" });
+      }
+
+      const updatedTransfer = await storage.recordReturnDelivery(transferId, user.id);
+      
+      if (!updatedTransfer) {
+        return res.status(404).json({ message: "Transfer not found" });
+      }
+
+      res.json(updatedTransfer);
+    } catch (error) {
+      console.error("Error recording return delivery:", error);
+      res.status(500).json({ message: "Failed to record return delivery" });
+    }
+  });
+
   // Enhanced Transfer Management Routes
   
   // Get all transfers with enriched data
