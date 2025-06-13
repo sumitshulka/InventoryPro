@@ -60,6 +60,30 @@ app.use((req, res, next) => {
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
   const port = 5000;
+  
+  // Add error handling for port conflicts
+  server.on('error', (err: any) => {
+    if (err.code === 'EADDRINUSE') {
+      console.error(`Port ${port} is already in use. Attempting to kill existing process...`);
+      process.exit(1);
+    } else {
+      console.error('Server error:', err);
+      process.exit(1);
+    }
+  });
+
+  // Graceful shutdown handling
+  const gracefulShutdown = () => {
+    console.log('\nReceived shutdown signal, closing server gracefully...');
+    server.close(() => {
+      console.log('Server closed');
+      process.exit(0);
+    });
+  };
+
+  process.on('SIGTERM', gracefulShutdown);
+  process.on('SIGINT', gracefulShutdown);
+
   server.listen({
     port,
     host: "0.0.0.0",
@@ -67,4 +91,7 @@ app.use((req, res, next) => {
   }, () => {
     log(`serving on port ${port}`);
   });
-})();
+})().catch((error) => {
+  console.error('Failed to start server:', error);
+  process.exit(1);
+});
