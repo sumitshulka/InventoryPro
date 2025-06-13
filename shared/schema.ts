@@ -445,8 +445,14 @@ export const insertTransferSchema = createInsertSchema(transfers).omit({
   createdAt: true,
   updatedAt: true,
 }).extend({
-  expectedShipmentDate: z.union([z.string(), z.date()]).optional().nullable(),
-  expectedArrivalDate: z.union([z.string(), z.date()]).optional().nullable(),
+  expectedShipmentDate: z.preprocess((arg) => {
+    if (typeof arg === 'string' || arg instanceof Date) return new Date(arg);
+    return arg;
+  }, z.date().optional().nullable()),
+  expectedArrivalDate: z.preprocess((arg) => {
+    if (typeof arg === 'string' || arg instanceof Date) return new Date(arg);
+    return arg;
+  }, z.date().optional().nullable()),
 });
 
 // Transfer items (individual items in a transfer)
