@@ -430,6 +430,15 @@ export const transfers = pgTable("transfers", {
   receiverNotes: text("receiver_notes"),
   overallCondition: text("overall_condition").default("good"), // good, damaged, mixed
   notes: text("notes"),
+  // Return tracking fields
+  returnReason: text("return_reason"),
+  returnCourierName: text("return_courier_name"),
+  returnTrackingNumber: text("return_tracking_number"),
+  returnShippedDate: timestamp("return_shipped_date"),
+  returnDeliveredDate: timestamp("return_delivered_date"),
+  // Disposal tracking fields
+  disposalReason: text("disposal_reason"),
+  disposalDate: timestamp("disposal_date"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at"),
 });

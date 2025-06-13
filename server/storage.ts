@@ -245,6 +245,12 @@ export interface IStorage {
   createRejectedGoods(rejectedGoods: InsertRejectedGoods): Promise<RejectedGoods>;
   updateRejectedGoods(id: number, rejectedGoodsData: Partial<InsertRejectedGoods>): Promise<RejectedGoods | undefined>;
   deleteRejectedGoods(id: number): Promise<boolean>;
+  
+  // Transfer Return/Disposal operations
+  approveReturn(transferId: number, returnReason: string, userId: number): Promise<Transfer | undefined>;
+  approveDisposal(transferId: number, disposalReason: string, userId: number): Promise<Transfer | undefined>;
+  recordReturnShipment(transferId: number, courierName: string, trackingNumber: string, userId: number): Promise<Transfer | undefined>;
+  recordReturnDelivery(transferId: number, userId: number): Promise<Transfer | undefined>;
 
   // Notification operations
   getNotification(id: number): Promise<Notification | undefined>;
@@ -2382,6 +2388,141 @@ export class DatabaseStorage implements IStorage {
       .where(eq(rejectedGoods.id, id))
       .returning();
     return !!deletedRejectedGoods;
+  }
+
+  // Transfer Return/Disposal operations
+  async approveReturn(transferId: number, returnReason: string, userId: number): Promise<Transfer | undefined> {
+    // Update transfer status to return_requested and add return reason
+    const [updatedTransfer] = await db.update(transfers)
+      .set({
+        status: 'return_requested',
+        returnReason,
+        updatedAt: new Date()
+      })
+      .where(eq(transfers.id, transferId))
+      .returning();
+
+    // Create transfer update log
+    if (updatedTransfer) {
+      await this.createTransferUpdate({
+        transferId,
+        updatedBy: userId,
+        status: 'return_requested',
+        updateType: 'status_change',
+        description: `Return approved. Reason: ${returnReason}`,
+        metadata: JSON.stringify({ returnReason })
+      });
+
+      // Update rejected goods status to 'returned'
+      await db.update(rejectedGoods)
+        .set({ status: 'returned' })
+        .where(eq(rejectedGoods.transferId, transferId));
+    }
+
+    return updatedTransfer || undefined;
+  }
+
+  async approveDisposal(transferId: number, disposalReason: string, userId: number): Promise<Transfer | undefined> {
+    // Update transfer status to disposed and add disposal details
+    const [updatedTransfer] = await db.update(transfers)
+      .set({
+        status: 'disposed',
+        disposalReason,
+        disposalDate: new Date(),
+        updatedAt: new Date()
+      })
+      .where(eq(transfers.id, transferId))
+      .returning();
+
+    // Create transfer update log
+    if (updatedTransfer) {
+      await this.createTransferUpdate({
+        transferId,
+        updatedBy: userId,
+        status: 'disposed',
+        updateType: 'status_change',
+        description: `Disposal approved. Reason: ${disposalReason}`,
+        metadata: JSON.stringify({ disposalReason })
+      });
+
+      // Update rejected goods status to 'disposed'
+      await db.update(rejectedGoods)
+        .set({ status: 'disposed' })
+        .where(eq(rejectedGoods.transferId, transferId));
+    }
+
+    return updatedTransfer || undefined;
+  }
+
+  async recordReturnShipment(transferId: number, courierName: string, trackingNumber: string, userId: number): Promise<Transfer | undefined> {
+    // Update transfer with return shipment details
+    const [updatedTransfer] = await db.update(transfers)
+      .set({
+        status: 'return_shipped',
+        returnCourierName: courierName,
+        returnTrackingNumber: trackingNumber,
+        returnShippedDate: new Date(),
+        updatedAt: new Date()
+      })
+      .where(eq(transfers.id, transferId))
+      .returning();
+
+    // Create transfer update log
+    if (updatedTransfer) {
+      await this.createTransferUpdate({
+        transferId,
+        updatedBy: userId,
+        status: 'return_shipped',
+        updateType: 'shipment_info',
+        description: `Return shipment initiated via ${courierName}`,
+        metadata: JSON.stringify({ courierName, trackingNumber })
+      });
+    }
+
+    return updatedTransfer || undefined;
+  }
+
+  async recordReturnDelivery(transferId: number, userId: number): Promise<Transfer | undefined> {
+    const transfer = await this.getTransfer(transferId);
+    if (!transfer) {
+      throw new Error('Transfer not found');
+    }
+
+    // Update transfer status to returned and record delivery
+    const [updatedTransfer] = await db.update(transfers)
+      .set({
+        status: 'returned',
+        returnDeliveredDate: new Date(),
+        updatedAt: new Date()
+      })
+      .where(eq(transfers.id, transferId))
+      .returning();
+
+    if (updatedTransfer) {
+      // Create transfer update log
+      await this.createTransferUpdate({
+        transferId,
+        updatedBy: userId,
+        status: 'returned',
+        updateType: 'receipt_info',
+        description: 'Return delivery confirmed - goods returned to source warehouse',
+        metadata: JSON.stringify({ returnCompletedBy: userId })
+      });
+
+      // Restore inventory to source warehouse
+      const transferItems = await this.getTransferItemsByTransfer(transferId);
+      for (const item of transferItems) {
+        if (item.actualQuantity && item.actualQuantity > 0) {
+          await this.updateInventoryQuantity(
+            item.itemId,
+            transfer.sourceWarehouseId,
+            item.actualQuantity
+          );
+        }
+      }
+    }
+
+    return updatedTransfer || undefined;
   }
 
 
