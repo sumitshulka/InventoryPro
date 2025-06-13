@@ -111,9 +111,11 @@ export default function EnhancedTransfersPage() {
   const [receiptDialogOpen, setReceiptDialogOpen] = useState(false);
   const [acceptanceDialogOpen, setAcceptanceDialogOpen] = useState(false);
   const [auditDialogOpen, setAuditDialogOpen] = useState(false);
+  const [rejectionDialogOpen, setRejectionDialogOpen] = useState(false);
   const [selectedTransfer, setSelectedTransfer] = useState<any>(null);
   const [activeTab, setActiveTab] = useState("all");
   const [refreshKey, setRefreshKey] = useState(0);
+  const [rejectionReason, setRejectionReason] = useState("");
 
   const { data: transfers, isLoading: transfersLoading } = useQuery({
     queryKey: ["/api/transfers", refreshKey],
@@ -253,6 +255,40 @@ export default function EnhancedTransfersPage() {
     },
   });
 
+  const rejectTransferMutation = useMutation({
+    mutationFn: async ({ id, rejectionReason }: { id: number; rejectionReason: string }) => {
+      const response = await fetch(`/api/transfers/${id}/reject`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rejectionReason }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to reject transfer: ${response.statusText}`);
+      }
+
+      return response.json();
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["/api/transfers"] });
+      setRejectionDialogOpen(false);
+      setRejectionReason("");
+      setSelectedTransfer(null);
+      
+      toast({
+        title: "Transfer Rejected",
+        description: "Transfer has been rejected successfully",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to reject transfer",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleSubmit = (data: FormValues) => {
     createTransferMutation.mutate(data);
   };
@@ -365,6 +401,10 @@ export default function EnhancedTransfersPage() {
         return transfer.status === "in-transit";
       case "completed":
         return transfer.status === "completed";
+      case "returned":
+        return transfer.status === "returned";
+      case "rejected":
+        return transfer.status === "rejected";
       default:
         return true;
     }
@@ -388,11 +428,13 @@ export default function EnhancedTransfersPage() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="all">All Transfers</TabsTrigger>
             <TabsTrigger value="pending">Pending</TabsTrigger>
             <TabsTrigger value="in-transit">In Transit</TabsTrigger>
             <TabsTrigger value="completed">Completed</TabsTrigger>
+            <TabsTrigger value="returned">Returned</TabsTrigger>
+            <TabsTrigger value="rejected">Rejected</TabsTrigger>
           </TabsList>
 
           <TabsContent value={activeTab} className="space-y-4">
@@ -541,14 +583,31 @@ export default function EnhancedTransfersPage() {
                                   <FileText className="h-4 w-4" />
                                 </Button>
                                 {transfer.status === "pending" && (
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="text-green-600"
-                                    onClick={() => handleUpdateStatus(transfer.id, "approved")}
-                                  >
-                                    <CheckCircle className="h-4 w-4" />
-                                  </Button>
+                                  <>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="text-green-600"
+                                      onClick={() => handleUpdateStatus(transfer.id, "approved")}
+                                      title="Approve transfer"
+                                    >
+                                      <CheckCircle className="h-4 w-4" />
+                                    </Button>
+                                    {(user?.role === 'admin' || transfer.initiatedBy === user?.id) && (
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="text-red-600"
+                                        onClick={() => {
+                                          setSelectedTransfer(transfer);
+                                          setRejectionDialogOpen(true);
+                                        }}
+                                        title="Reject or cancel transfer"
+                                      >
+                                        <X className="h-4 w-4" />
+                                      </Button>
+                                    )}
+                                  </>
                                 )}
                                 {transfer.status === "approved" && transfer.sourceWarehouse?.managerId === user?.id && (
                                   <Button
@@ -1704,6 +1763,56 @@ export default function EnhancedTransfersPage() {
             <DialogFooter>
               <Button variant="outline" onClick={() => setAuditDialogOpen(false)}>
                 Close
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Rejection Dialog */}
+        <Dialog open={rejectionDialogOpen} onOpenChange={setRejectionDialogOpen}>
+          <DialogContent className="sm:max-w-[500px]">
+            <DialogHeader>
+              <DialogTitle>Reject Transfer</DialogTitle>
+              <DialogDescription>
+                Are you sure you want to reject transfer {selectedTransfer?.transferCode}? Please provide a reason for rejection.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="rejectionReason">Rejection Reason</Label>
+                <Textarea
+                  id="rejectionReason"
+                  placeholder="Enter reason for rejecting this transfer..."
+                  value={rejectionReason}
+                  onChange={(e) => setRejectionReason(e.target.value)}
+                  className="mt-1"
+                  rows={3}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setRejectionDialogOpen(false);
+                  setRejectionReason("");
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={() => {
+                  if (selectedTransfer && rejectionReason.trim()) {
+                    rejectTransferMutation.mutate({
+                      id: selectedTransfer.id,
+                      rejectionReason: rejectionReason.trim()
+                    });
+                  }
+                }}
+                disabled={!rejectionReason.trim() || rejectTransferMutation.isPending}
+              >
+                {rejectTransferMutation.isPending ? "Rejecting..." : "Reject Transfer"}
               </Button>
             </DialogFooter>
           </DialogContent>
