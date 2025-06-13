@@ -518,13 +518,13 @@ export default function IssuesPage() {
   };
 
   // Notification filtering and helpers
-  const filteredNotifications = notifications.filter((notification: Notification) => {
+  const filteredNotifications = Array.isArray(notifications) ? notifications.filter((notification: Notification) => {
     if (notificationFilter === "all") return true;
     if (notificationFilter === "unread") return notification.status === "unread";
     if (notificationFilter === "read") return notification.status === "read";
     if (notificationFilter === "archived") return notification.isArchived;
     return true;
-  });
+  }) : [];
 
   const getNotificationPriorityColor = (priority: string) => {
     switch (priority) {

@@ -136,6 +136,39 @@ export interface IStorage {
   updateInventoryQuantity(itemId: number, warehouseId: number, quantity: number): Promise<Inventory | undefined>;
   deleteInventory(id: number): Promise<boolean>;
 
+  // Notification operations
+  getNotificationsByRecipient(recipientId: number): Promise<any[]>;
+  getUnreadNotificationCount(userId: number): Promise<number>;
+  createNotification(notification: any): Promise<any>;
+  markNotificationAsRead(id: number): Promise<any>;
+  getNotificationsByCategory(userId: number, category: string): Promise<any[]>;
+  getNotificationThread(notificationId: number): Promise<any[]>;
+  getNotification(id: number): Promise<any>;
+  markNotificationAsReplied(id: number): Promise<any>;
+  markNotificationAsClosed(id: number): Promise<any>;
+  archiveNotification(id: number): Promise<any>;
+  cleanupArchivedNotifications(): Promise<void>;
+
+  // Issue operations
+  closeIssue(id: number, userId: number, resolutionNotes: string): Promise<any>;
+  reopenIssue(id: number, userId: number): Promise<any>;
+  getIssueActivityWithUser(issueId: number): Promise<any[]>;
+
+  // Email settings operations
+  getEmailSettings(): Promise<any>;
+  createEmailSettings(settings: any): Promise<any>;
+  updateEmailSettings(id: number, settings: any): Promise<any>;
+  markEmailSettingsAsVerified(id: number): Promise<any>;
+  deleteEmailSettings(id: number): Promise<boolean>;
+
+  // User operations extensions
+  getUserById(id: number): Promise<any>;
+  updateUserStatus(id: number, isActive: boolean): Promise<any>;
+
+  // Transfer operations extensions
+  updateTransferItem(id: number, data: any): Promise<any>;
+  createRejectedGoods(data: any): Promise<any>;
+
   // Session store
   sessionStore: session.Store;
 }
