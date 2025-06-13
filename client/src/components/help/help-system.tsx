@@ -50,46 +50,83 @@ const helpArticles: HelpArticle[] = [
   {
     id: "getting-started",
     title: "Getting Started with Inventory Management",
-    content: `Welcome to your inventory management system! This guide will help you get started with the basics.
+    content: `Welcome to your comprehensive inventory management system! This guide will help you get started with the basics.
 
 **First Steps:**
-1. Set up your organization settings
-2. Create warehouses and locations
-3. Add items to your inventory
+1. Set up your organization settings and currency preferences
+2. Create warehouses and locations with detailed address information
+3. Add items to your inventory with categories and pricing
 4. Configure user roles and permissions
+5. Set up email notifications and approval workflows
+6. Configure barcode scanning for check-in processes
 
 **Dashboard Overview:**
-The dashboard provides a quick overview of your inventory status, recent transactions, and key metrics. You can see:
-- Current stock levels
-- Low stock alerts
-- Recent activities
-- Performance metrics`,
+The dashboard provides a real-time overview of your inventory status with:
+- Current stock levels across all warehouses
+- Low stock alerts with automated notifications
+- Recent transaction history and activities
+- Performance metrics and analytics
+- Quick access to pending approvals
+- Warehouse capacity utilization charts
+
+**Advanced Features Available:**
+- Multi-warehouse inventory tracking
+- Advanced analytics and reporting
+- Issue tracking and resolution system
+- Comprehensive notification center
+- Audit trail and compliance tracking
+- Price tracking and valuation reports
+- Disposed inventory management
+- Transfer request workflow`,
     category: "getting-started",
-    tags: ["basics", "setup", "dashboard"],
+    tags: ["basics", "setup", "dashboard", "overview"],
     difficulty: "beginner"
   },
   {
     id: "managing-inventory",
-    title: "Managing Inventory Items",
-    content: `Learn how to effectively manage your inventory items and stock levels.
+    title: "Advanced Inventory Management",
+    content: `Learn how to effectively manage your inventory items, pricing, and stock levels across multiple warehouses.
 
 **Adding New Items:**
 1. Navigate to Inventory → Items
 2. Click "Add New Item"
-3. Fill in item details (name, SKU, description)
-4. Set minimum stock levels
-5. Assign categories and units
+3. Fill in complete item details (name, SKU, description, specifications)
+4. Set minimum and maximum stock levels
+5. Assign categories and units of measurement
+6. Configure pricing information and cost tracking
+7. Set up reorder points and preferred suppliers
 
-**Stock Adjustments:**
-- Use the "Adjust Stock" feature for corrections
-- Record reasons for all adjustments
-- Monitor adjustment history in audit trail
+**Multi-Warehouse Stock Management:**
+- Track inventory across multiple warehouse locations
+- Set warehouse-specific minimum stock levels
+- Monitor stock distribution and utilization
+- Transfer items between warehouses with full audit trail
+
+**Advanced Stock Operations:**
+- Bulk stock adjustments with reason codes
+- Cycle counting and physical inventory reconciliation
+- Automatic low stock alerts with email notifications
+- Stock reservation for pending requests
+- Real-time stock level updates across all locations
+
+**Price Tracking and Valuation:**
+- Track unit costs and pricing history
+- Calculate inventory valuations using FIFO/LIFO methods
+- Monitor price variations over time
+- Generate cost analysis reports
+- Set up price alerts for significant changes
+
+**Barcode Integration:**
+- Generate and print barcode labels for items
+- Use mobile devices for barcode scanning during check-in
+- Quick inventory lookups using barcode scanning
+- Streamlined receiving and put-away processes
 
 **Item Categories:**
-Organize items using categories for better management and reporting.`,
+Organize items using hierarchical categories for better management and reporting.`,
     category: "inventory",
-    tags: ["items", "stock", "categories"],
-    difficulty: "beginner"
+    tags: ["items", "stock", "categories", "pricing", "barcode"],
+    difficulty: "intermediate"
   },
   {
     id: "warehouse-management",
@@ -208,6 +245,225 @@ Configure which notifications you want to receive via email or in-system alerts.
     difficulty: "beginner"
   },
   {
+    id: "transfer-management",
+    title: "Transfer Request Management",
+    content: `Manage complex transfer workflows between warehouses with approval processes.
+
+**Creating Transfer Requests:**
+1. Navigate to Transfers → New Transfer Request
+2. Select source and destination warehouses
+3. Add items and quantities to transfer
+4. Set priority level and justification
+5. Submit for approval workflow
+
+**Transfer Lifecycle:**
+- **Pending:** Awaiting approval from warehouse managers
+- **Approved:** Ready for shipment preparation
+- **In Transit:** Items being moved between locations
+- **Delivered:** Items received at destination
+- **Rejected:** Transfer denied with reasons
+
+**Rejected Goods Management:**
+- Handle items that don't meet quality standards
+- Document rejection reasons and conditions
+- Choose disposal or return options
+- Track rejected goods separately from main inventory
+- Generate reports on rejection patterns
+
+**Transfer Notifications:**
+- Automatic notifications to warehouse managers
+- Real-time status updates for all stakeholders
+- Email alerts for urgent transfers
+- Mobile notifications for warehouse operators`,
+    category: "transfers",
+    tags: ["transfers", "warehouses", "approval", "rejected-goods"],
+    difficulty: "advanced"
+  },
+  {
+    id: "analytics-reporting",
+    title: "Advanced Analytics & Reporting",
+    content: `Leverage comprehensive analytics and reporting capabilities for data-driven decisions.
+
+**Available Reports:**
+- **Inventory Valuation Report:** Real-time asset valuation with price tracking
+- **Movement Report:** Detailed transaction history with filtering
+- **Low Stock Report:** Items below minimum thresholds
+- **Disposed Inventory Report:** Track waste and disposal costs
+- **Price Variation Analysis:** Monitor cost fluctuations over time
+- **Warehouse Utilization:** Capacity and efficiency metrics
+
+**Analytics Dashboard:**
+- Interactive charts and graphs
+- Trend analysis over multiple time periods
+- Drill-down capabilities for detailed insights
+- Customizable dashboard widgets
+- Real-time data updates
+
+**Export Capabilities:**
+- Excel exports with formatting
+- PDF reports for presentations
+- Scheduled automated reports via email
+- API access for external systems integration
+
+**Price Tracking Features:**
+- Historical price charts
+- Cost variance analysis
+- Profit margin calculations
+- Supplier price comparison
+- Alert system for significant price changes`,
+    category: "analytics",
+    tags: ["reports", "analytics", "pricing", "trends", "export"],
+    difficulty: "advanced"
+  },
+  {
+    id: "issues-communication",
+    title: "Issue Tracking & Communication Center",
+    content: `Comprehensive system for managing issues and internal communication.
+
+**Issue Management:**
+- **Create Issues:** Report problems with detailed descriptions
+- **Priority Levels:** Critical, High, Medium, Low prioritization
+- **Category System:** Equipment, Safety, Inventory, Maintenance
+- **Assignment Workflow:** Route issues to appropriate personnel
+- **Resolution Tracking:** Monitor progress and closure
+
+**Issue Lifecycle:**
+1. **Open:** New issue reported
+2. **In Progress:** Assigned and being worked on
+3. **Resolved:** Solution implemented
+4. **Closed:** Verified and archived
+5. **Reopened:** If issue resurfaces
+
+**Communication Features:**
+- **Notification Center:** Centralized message hub
+- **Direct Messaging:** Send targeted communications
+- **Broadcast Messages:** System-wide announcements
+- **Email Integration:** Automatic email notifications
+- **Mobile Alerts:** Push notifications for urgent matters
+
+**Notification Types:**
+- Low stock alerts
+- Approval requests
+- Transfer status updates
+- Issue assignments
+- System maintenance notices
+- Custom user messages`,
+    category: "communication",
+    tags: ["issues", "notifications", "messaging", "alerts"],
+    difficulty: "intermediate"
+  },
+  {
+    id: "check-in-barcode",
+    title: "Check-in & Barcode Scanning",
+    content: `Streamline receiving processes with mobile barcode scanning and check-in workflows.
+
+**Barcode Scanning Setup:**
+1. Enable barcode scanning in system settings
+2. Generate barcode labels for all inventory items
+3. Configure mobile devices for scanning
+4. Train staff on scanning procedures
+
+**Check-in Process:**
+1. Navigate to Check-in page
+2. Scan item barcodes using mobile device
+3. Verify item details and quantities
+4. Record condition and quality notes
+5. Assign to warehouse locations
+6. Complete check-in with digital signature
+
+**Mobile Features:**
+- Camera-based barcode scanning
+- Offline capability for remote locations
+- Bulk scanning for multiple items
+- Photo capture for condition documentation
+- GPS location tracking for verification
+
+**Quality Control:**
+- Document item condition upon receipt
+- Flag damaged or defective items
+- Route problem items to quality review
+- Generate quality reports and trends
+- Integration with supplier performance tracking`,
+    category: "operations",
+    tags: ["check-in", "barcode", "mobile", "quality", "receiving"],
+    difficulty: "intermediate"
+  },
+  {
+    id: "user-management-advanced",
+    title: "Advanced User Management & Security",
+    content: `Comprehensive user management with role-based security and audit trails.
+
+**User Roles & Permissions:**
+- **System Admin:** Full system access and configuration
+- **Manager:** Multi-warehouse oversight and reporting
+- **Warehouse Manager:** Single warehouse operations
+- **Operator:** Daily transactions and inventory tasks
+- **Viewer:** Read-only access to reports and data
+- **Quality Inspector:** Quality control and check-in processes
+
+**Advanced Security Features:**
+- Role-based access control (RBAC)
+- Warehouse-specific permissions
+- Time-based access restrictions
+- IP address restrictions
+- Two-factor authentication support
+- Password complexity requirements
+
+**User Activity Monitoring:**
+- Complete audit trail of all user actions
+- Login/logout tracking
+- Transaction history per user
+- Permission change logs
+- Failed login attempt monitoring
+- Data export activity tracking
+
+**Department Management:**
+- Organize users by departments
+- Department-specific approval workflows
+- Budget allocation and tracking per department
+- Performance metrics by department`,
+    category: "security",
+    tags: ["users", "security", "audit", "permissions", "departments"],
+    difficulty: "advanced"
+  },
+  {
+    id: "email-notifications",
+    title: "Email Configuration & Notifications",
+    content: `Configure comprehensive email notification system for automated communications.
+
+**Email Provider Setup:**
+- Support for SMTP, SendGrid, Gmail, Outlook
+- Secure connection configuration
+- Test email functionality
+- Email template customization
+- Delivery status monitoring
+
+**Notification Types:**
+- **Stock Alerts:** Low stock, out of stock warnings
+- **Approval Requests:** Pending approvals requiring action
+- **Transfer Updates:** Status changes in transfer requests
+- **Issue Assignments:** New issues assigned to users
+- **System Alerts:** Maintenance, updates, security notices
+- **Reports:** Scheduled report delivery
+
+**Email Templates:**
+- Professional branded templates
+- Customizable content and styling
+- Multi-language support
+- Dynamic content insertion
+- HTML and plain text versions
+
+**Notification Preferences:**
+- User-specific notification settings
+- Frequency controls (immediate, daily digest, weekly)
+- Category-based preferences
+- Escalation rules for urgent matters
+- Unsubscribe options for non-critical alerts`,
+    category: "email",
+    tags: ["email", "notifications", "automation", "templates"],
+    difficulty: "intermediate"
+  },
+  {
     id: "troubleshooting",
     title: "Common Issues and Troubleshooting",
     content: `Solutions for common problems and issues.
@@ -240,10 +496,26 @@ const quickActions: QuickAction[] = [
   {
     id: "add-item",
     title: "Add New Item",
-    description: "Create a new inventory item",
+    description: "Create a new inventory item with barcode",
     icon: Package,
     action: "/inventory",
     category: "inventory"
+  },
+  {
+    id: "check-in-items",
+    title: "Check-in Items",
+    description: "Scan and receive new inventory",
+    icon: Package,
+    action: "/check-in",
+    category: "operations"
+  },
+  {
+    id: "create-transfer",
+    title: "Create Transfer",
+    description: "Transfer items between warehouses",
+    icon: ArrowRight,
+    action: "/transfers",
+    category: "transfers"
   },
   {
     id: "create-request",
@@ -254,33 +526,49 @@ const quickActions: QuickAction[] = [
     category: "requests"
   },
   {
-    id: "view-reports",
-    title: "View Reports",
-    description: "Access inventory reports and analytics",
+    id: "view-analytics",
+    title: "View Analytics",
+    description: "Access advanced reports and analytics",
     icon: BarChart3,
-    action: "/reports",
-    category: "reports"
+    action: "/analytics",
+    category: "analytics"
+  },
+  {
+    id: "track-issues",
+    title: "Track Issues",
+    description: "Manage issues and communication",
+    icon: MessageSquare,
+    action: "/issues",
+    category: "communication"
   },
   {
     id: "manage-users",
     title: "Manage Users",
-    description: "Add or edit user accounts",
+    description: "Add or edit user accounts and permissions",
     icon: Users,
-    action: "/settings",
-    category: "users"
+    action: "/users-management",
+    category: "security"
   },
   {
     id: "warehouse-settings",
     title: "Warehouse Settings",
     description: "Configure warehouses and locations",
     icon: Warehouse,
-    action: "/settings",
+    action: "/warehouses",
     category: "warehouses"
+  },
+  {
+    id: "email-settings",
+    title: "Email Settings",
+    description: "Configure email notifications",
+    icon: MessageSquare,
+    action: "/settings",
+    category: "email"
   },
   {
     id: "system-settings",
     title: "System Settings",
-    description: "Configure system preferences",
+    description: "Configure organization preferences",
     icon: Settings,
     action: "/settings",
     category: "settings"
@@ -297,6 +585,12 @@ export default function HelpSystem({ open, onOpenChange }: HelpSystemProps) {
     { id: "getting-started", name: "Getting Started", icon: HelpCircle },
     { id: "inventory", name: "Inventory", icon: Package },
     { id: "warehouses", name: "Warehouses", icon: Warehouse },
+    { id: "transfers", name: "Transfers", icon: ArrowRight },
+    { id: "analytics", name: "Analytics", icon: BarChart3 },
+    { id: "communication", name: "Communication", icon: MessageSquare },
+    { id: "operations", name: "Operations", icon: Settings },
+    { id: "security", name: "Security", icon: Users },
+    { id: "email", name: "Email", icon: MessageSquare },
     { id: "users", name: "Users", icon: Users },
     { id: "requests", name: "Requests", icon: FileText },
     { id: "reports", name: "Reports", icon: BarChart3 },
@@ -529,8 +823,36 @@ export default function HelpSystem({ open, onOpenChange }: HelpSystemProps) {
                 Contact Support
               </Button>
             </div>
-            <div className="flex items-center gap-2">
-              <span>Version 1.0.0</span>
+            <div className="flex items-center gap-4">
+              <a 
+                href="https://docs.inventoryms.com/privacy-policy" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="hover:text-blue-600 transition-colors"
+              >
+                <ExternalLink className="h-3 w-3 inline mr-1" />
+                Privacy Policy
+              </a>
+              <a 
+                href="https://docs.inventoryms.com/terms-of-service" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="hover:text-blue-600 transition-colors"
+              >
+                <ExternalLink className="h-3 w-3 inline mr-1" />
+                Terms of Service
+              </a>
+              <a 
+                href="https://help.inventoryms.com" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="hover:text-blue-600 transition-colors"
+              >
+                <ExternalLink className="h-3 w-3 inline mr-1" />
+                Help Center
+              </a>
+              <span className="text-gray-400">|</span>
+              <span>Version 2.0.0</span>
             </div>
           </div>
         </div>
