@@ -280,8 +280,12 @@ export function setupAuth(app: Express) {
           html: `
             <h2>Password Reset Request</h2>
             <p>You requested a password reset for your inventory management account.</p>
-            <p>Click the link below to reset your password:</p>
-            <a href="${resetUrl}" style="background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Reset Password</a>
+            <p>Click the button below to reset your password:</p>
+            <p style="margin: 20px 0;">
+              <a href="${resetUrl}" style="background-color: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; display: inline-block;">Reset Password</a>
+            </p>
+            <p><strong>If the button doesn't work, copy and paste this link into your browser:</strong></p>
+            <p style="background-color: #f5f5f5; padding: 10px; border-radius: 4px; word-break: break-all; font-family: monospace; font-size: 14px;">${resetUrl}</p>
             <p>This link will expire in 1 hour.</p>
             <p>If you didn't request this reset, please ignore this email.</p>
           `,
@@ -289,7 +293,7 @@ export function setupAuth(app: Express) {
           
 You requested a password reset for your inventory management account.
           
-Click the link below to reset your password:
+Copy and paste this link into your browser to reset your password:
 ${resetUrl}
 
 This link will expire in 1 hour.

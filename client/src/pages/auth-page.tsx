@@ -89,21 +89,50 @@ export default function AuthPage() {
   };
   
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
-      <div className="w-full max-w-5xl grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
-        <div className="hidden lg:block">
-          <div className="p-8">
-            <h1 className="text-4xl font-bold text-primary mb-4">Inventory Management System</h1>
-            <p className="text-gray-600 mb-6">
-              A comprehensive solution for managing inventory across multiple warehouses. 
-              Track items, process requests, and manage transfers efficiently.
-            </p>
-            <div className="space-y-4">
-              <div className="flex items-start">
-                <div className="bg-primary/10 p-2 rounded-full mr-4">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50">
+      <div className="min-h-screen flex">
+        {/* Left Panel - Features */}
+        <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-primary/90 to-primary text-white flex-col justify-center p-12 relative overflow-hidden">
+          {/* Background Pattern */}
+          <div className="absolute inset-0 opacity-10">
+            <div className="absolute top-0 left-0 w-64 h-64 bg-white rounded-full -translate-x-32 -translate-y-32"></div>
+            <div className="absolute bottom-0 right-0 w-96 h-96 bg-white rounded-full translate-x-48 translate-y-48"></div>
+            <div className="absolute top-1/2 left-1/2 w-32 h-32 bg-white rounded-full -translate-x-16 -translate-y-16"></div>
+          </div>
+          
+          <div className="relative z-10">
+            <div className="mb-8">
+              <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center mb-6">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-8 w-8 text-white"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
+                  />
+                </svg>
+              </div>
+              <h1 className="text-5xl font-bold mb-4 leading-tight">
+                Inventory<br />
+                <span className="text-white/80">Management</span>
+              </h1>
+              <p className="text-xl text-white/90 leading-relaxed">
+                Streamline your warehouse operations with our comprehensive inventory management solution.
+              </p>
+            </div>
+            
+            <div className="space-y-6">
+              <div className="flex items-center">
+                <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center mr-4 flex-shrink-0">
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
-                    className="h-6 w-6 text-primary"
+                    className="h-6 w-6 text-white"
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
@@ -112,22 +141,23 @@ export default function AuthPage() {
                       strokeLinecap="round"
                       strokeLinejoin="round"
                       strokeWidth={2}
-                      d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                      d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
                     />
                   </svg>
                 </div>
                 <div>
-                  <h3 className="font-medium text-gray-900">Multi-Warehouse Support</h3>
-                  <p className="text-gray-600 text-sm">
-                    Manage inventory across multiple locations with ease
+                  <h3 className="text-lg font-semibold mb-1">Multi-Warehouse Operations</h3>
+                  <p className="text-white/80 text-sm">
+                    Manage inventory across multiple locations seamlessly
                   </p>
                 </div>
               </div>
-              <div className="flex items-start">
-                <div className="bg-primary/10 p-2 rounded-full mr-4">
+              
+              <div className="flex items-center">
+                <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center mr-4 flex-shrink-0">
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
-                    className="h-6 w-6 text-primary"
+                    className="h-6 w-6 text-white"
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
@@ -136,22 +166,23 @@ export default function AuthPage() {
                       strokeLinecap="round"
                       strokeLinejoin="round"
                       strokeWidth={2}
-                      d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+                      d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
                     />
                   </svg>
                 </div>
                 <div>
-                  <h3 className="font-medium text-gray-900">Role-Based Access Control</h3>
-                  <p className="text-gray-600 text-sm">
-                    Different permissions for admins, managers and regular users
+                  <h3 className="text-lg font-semibold mb-1">Secure Access Control</h3>
+                  <p className="text-white/80 text-sm">
+                    Role-based permissions for enhanced security
                   </p>
                 </div>
               </div>
-              <div className="flex items-start">
-                <div className="bg-primary/10 p-2 rounded-full mr-4">
+              
+              <div className="flex items-center">
+                <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center mr-4 flex-shrink-0">
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
-                    className="h-6 w-6 text-primary"
+                    className="h-6 w-6 text-white"
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
@@ -165,131 +196,164 @@ export default function AuthPage() {
                   </svg>
                 </div>
                 <div>
-                  <h3 className="font-medium text-gray-900">Comprehensive Reporting</h3>
-                  <p className="text-gray-600 text-sm">
-                    Detailed reports for inventory status and movements
+                  <h3 className="text-lg font-semibold mb-1">Real-time Analytics</h3>
+                  <p className="text-white/80 text-sm">
+                    Comprehensive reporting and insights dashboard
                   </p>
                 </div>
               </div>
             </div>
           </div>
         </div>
-        
-        <div>
-          <Card className="w-full">
-            <CardHeader>
-              <CardTitle className="text-2xl text-center">
-                {activeView === "login" ? "Sign In" : "Reset Password"}
-              </CardTitle>
-              <CardDescription className="text-center">
-                {activeView === "login" 
-                  ? "Enter your credentials to access your account" 
-                  : "Enter your email to receive a password reset link"
-                }
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {activeView === "login" ? (
-                <form onSubmit={loginForm.handleSubmit(onLoginSubmit)} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="usernameOrEmail">Username or Email</Label>
-                    <Input
-                      id="usernameOrEmail"
-                      placeholder="Enter your username or email"
-                      {...loginForm.register("usernameOrEmail")}
-                    />
-                    {loginForm.formState.errors.usernameOrEmail && (
-                      <p className="text-sm text-red-500">
-                        {loginForm.formState.errors.usernameOrEmail.message}
-                      </p>
-                    )}
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="password">Password</Label>
-                    <Input
-                      id="password"
-                      type="password"
-                      placeholder="Enter your password"
-                      {...loginForm.register("password")}
-                    />
-                    {loginForm.formState.errors.password && (
-                      <p className="text-sm text-red-500">
-                        {loginForm.formState.errors.password.message}
-                      </p>
-                    )}
-                  </div>
-                  
-                  <div className="flex justify-end">
-                    <button
-                      type="button"
-                      onClick={() => setActiveView("forgot-password")}
-                      className="text-sm text-primary hover:underline"
-                    >
-                      Forgot password?
-                    </button>
-                  </div>
-                  
-                  <Button
-                    type="submit"
-                    className="w-full"
-                    disabled={loginMutation.isPending}
-                  >
-                    {loginMutation.isPending ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Signing in...
-                      </>
-                    ) : (
-                      "Sign In"
-                    )}
-                  </Button>
-                </form>
-              ) : (
-                <form onSubmit={forgotPasswordForm.handleSubmit(onForgotPasswordSubmit)} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="email">Email Address</Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      placeholder="Enter your email address"
-                      {...forgotPasswordForm.register("email")}
-                    />
-                    {forgotPasswordForm.formState.errors.email && (
-                      <p className="text-sm text-red-500">
-                        {forgotPasswordForm.formState.errors.email.message}
-                      </p>
-                    )}
-                  </div>
-                  
-                  <div className="flex space-x-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="flex-1"
-                      onClick={() => setActiveView("login")}
-                    >
-                      Back to Login
-                    </Button>
+
+        {/* Right Panel - Login Form */}
+        <div className="w-full lg:w-1/2 flex items-center justify-center p-8">
+          <div className="w-full max-w-md">
+            {/* Mobile Logo */}
+            <div className="lg:hidden text-center mb-8">
+              <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-8 w-8 text-primary"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
+                  />
+                </svg>
+              </div>
+              <h1 className="text-2xl font-bold text-gray-900">Inventory Management</h1>
+            </div>
+
+            <Card className="shadow-xl border-0 bg-white/95 backdrop-blur-sm">
+              <CardHeader className="space-y-1 pb-6">
+                <CardTitle className="text-3xl font-bold text-center text-gray-900">
+                  {activeView === "login" ? "Welcome Back" : "Reset Password"}
+                </CardTitle>
+                <CardDescription className="text-center text-gray-600 text-base">
+                  {activeView === "login" 
+                    ? "Enter your credentials to access your account" 
+                    : "Enter your email to receive a password reset link"
+                  }
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="pt-0">
+                {activeView === "login" ? (
+                  <form onSubmit={loginForm.handleSubmit(onLoginSubmit)} className="space-y-6">
+                    <div className="space-y-2">
+                      <Label htmlFor="usernameOrEmail" className="text-sm font-medium text-gray-700">
+                        Username or Email
+                      </Label>
+                      <Input
+                        id="usernameOrEmail"
+                        placeholder="Enter your username or email"
+                        className="h-12 text-base"
+                        {...loginForm.register("usernameOrEmail")}
+                      />
+                      {loginForm.formState.errors.usernameOrEmail && (
+                        <p className="text-sm text-red-500">
+                          {loginForm.formState.errors.usernameOrEmail.message}
+                        </p>
+                      )}
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="password" className="text-sm font-medium text-gray-700">
+                        Password
+                      </Label>
+                      <Input
+                        id="password"
+                        type="password"
+                        placeholder="Enter your password"
+                        className="h-12 text-base"
+                        {...loginForm.register("password")}
+                      />
+                      {loginForm.formState.errors.password && (
+                        <p className="text-sm text-red-500">
+                          {loginForm.formState.errors.password.message}
+                        </p>
+                      )}
+                    </div>
+                    
+                    <div className="flex justify-end">
+                      <button
+                        type="button"
+                        onClick={() => setActiveView("forgot-password")}
+                        className="text-sm text-primary hover:text-primary/80 hover:underline transition-colors"
+                      >
+                        Forgot password?
+                      </button>
+                    </div>
+                    
                     <Button
                       type="submit"
-                      className="flex-1"
-                      disabled={forgotPasswordMutation.isPending}
+                      className="w-full h-12 text-base font-medium"
+                      disabled={loginMutation.isPending}
                     >
-                      {forgotPasswordMutation.isPending ? (
+                      {loginMutation.isPending ? (
                         <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Sending...
+                          <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                          Signing in...
                         </>
                       ) : (
-                        "Send Reset Link"
+                        "Sign In"
                       )}
                     </Button>
-                  </div>
-                </form>
-              )}
-            </CardContent>
-          </Card>
+                  </form>
+                ) : (
+                  <form onSubmit={forgotPasswordForm.handleSubmit(onForgotPasswordSubmit)} className="space-y-6">
+                    <div className="space-y-2">
+                      <Label htmlFor="email" className="text-sm font-medium text-gray-700">
+                        Email Address
+                      </Label>
+                      <Input
+                        id="email"
+                        type="email"
+                        placeholder="Enter your email address"
+                        className="h-12 text-base"
+                        {...forgotPasswordForm.register("email")}
+                      />
+                      {forgotPasswordForm.formState.errors.email && (
+                        <p className="text-sm text-red-500">
+                          {forgotPasswordForm.formState.errors.email.message}
+                        </p>
+                      )}
+                    </div>
+                    
+                    <div className="flex space-x-3">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="flex-1 h-12 text-base"
+                        onClick={() => setActiveView("login")}
+                      >
+                        Back to Login
+                      </Button>
+                      <Button
+                        type="submit"
+                        className="flex-1 h-12 text-base font-medium"
+                        disabled={forgotPasswordMutation.isPending}
+                      >
+                        {forgotPasswordMutation.isPending ? (
+                          <>
+                            <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                            Sending...
+                          </>
+                        ) : (
+                          "Send Reset Link"
+                        )}
+                      </Button>
+                    </div>
+                  </form>
+                )}
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </div>
     </div>
