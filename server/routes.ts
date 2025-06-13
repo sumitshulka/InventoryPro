@@ -3722,6 +3722,78 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Helper function to calculate item unit values globally
+  async function calculateItemUnitValues(asOfDate: Date) {
+    // Get organization settings to determine valuation method
+    const orgSettings = await db.select().from(organizationSettings).limit(1);
+    const valuationMethod = orgSettings[0]?.inventoryValuationMethod || 'Last Value';
+
+    // Get all check-in transactions up to the as-of date
+    const allCheckInTransactions = await db.select({
+      id: transactions.id,
+      itemId: transactions.itemId,
+      quantity: transactions.quantity,
+      cost: transactions.cost,
+      createdAt: transactions.createdAt,
+    })
+    .from(transactions)
+    .where(
+      and(
+        eq(transactions.transactionType, 'check-in'),
+        lte(transactions.createdAt, asOfDate)
+      )
+    )
+    .orderBy(transactions.itemId, transactions.createdAt);
+
+    // Group check-ins by item
+    const checkInsByItem = new Map();
+    for (const transaction of allCheckInTransactions) {
+      if (!checkInsByItem.has(transaction.itemId)) {
+        checkInsByItem.set(transaction.itemId, []);
+      }
+      checkInsByItem.get(transaction.itemId).push(transaction);
+    }
+
+    // Calculate unit values for each item
+    const itemUnitValues = new Map();
+    for (const [itemId, checkInTransactions] of checkInsByItem.entries()) {
+      if (checkInTransactions.length === 0) continue;
+
+      let unitValue = 0;
+      switch (valuationMethod) {
+        case 'Last Value':
+          const lastTransaction = checkInTransactions[checkInTransactions.length - 1];
+          unitValue = parseFloat(lastTransaction.cost || '0');
+          break;
+
+        case 'Earliest Value':
+          const firstTransaction = checkInTransactions[0];
+          unitValue = parseFloat(firstTransaction.cost || '0');
+          break;
+
+        case 'Average Value':
+          let totalCost = 0;
+          let totalQuantity = 0;
+          for (const transaction of checkInTransactions) {
+            const cost = parseFloat(transaction.cost || '0');
+            if (cost && transaction.quantity) {
+              totalCost += cost * transaction.quantity;
+              totalQuantity += transaction.quantity;
+            }
+          }
+          unitValue = totalQuantity > 0 ? totalCost / totalQuantity : 0;
+          break;
+
+        default:
+          unitValue = 0;
+      }
+
+      itemUnitValues.set(itemId, unitValue);
+    }
+
+    return { itemUnitValues, valuationMethod };
+  }
+
   // Get inventory valuation report
   app.get("/api/reports/inventory-valuation", async (req, res) => {
     try {
@@ -3736,9 +3808,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Set the end of day for the as of date to include all transactions from that day
       asOfDate.setHours(23, 59, 59, 999);
 
-      // Get organization settings to determine valuation method
-      const orgSettings = await db.select().from(organizationSettings).limit(1);
-      const valuationMethod = orgSettings[0]?.inventoryValuationMethod || 'Last Value';
+      // Calculate global item unit values using the shared helper
+      const { itemUnitValues, valuationMethod } = await calculateItemUnitValues(asOfDate);
 
       // Optimized: Get all inventory with item, warehouse, and category details in one query
       const inventoryData = await db.select({
@@ -3776,7 +3847,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Create efficient lookup maps to avoid repeated queries
       const transactionsByItem = new Map();
-      const checkInsByItemWarehouse = new Map();
+      const checkInsByItem = new Map(); // Global check-ins per item (not warehouse-specific)
 
       // Group transactions by item for efficient processing
       for (const transaction of allTransactions) {
@@ -3786,13 +3857,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         transactionsByItem.get(transaction.itemId).push(transaction);
 
-        // Group check-in transactions by item-warehouse combination
+        // Group check-in transactions by item globally (regardless of warehouse)
         if (transaction.transactionType === 'check-in' && transaction.destinationWarehouseId) {
-          const key = `${transaction.itemId}-${transaction.destinationWarehouseId}`;
-          if (!checkInsByItemWarehouse.has(key)) {
-            checkInsByItemWarehouse.set(key, []);
+          if (!checkInsByItem.has(transaction.itemId)) {
+            checkInsByItem.set(transaction.itemId, []);
           }
-          checkInsByItemWarehouse.get(key).push(transaction);
+          checkInsByItem.get(transaction.itemId).push(transaction);
         }
       }
 
@@ -3826,56 +3896,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           continue;
         }
 
-        // Get check-in transactions for this item-warehouse combination (pre-grouped)
-        const checkInKey = `${invItem.itemId}-${invItem.warehouseId}`;
-        const checkInTransactions = checkInsByItemWarehouse.get(checkInKey) || [];
+        // Get the globally calculated unit value for this item
+        const unitValue = itemUnitValues.get(invItem.itemId) || 0;
 
-        if (checkInTransactions.length === 0) {
-          // No check-in transactions, skip this item
+        if (unitValue === 0) {
+          // No valuation available for this item, skip
           continue;
-        }
-
-        let unitValue = 0;
-        let lastCheckInDate = null;
-        let firstCheckInDate = null;
-
-        if (checkInTransactions.length > 0) {
-          firstCheckInDate = checkInTransactions[0].createdAt;
-          lastCheckInDate = checkInTransactions[checkInTransactions.length - 1].createdAt;
-        }
-
-        // Calculate unit value based on valuation method
-        switch (valuationMethod) {
-          case 'Last Value':
-            // Use the cost from the most recent check-in
-            const lastTransaction = checkInTransactions[checkInTransactions.length - 1];
-            unitValue = parseFloat(lastTransaction.cost || '0');
-            break;
-
-          case 'Earliest Value':
-            // Use the cost from the first check-in
-            const firstTransaction = checkInTransactions[0];
-            unitValue = parseFloat(firstTransaction.cost || '0');
-            break;
-
-          case 'Average Value':
-            // Calculate weighted average: total cost / total quantity
-            let totalCost = 0;
-            let totalQuantity = 0;
-            
-            for (const transaction of checkInTransactions) {
-              const cost = parseFloat(transaction.cost || '0');
-              if (cost && transaction.quantity) {
-                totalCost += cost * transaction.quantity;
-                totalQuantity += transaction.quantity;
-              }
-            }
-            
-            unitValue = totalQuantity > 0 ? totalCost / totalQuantity : 0;
-            break;
-
-          default:
-            unitValue = 0;
         }
 
         const totalValue = unitValue * inventoryAsOfDate;
@@ -3891,8 +3917,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           unitValue: unitValue,
           totalValue: totalValue,
           valuationMethod: valuationMethod,
-          lastCheckInDate: lastCheckInDate,
-          firstCheckInDate: firstCheckInDate,
         });
       }
 
