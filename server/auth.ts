@@ -245,20 +245,28 @@ export function setupAuth(app: Express) {
       }
 
       if (emailService) {
-        // Generate proper reset URL for Replit hosting
+        // Generate proper reset URL - prioritize actual request host for custom domains
         const host = req.get('host');
+        const protocol = req.protocol;
         const replitDomain = process.env.REPLIT_DOMAINS;
         
         let baseUrl;
-        if (replitDomain) {
-          // Use Replit domain if available
+        if (host) {
+          // Always prioritize the actual request host (works for custom domains)
+          // Use HTTPS for production domains, follow request protocol otherwise
+          const useHttps = host.includes('.sumits.me') || 
+                          host.includes('.replit.dev') || 
+                          host.includes('.replit.app') || 
+                          host.includes('.repl.co') ||
+                          protocol === 'https';
+          
+          baseUrl = `${useHttps ? 'https' : protocol}://${host}`;
+        } else if (replitDomain) {
+          // Fallback to Replit domain if host is not available
           baseUrl = `https://${replitDomain}`;
-        } else if (host?.includes('.replit.dev') || host?.includes('.replit.app') || host?.includes('.repl.co')) {
-          // Use host if it's a Replit domain
-          baseUrl = `https://${host}`;
         } else {
-          // Fallback to request protocol and host
-          baseUrl = `${req.protocol}://${host}`;
+          // Final fallback
+          baseUrl = `${protocol}://${host || 'localhost:5000'}`;
         }
         
         const resetUrl = `${baseUrl}/reset-password?token=${resetToken}`;
