@@ -246,20 +246,22 @@ export default function Sidebar({ user, isOpen, onClose }: SidebarProps) {
                       <span className="whitespace-nowrap">Notification Center</span>
                     </Link>
                   </li>
-                  <li>
-                    <Link 
-                      href="/my-profile"
-                      className={cn(
-                        "flex items-center px-3 py-2 rounded-md",
-                        isActive("/my-profile") 
-                          ? "bg-primary/10 border-l-4 border-primary text-primary" 
-                          : "text-gray-700 hover:text-primary hover:bg-primary/5"
-                      )}
-                    >
-                      <span className="material-icons mr-3">account_circle</span>
-                      <span className="whitespace-nowrap">My Profile</span>
-                    </Link>
-                  </li>
+                  {(user?.role === 'admin' || user?.role === 'manager') && (
+                    <li>
+                      <Link 
+                        href="/approvals"
+                        className={cn(
+                          "flex items-center px-3 py-2 rounded-md",
+                          isActive("/approvals") 
+                            ? "bg-primary/10 border-l-4 border-primary text-primary" 
+                            : "text-gray-700 hover:text-primary hover:bg-primary/5"
+                        )}
+                      >
+                        <span className="material-icons mr-3">approval</span>
+                        <span className="whitespace-nowrap">Approvals</span>
+                      </Link>
+                    </li>
+                  )}
                 </ul>
               </div>
 
@@ -375,20 +377,7 @@ export default function Sidebar({ user, isOpen, onClose }: SidebarProps) {
                         <span className="whitespace-nowrap">Users</span>
                       </Link>
                     </li>
-                    <li>
-                      <Link 
-                        href="/approvals"
-                        className={cn(
-                          "flex items-center px-3 py-2 rounded-md",
-                          isActive("/approvals") 
-                            ? "bg-primary/10 border-l-4 border-primary text-primary" 
-                            : "text-gray-700 hover:text-primary hover:bg-primary/5"
-                        )}
-                      >
-                        <span className="material-icons mr-3">approval</span>
-                        <span className="whitespace-nowrap">Approvals</span>
-                      </Link>
-                    </li>
+
                     <li>
                       <Link 
                         href="/audit-trail"
@@ -401,6 +390,20 @@ export default function Sidebar({ user, isOpen, onClose }: SidebarProps) {
                       >
                         <span className="material-icons mr-3">fact_check</span>
                         <span className="whitespace-nowrap">Audit Trail</span>
+                      </Link>
+                    </li>
+                    <li>
+                      <Link 
+                        href="/my-profile"
+                        className={cn(
+                          "flex items-center px-3 py-2 rounded-md",
+                          isActive("/my-profile") 
+                            ? "bg-primary/10 border-l-4 border-primary text-primary" 
+                            : "text-gray-700 hover:text-primary hover:bg-primary/5"
+                        )}
+                      >
+                        <span className="material-icons mr-3">account_circle</span>
+                        <span className="whitespace-nowrap">My Profile</span>
                       </Link>
                     </li>
                   </ul>
