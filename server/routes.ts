@@ -2702,7 +2702,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Cannot dispose more than available quantity" });
       }
 
-      // Create a disposal transfer
+      // Create a disposal transfer with transfer code
+      const transferCode = `DISP-${Date.now()}`;
       const disposalTransfer = await storage.createTransfer({
         sourceWarehouseId: inventory.warehouseId,
         destinationWarehouseId: inventory.warehouseId, // Same warehouse for disposal
@@ -2715,6 +2716,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         notes: `Direct disposal from inventory by admin: ${user.name}`,
       });
 
+      // Update transfer with the generated code
+      await storage.updateTransfer(disposalTransfer.id, { 
+        notes: `${transferCode} - Direct disposal from inventory by admin: ${user.name}` 
+      });
+
       // Create transfer item
       await storage.createTransferItem({
         transferId: disposalTransfer.id,
@@ -2722,6 +2728,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         requestedQuantity: quantity,
         approvedQuantity: quantity,
         actualQuantity: quantity
+      });
+
+      // Create disposal transaction for movement history
+      await storage.createTransaction({
+        transactionType: "disposal",
+        itemId: inventory.itemId,
+        quantity: quantity,
+        sourceWarehouseId: inventory.warehouseId,
+        destinationWarehouseId: inventory.warehouseId, // Use same warehouse for disposal
+        userId: user.id,
+        status: "completed",
+        notes: `${transferCode} - Disposal: ${disposalReason}`,
+        completedAt: new Date()
       });
 
       // Update inventory quantity
@@ -2770,17 +2789,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         for (const transferItem of transferItems) {
           const item = await storage.getItem(transferItem.itemId);
           const warehouse = await storage.getWarehouse(transfer.destinationWarehouseId);
+          const approvedByUser = transfer.approvedBy ? await storage.getUser(transfer.approvedBy) : null;
           
           disposedItems.push({
             transferId: transfer.id,
-            transferCode: transfer.transferCode,
+            transferCode: transfer.transferCode || `DISP-${transfer.id}`,
             itemId: transferItem.itemId,
             item,
             warehouse,
             warehouseId: transfer.destinationWarehouseId,
-            quantity: transferItem.requestedQuantity,
+            quantity: transferItem.actualQuantity || transferItem.requestedQuantity,
             disposalDate: transfer.disposalDate,
-            disposalReason: transfer.disposalReason
+            disposalReason: transfer.disposalReason,
+            approvedBy: approvedByUser?.name || 'System',
+            approvedById: transfer.approvedBy
           });
         }
       }

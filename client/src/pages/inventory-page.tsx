@@ -131,18 +131,24 @@ export default function InventoryPage() {
   const disposeInventoryMutation = useMutation({
     mutationFn: async (data: DisposalFormValues) => {
       const res = await apiRequest("POST", "/api/inventory/dispose", {
-        inventoryId: disposalItem.id,
+        inventoryId: disposalItem?.id,
         quantity: parseInt(data.quantity),
         disposalReason: data.disposalReason,
       });
       return res.json();
     },
     onSuccess: () => {
+      // Comprehensive refresh pattern like warehouse movements
       queryClient.invalidateQueries({ queryKey: ["/api/reports/inventory-stock"] });
       queryClient.invalidateQueries({ queryKey: ["/api/disposed-inventory"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/reports/inventory-movement"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/summary"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/warehouses/stats"] });
+      
       toast({
-        title: "Inventory disposed",
-        description: "The inventory has been disposed successfully.",
+        title: "Success",
+        description: "Inventory disposed successfully",
       });
       disposalForm.reset();
       setIsDisposalDialogOpen(false);
@@ -151,7 +157,7 @@ export default function InventoryPage() {
     onError: (error: Error) => {
       toast({
         title: "Error",
-        description: error.message,
+        description: error.message || "Failed to dispose inventory",
         variant: "destructive",
       });
     },
