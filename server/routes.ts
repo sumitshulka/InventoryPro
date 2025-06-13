@@ -1239,6 +1239,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 await storage.createTransaction({
                   itemId: requestItem.itemId,
                   quantity: requestItem.quantity,
+                  transactionCode: trxCode,
                   transactionType: "transfer",
                   sourceWarehouseId: warehouse.id,
                   destinationWarehouseId: request.warehouseId,
@@ -1270,6 +1271,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             await storage.createTransaction({
               itemId: requestItem.itemId,
               quantity: requestItem.quantity,
+              transactionCode: issueCode,
               transactionType: "issue",
               sourceWarehouseId: request.warehouseId,
               requestId: request.id,

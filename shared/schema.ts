@@ -254,12 +254,10 @@ export const transactions = pgTable("transactions", {
 export const insertTransactionSchema = createInsertSchema(transactions)
   .omit({
     id: true,
-    transactionCode: true,
     createdAt: true,
     completedAt: true,
   })
   .extend({
-    userId: z.number().optional(),
     cost: z.preprocess((arg) => {
       if (typeof arg === 'number') return arg.toString();
       return arg;
@@ -307,7 +305,6 @@ export const requests = pgTable("requests", {
 
 export const insertRequestSchema = createInsertSchema(requests).omit({
   id: true,
-  requestCode: true,
   createdAt: true,
   updatedAt: true,
 });
@@ -445,7 +442,6 @@ export const transfers = pgTable("transfers", {
 
 export const insertTransferSchema = createInsertSchema(transfers).omit({
   id: true,
-  transferCode: true,
   createdAt: true,
   updatedAt: true,
 }).extend({
