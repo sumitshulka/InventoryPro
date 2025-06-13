@@ -263,6 +263,9 @@ export function setupAuth(app: Express) {
         
         const resetUrl = `${baseUrl}/reset-password?token=${resetToken}`;
         
+        console.log(`Attempting to send reset email to: ${user.email}`);
+        console.log(`Reset URL generated: ${resetUrl}`);
+        
         const emailSent = await emailService.sendEmail({
           to: user.email,
           subject: 'Password Reset Request',
@@ -285,8 +288,11 @@ This link will expire in 1 hour.
 If you didn't request this reset, please ignore this email.`
         });
 
+        console.log(`Email send result: ${emailSent}`);
         if (!emailSent) {
           console.error("Failed to send password reset email");
+        } else {
+          console.log("Password reset email sent successfully");
         }
       } else {
         console.error("Email service not configured");
