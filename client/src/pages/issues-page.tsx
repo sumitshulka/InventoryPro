@@ -170,15 +170,48 @@ export default function IssuesPage() {
 
   const { data: issues = [], isLoading } = useQuery({
     queryKey: ['/api/issues'],
-    queryFn: () => fetch('/api/issues').then(res => res.json()).catch(() => [])
+    queryFn: async () => {
+      try {
+        const res = await fetch('/api/issues');
+        if (!res.ok) {
+          console.warn('Issues API returned error:', res.status);
+          return [];
+        }
+        const data = await res.json();
+        return Array.isArray(data) ? data : [];
+      } catch (error) {
+        console.warn('Issues API error:', error);
+        return [];
+      }
+    }
   });
 
   const { data: warehouses = [] } = useQuery({
     queryKey: ['/api/warehouses'],
+    queryFn: async () => {
+      try {
+        const res = await fetch('/api/warehouses');
+        if (!res.ok) return [];
+        const data = await res.json();
+        return Array.isArray(data) ? data : [];
+      } catch (error) {
+        return [];
+      }
+    }
   });
 
   const { data: items = [] } = useQuery({
     queryKey: ['/api/items'],
+    queryFn: async () => {
+      try {
+        const res = await fetch('/api/items');
+        if (!res.ok) return [];
+        const data = await res.json();
+        return Array.isArray(data) ? data : [];
+      } catch (error) {
+        return [];
+      }
+    }
   });
 
   const { data: users = [] } = useQuery({
@@ -197,7 +230,20 @@ export default function IssuesPage() {
   // Notification queries
   const { data: notifications = [], isLoading: notificationsLoading } = useQuery({
     queryKey: ['/api/notifications'],
-    queryFn: () => fetch('/api/notifications').then(res => res.json()).catch(() => [])
+    queryFn: async () => {
+      try {
+        const res = await fetch('/api/notifications');
+        if (!res.ok) {
+          console.warn('Notifications API returned error:', res.status);
+          return [];
+        }
+        const data = await res.json();
+        return Array.isArray(data) ? data : [];
+      } catch (error) {
+        console.warn('Notifications API error:', error);
+        return [];
+      }
+    }
   });
 
   const { data: unreadCount = 0 } = useQuery({
@@ -432,14 +478,14 @@ export default function IssuesPage() {
     },
   });
 
-  const filteredIssues = issues.filter((issue: Issue) => {
+  const filteredIssues = Array.isArray(issues) ? issues.filter((issue: Issue) => {
     if (searchTerm && !issue.title.toLowerCase().includes(searchTerm.toLowerCase()) &&
         !issue.description.toLowerCase().includes(searchTerm.toLowerCase())) return false;
     if (categoryFilter !== "all" && issue.category !== categoryFilter) return false;
     if (priorityFilter !== "all" && issue.priority !== priorityFilter) return false;
     if (statusFilter !== "all" && issue.status !== statusFilter) return false;
     return true;
-  });
+  }) : [];
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
@@ -791,9 +837,11 @@ export default function IssuesPage() {
                 <Button 
                   variant="outline" 
                   onClick={() => {
-                    notifications.filter((n: Notification) => n.status === 'unread').forEach((n: Notification) => {
-                      markAsReadMutation.mutate(n.id);
-                    });
+                    if (Array.isArray(notifications)) {
+                      notifications.filter((n: Notification) => n.status === 'unread').forEach((n: Notification) => {
+                        markAsReadMutation.mutate(n.id);
+                      });
+                    }
                   }}
                   disabled={unreadCount === 0}
                 >
@@ -1028,7 +1076,7 @@ export default function IssuesPage() {
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              {warehouses.map((warehouse: any) => (
+                              {Array.isArray(warehouses) && warehouses.map((warehouse: any) => (
                                 <SelectItem key={warehouse.id} value={warehouse.id.toString()}>
                                   {warehouse.name}
                                 </SelectItem>

@@ -4690,7 +4690,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       relevantItems.forEach(item => {
         const itemTransactions = allTransactions
-          .filter(t => t.itemId === item.id && t.rate && t.rate > 0)
+          .filter(t => t.itemId === item.id && t.rate && Number(t.rate) > 0)
           .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
         
         if (itemTransactions.length >= 2) {
@@ -4706,20 +4706,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
           let endPrice = 0;
           
           if (startPeriodTransactions.length > 0) {
-            startPrice = startPeriodTransactions[startPeriodTransactions.length - 1].rate;
+            startPrice = Number(startPeriodTransactions[startPeriodTransactions.length - 1].rate);
           } else {
-            startPrice = itemTransactions[0].rate;
+            startPrice = Number(itemTransactions[0].rate);
           }
           
           if (endPeriodTransactions.length > 0) {
-            endPrice = endPeriodTransactions[endPeriodTransactions.length - 1].rate;
+            endPrice = Number(endPeriodTransactions[endPeriodTransactions.length - 1].rate);
           } else {
-            endPrice = itemTransactions[itemTransactions.length - 1].rate;
+            endPrice = Number(itemTransactions[itemTransactions.length - 1].rate);
           }
           
-          const minPrice = Math.min(...itemTransactions.map(t => t.rate));
-          const maxPrice = Math.max(...itemTransactions.map(t => t.rate));
-          const avgPrice = itemTransactions.reduce((sum, t) => sum + t.rate, 0) / itemTransactions.length;
+          const rates = itemTransactions.map(t => Number(t.rate)).filter(rate => !isNaN(rate));
+          const minPrice = Math.min(...rates);
+          const maxPrice = Math.max(...rates);
+          const avgPrice = rates.reduce((sum, rate) => sum + rate, 0) / rates.length;
           const priceChange = endPrice - startPrice;
           const variationPercent = startPrice > 0 ? 
             Math.round(((maxPrice - minPrice) / minPrice) * 100) : 0;
