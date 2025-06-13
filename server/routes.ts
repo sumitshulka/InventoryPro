@@ -2705,6 +2705,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Create a disposal transfer with transfer code
       const transferCode = `DISP-${Date.now()}`;
       const disposalTransfer = await storage.createTransfer({
+        transferCode,
         sourceWarehouseId: inventory.warehouseId,
         destinationWarehouseId: inventory.warehouseId, // Same warehouse for disposal
         initiatedBy: user.id,
@@ -2732,6 +2733,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Create disposal transaction for movement history
       await storage.createTransaction({
+        transactionCode: `TXN-${transferCode}`,
         transactionType: "disposal",
         itemId: inventory.itemId,
         quantity: quantity,
@@ -2739,7 +2741,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         destinationWarehouseId: inventory.warehouseId, // Use same warehouse for disposal
         userId: user.id,
         status: "completed",
-        notes: `${transferCode} - Disposal: ${disposalReason}`,
         completedAt: new Date()
       });
 
