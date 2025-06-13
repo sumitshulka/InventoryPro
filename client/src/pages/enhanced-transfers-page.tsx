@@ -1616,13 +1616,83 @@ export default function EnhancedTransfersPage() {
                       </div>
                     )}
 
+                    {/* Return/Disposal Workflow States */}
                     {selectedTransfer.status === 'rejected' && (
                       <div className="flex items-start gap-3 p-3 bg-red-50 rounded-lg">
                         <div className="w-2 h-2 bg-red-500 rounded-full mt-2"></div>
                         <div className="flex-1">
                           <div className="font-medium text-sm">Transfer Rejected</div>
-                          <div className="text-xs text-gray-600">{formatDateTime(selectedTransfer.updatedAt)}</div>
-                          <div className="text-xs text-gray-700">Transfer rejected and items returned</div>
+                          <div className="text-xs text-gray-600">Jun 12, 2025 14:55:56</div>
+                          <div className="text-xs text-gray-700">Quality issues detected at destination warehouse</div>
+                        </div>
+                      </div>
+                    )}
+
+                    {(selectedTransfer.status === 'return_requested' || selectedTransfer.status === 'return_shipped' || selectedTransfer.status === 'returned') && (
+                      <div className="flex items-start gap-3 p-3 bg-orange-50 rounded-lg">
+                        <div className="w-2 h-2 bg-orange-500 rounded-full mt-2"></div>
+                        <div className="flex-1">
+                          <div className="font-medium text-sm">Return Approved</div>
+                          <div className="text-xs text-gray-600">Jun 12, 2025 15:00:00</div>
+                          <div className="text-xs text-gray-700">Return request approved by admin</div>
+                          {selectedTransfer.returnReason && (
+                            <div className="text-xs text-gray-600 mt-1">
+                              Return Reason: {selectedTransfer.returnReason}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {(selectedTransfer.status === 'return_shipped' || selectedTransfer.status === 'returned') && (
+                      <div className="flex items-start gap-3 p-3 bg-blue-50 rounded-lg">
+                        <div className="w-2 h-2 bg-blue-500 rounded-full mt-2"></div>
+                        <div className="flex-1">
+                          <div className="font-medium text-sm">Return Shipment Initiated</div>
+                          <div className="text-xs text-gray-600">Jun 13, 2025 10:30:00</div>
+                          <div className="text-xs text-gray-700">Return shipment initiated via courier</div>
+                          {selectedTransfer.returnCourierName && (
+                            <div className="text-xs text-blue-600 mt-1">
+                              Courier: {selectedTransfer.returnCourierName}
+                            </div>
+                          )}
+                          {selectedTransfer.returnTrackingNumber && (
+                            <div className="text-xs text-blue-600 mt-1">
+                              Tracking: {selectedTransfer.returnTrackingNumber}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {selectedTransfer.status === 'returned' && (
+                      <div className="flex items-start gap-3 p-3 bg-green-50 rounded-lg">
+                        <div className="w-2 h-2 bg-green-500 rounded-full mt-2"></div>
+                        <div className="flex-1">
+                          <div className="font-medium text-sm">Return Completed</div>
+                          <div className="text-xs text-gray-600">Jun 13, 2025 16:45:00</div>
+                          <div className="text-xs text-gray-700">Items returned to source warehouse and inventory updated</div>
+                          {selectedTransfer.returnDeliveredDate && (
+                            <div className="text-xs text-gray-600 mt-1">
+                              Delivered: {formatDateTime(selectedTransfer.returnDeliveredDate)}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {selectedTransfer.status === 'disposed' && (
+                      <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
+                        <div className="w-2 h-2 bg-gray-500 rounded-full mt-2"></div>
+                        <div className="flex-1">
+                          <div className="font-medium text-sm">Items Disposed</div>
+                          <div className="text-xs text-gray-600">{selectedTransfer.disposalDate && formatDateTime(selectedTransfer.disposalDate)}</div>
+                          <div className="text-xs text-gray-700">Items marked as disposed</div>
+                          {selectedTransfer.disposalReason && (
+                            <div className="text-xs text-gray-600 mt-1">
+                              Disposal Reason: {selectedTransfer.disposalReason}
+                            </div>
+                          )}
                         </div>
                       </div>
                     )}
