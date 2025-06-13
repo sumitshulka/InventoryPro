@@ -92,10 +92,16 @@ export default function RejectedGoodsPage() {
 
   const approveDisposalMutation = useMutation({
     mutationFn: async ({ transferId, disposalReason }: { transferId: number; disposalReason: string }) => {
-      return apiRequest(`/api/transfers/${transferId}/approve-disposal`, {
+      const response = await fetch(`/api/transfers/${transferId}/approve-disposal`, {
         method: 'POST',
-        body: { disposalReason },
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ disposalReason }),
       });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to approve disposal');
+      }
+      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/rejected-goods'] });
@@ -204,7 +210,6 @@ export default function RejectedGoodsPage() {
     switch (action) {
       case 'dispose': return 'Dispose Item';
       case 'return': return 'Return to Source';
-      case 'restock': return 'Restock Item';
       default: return 'Update Status';
     }
   };
@@ -213,7 +218,6 @@ export default function RejectedGoodsPage() {
     switch (action) {
       case 'dispose': return 'Mark this item as disposed. This action cannot be undone.';
       case 'return': return 'Return this item to the source warehouse for further processing.';
-      case 'restock': return 'Restock this item back into warehouse inventory if condition allows.';
       default: return 'Update the status of this rejected item.';
     }
   };
@@ -298,16 +302,7 @@ export default function RejectedGoodsPage() {
                                 <Button
                                   variant="outline"
                                   size="sm"
-                                  onClick={() => handleAction(item, 'restock')}
-                                  className="text-green-600"
-                                >
-                                  <Package className="h-3 w-3 mr-1" />
-                                  Restock
-                                </Button>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => handleAction(item, 'return')}
+                                  onClick={() => handleActionDialog(item, 'return')}
                                   className="text-blue-600"
                                 >
                                   <RefreshCw className="h-3 w-3 mr-1" />
@@ -316,7 +311,7 @@ export default function RejectedGoodsPage() {
                                 <Button
                                   variant="outline"
                                   size="sm"
-                                  onClick={() => handleAction(item, 'dispose')}
+                                  onClick={() => handleActionDialog(item, 'dispose')}
                                   className="text-red-600"
                                 >
                                   <AlertTriangle className="h-3 w-3 mr-1" />
@@ -463,11 +458,11 @@ export default function RejectedGoodsPage() {
               </Button>
               <Button
                 type="button"
-                onClick={handleStatusUpdate}
-                disabled={updateStatusMutation.isPending}
+                onClick={handleAction}
+                disabled={approveReturnMutation.isPending || approveDisposalMutation.isPending || !actionNotes.trim()}
                 variant={actionType === 'dispose' ? 'destructive' : 'default'}
               >
-                {updateStatusMutation.isPending ? 'Processing...' : `Confirm ${getActionTitle(actionType)}`}
+                {(approveReturnMutation.isPending || approveDisposalMutation.isPending) ? 'Processing...' : `Confirm ${getActionTitle(actionType)}`}
               </Button>
             </DialogFooter>
           </DialogContent>
