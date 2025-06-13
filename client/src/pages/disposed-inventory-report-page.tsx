@@ -21,8 +21,8 @@ export default function DisposedInventoryReportPage() {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("summary");
   const [filters, setFilters] = useState({
-    warehouseId: "",
-    itemId: "",
+    warehouseId: "all",
+    itemId: "all",
     dateFrom: "",
     dateTo: "",
     disposalReason: ""
@@ -34,7 +34,7 @@ export default function DisposedInventoryReportPage() {
     queryFn: async () => {
       const params = new URLSearchParams();
       Object.entries(filters).forEach(([key, value]) => {
-        if (value) params.append(key, value);
+        if (value && value !== "all") params.append(key, value);
       });
       
       const response = await fetch(`/api/disposed-inventory?${params}`);
@@ -91,8 +91,8 @@ export default function DisposedInventoryReportPage() {
 
   const clearFilters = () => {
     setFilters({
-      warehouseId: "",
-      itemId: "",
+      warehouseId: "all",
+      itemId: "all",
       dateFrom: "",
       dateTo: "",
       disposalReason: ""
@@ -188,7 +188,7 @@ export default function DisposedInventoryReportPage() {
                     <SelectValue placeholder="All warehouses" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">All warehouses</SelectItem>
+                    <SelectItem value="all">All warehouses</SelectItem>
                     {warehouses?.map((warehouse: any) => (
                       <SelectItem key={warehouse.id} value={warehouse.id.toString()}>
                         {warehouse.name}
@@ -205,7 +205,7 @@ export default function DisposedInventoryReportPage() {
                     <SelectValue placeholder="All items" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">All items</SelectItem>
+                    <SelectItem value="all">All items</SelectItem>
                     {items?.map((item: any) => (
                       <SelectItem key={item.id} value={item.id.toString()}>
                         {item.name} ({item.sku})

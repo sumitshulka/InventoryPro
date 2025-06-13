@@ -1976,7 +1976,7 @@ export default function SettingsPage() {
                   <SelectValue placeholder="Select a manager (optional)" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">No manager assigned</SelectItem>
+                  <SelectItem value="none">No manager assigned</SelectItem>
                   {users && Array.isArray(users) && users.map((user: any) => (
                     <SelectItem key={user.id} value={user.id.toString()}>
                       {user.name} ({user.role})
