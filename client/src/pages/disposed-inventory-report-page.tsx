@@ -56,6 +56,7 @@ export default function DisposedInventoryReportPage() {
   });
 
   const baseCurrency = organizationSettings?.baseCurrency || "USD";
+  const currencySymbol = getCurrencySymbol(baseCurrency);
 
   // Calculate summary statistics
   const summaryStats = disposedItems?.reduce((acc: any, item: any) => {
@@ -288,7 +289,7 @@ export default function DisposedInventoryReportPage() {
                     <CalendarIcon className="h-4 w-4 text-muted-foreground" />
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold">{formatCurrencyFull(summaryStats.totalValue, baseCurrency)}</div>
+                    <div className="text-2xl font-bold">{formatCurrencyFull(summaryStats.totalValue, currencySymbol)}</div>
                     <p className="text-xs text-muted-foreground">
                       Estimated market value
                     </p>
@@ -302,7 +303,7 @@ export default function DisposedInventoryReportPage() {
                   </CardHeader>
                   <CardContent>
                     <div className="text-2xl font-bold">
-                      {formatCurrencyFull(summaryStats.totalItems > 0 ? summaryStats.totalValue / summaryStats.totalItems : 0, baseCurrency)}
+                      {formatCurrencyFull(summaryStats.totalItems > 0 ? summaryStats.totalValue / summaryStats.totalItems : 0, currencySymbol)}
                     </div>
                     <p className="text-xs text-muted-foreground">
                       Per disposed item
@@ -345,7 +346,7 @@ export default function DisposedInventoryReportPage() {
                         <TableRow key={warehouseId}>
                           <TableCell className="font-medium">{data.name}</TableCell>
                           <TableCell>{data.quantity}</TableCell>
-                          <TableCell>{formatCurrencyFull(data.value, baseCurrency)}</TableCell>
+                          <TableCell>{formatCurrencyFull(data.value, currencySymbol)}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -409,8 +410,8 @@ export default function DisposedInventoryReportPage() {
                                   </div>
                                 </TableCell>
                                 <TableCell>{item.quantity}</TableCell>
-                                <TableCell>{formatCurrencyFull(item.item?.rate || 0, baseCurrency)}</TableCell>
-                                <TableCell>{formatCurrencyFull((item.quantity * (item.item?.rate || 0)), baseCurrency)}</TableCell>
+                                <TableCell>{formatCurrencyFull(item.item?.rate || 0, currencySymbol)}</TableCell>
+                                <TableCell>{formatCurrencyFull((item.quantity * (item.item?.rate || 0)), currencySymbol)}</TableCell>
                                 <TableCell>
                                   {item.disposalDate ? new Date(item.disposalDate).toLocaleDateString() : 'N/A'}
                                 </TableCell>
@@ -455,7 +456,7 @@ export default function DisposedInventoryReportPage() {
                         <TableRow key={reason}>
                           <TableCell className="font-medium">{reason}</TableCell>
                           <TableCell>{data.quantity}</TableCell>
-                          <TableCell>{formatCurrencyFull(data.value, baseCurrency)}</TableCell>
+                          <TableCell>{formatCurrencyFull(data.value, currencySymbol)}</TableCell>
                           <TableCell>
                             {((data.value / summaryStats.totalValue) * 100).toFixed(1)}%
                           </TableCell>
