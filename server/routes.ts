@@ -4378,6 +4378,323 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Analytics API endpoints
+  
+  // Fastest Moving Items Analytics
+  app.get("/api/analytics/fastest-moving", async (req, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const { startDate, endDate, departmentId, warehouseId } = req.query;
+      
+      // Get transactions within date range
+      const allTransactions = await storage.getAllTransactions();
+      const filteredTransactions = allTransactions.filter(txn => {
+        const txnDate = new Date(txn.createdAt || '');
+        const start = new Date(startDate as string);
+        const end = new Date(endDate as string);
+        
+        let matchesDate = txnDate >= start && txnDate <= end;
+        let matchesDept = !departmentId || departmentId === 'all';
+        let matchesWarehouse = !warehouseId || warehouseId === 'all' || 
+          txn.sourceWarehouseId === parseInt(warehouseId as string) || 
+          txn.destinationWarehouseId === parseInt(warehouseId as string);
+        
+        return matchesDate && matchesDept && matchesWarehouse;
+      });
+
+      // Group by item and calculate movement frequency
+      const itemMovements = new Map();
+      const allItems = await storage.getAllItems();
+      
+      filteredTransactions.forEach(txn => {
+        const item = allItems.find(i => i.id === txn.itemId);
+        if (!item) return;
+        
+        if (!itemMovements.has(txn.itemId)) {
+          itemMovements.set(txn.itemId, {
+            itemId: txn.itemId,
+            name: item.name,
+            sku: item.sku,
+            movementCount: 0,
+            totalQuantity: 0
+          });
+        }
+        
+        const movement = itemMovements.get(txn.itemId);
+        movement.movementCount++;
+        movement.totalQuantity += txn.quantity;
+      });
+
+      // Calculate turnover rates and sort
+      const fastestMoving = Array.from(itemMovements.values()).map(item => ({
+        ...item,
+        turnoverRate: Math.round((item.movementCount / (filteredTransactions.length || 1)) * 100)
+      })).sort((a, b) => b.movementCount - a.movementCount);
+
+      res.json(fastestMoving);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Most Ordered Items Analytics
+  app.get("/api/analytics/most-ordered", async (req, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const { startDate, endDate, departmentId, warehouseId } = req.query;
+      
+      const allRequests = await storage.getAllRequests();
+      const allRequestItems = [];
+      
+      for (const request of allRequests) {
+        const items = await storage.getRequestItemsByRequest(request.id);
+        items.forEach(item => allRequestItems.push({ ...item, request }));
+      }
+
+      // Filter by date range and other criteria
+      const filteredItems = allRequestItems.filter(item => {
+        const reqDate = new Date(item.request.createdAt || '');
+        const start = new Date(startDate as string);
+        const end = new Date(endDate as string);
+        
+        let matchesDate = reqDate >= start && reqDate <= end;
+        let matchesDept = !departmentId || departmentId === 'all' || item.request.userId;
+        let matchesWarehouse = !warehouseId || warehouseId === 'all';
+        
+        return matchesDate && matchesDept && matchesWarehouse;
+      });
+
+      // Group by item
+      const itemOrders = new Map();
+      const allItems = await storage.getAllItems();
+      
+      filteredItems.forEach(reqItem => {
+        const item = allItems.find(i => i.id === reqItem.itemId);
+        if (!item) return;
+        
+        if (!itemOrders.has(reqItem.itemId)) {
+          itemOrders.set(reqItem.itemId, {
+            itemId: reqItem.itemId,
+            name: item.name,
+            sku: item.sku,
+            orderCount: 0,
+            totalQuantity: 0
+          });
+        }
+        
+        const order = itemOrders.get(reqItem.itemId);
+        order.orderCount++;
+        order.totalQuantity += reqItem.quantity;
+      });
+
+      const mostOrdered = Array.from(itemOrders.values())
+        .sort((a, b) => b.orderCount - a.orderCount);
+
+      res.json(mostOrdered);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Department Consumption Analytics
+  app.get("/api/analytics/department-consumption", async (req, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const { startDate, endDate, warehouseId } = req.query;
+      
+      const allRequests = await storage.getAllRequests();
+      const allUsers = await storage.getAllUsers();
+      const allDepartments = await storage.getAllDepartments();
+      
+      // Filter requests by date
+      const filteredRequests = allRequests.filter(req => {
+        const reqDate = new Date(req.createdAt || '');
+        const start = new Date(startDate as string);
+        const end = new Date(endDate as string);
+        return reqDate >= start && reqDate <= end;
+      });
+
+      // Group by department
+      const deptConsumption = new Map();
+      
+      for (const request of filteredRequests) {
+        const user = allUsers.find(u => u.id === request.userId);
+        const dept = user ? allDepartments.find(d => d.id === user.departmentId) : null;
+        
+        if (!dept) continue;
+        
+        if (!deptConsumption.has(dept.id)) {
+          deptConsumption.set(dept.id, {
+            id: dept.id,
+            name: dept.name,
+            requestCount: 0,
+            totalValue: 0,
+            avgValue: 0
+          });
+        }
+        
+        const consumption = deptConsumption.get(dept.id);
+        consumption.requestCount++;
+        
+        // Calculate request value (simplified)
+        const requestItems = await storage.getRequestItemsByRequest(request.id);
+        const requestValue = requestItems.reduce((sum, item) => sum + (item.quantity * 10), 0); // Using estimated value
+        consumption.totalValue += requestValue;
+      }
+
+      // Calculate averages
+      const departmentData = Array.from(deptConsumption.values()).map(dept => ({
+        ...dept,
+        avgValue: dept.requestCount > 0 ? dept.totalValue / dept.requestCount : 0
+      })).sort((a, b) => b.totalValue - a.totalValue);
+
+      res.json(departmentData);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // User Request Analysis
+  app.get("/api/analytics/user-requests", async (req, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const { startDate, endDate, departmentId, warehouseId } = req.query;
+      
+      const allRequests = await storage.getAllRequests();
+      const allUsers = await storage.getAllUsers();
+      const allDepartments = await storage.getAllDepartments();
+      
+      // Filter by date range
+      const filteredRequests = allRequests.filter(req => {
+        const reqDate = new Date(req.createdAt || '');
+        const start = new Date(startDate as string);
+        const end = new Date(endDate as string);
+        return reqDate >= start && reqDate <= end;
+      });
+
+      // Group by user
+      const userAnalysis = new Map();
+      
+      filteredRequests.forEach(request => {
+        const user = allUsers.find(u => u.id === request.userId);
+        if (!user) return;
+        
+        const dept = allDepartments.find(d => d.id === user.departmentId);
+        
+        if (!userAnalysis.has(user.id)) {
+          userAnalysis.set(user.id, {
+            userId: user.id,
+            userName: user.name,
+            departmentName: dept?.name || 'Unknown',
+            requestCount: 0,
+            approvedCount: 0,
+            rejectedCount: 0,
+            pendingCount: 0,
+            approvalRate: 0
+          });
+        }
+        
+        const analysis = userAnalysis.get(user.id);
+        analysis.requestCount++;
+        
+        switch (request.status) {
+          case 'approved':
+            analysis.approvedCount++;
+            break;
+          case 'rejected':
+            analysis.rejectedCount++;
+            break;
+          default:
+            analysis.pendingCount++;
+        }
+      });
+
+      // Calculate approval rates
+      const userRequestData = Array.from(userAnalysis.values()).map(user => ({
+        ...user,
+        approvalRate: user.requestCount > 0 ? Math.round((user.approvedCount / user.requestCount) * 100) : 0
+      })).sort((a, b) => b.requestCount - a.requestCount);
+
+      res.json(userRequestData);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Price Variation Analysis
+  app.get("/api/analytics/price-variation", async (req, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const { startDate, endDate, warehouseId } = req.query;
+      
+      const allTransactions = await storage.getAllTransactions();
+      const allItems = await storage.getAllItems();
+      
+      // Filter transactions by date
+      const filteredTransactions = allTransactions.filter(txn => {
+        const txnDate = new Date(txn.createdAt || '');
+        const start = new Date(startDate as string);
+        const end = new Date(endDate as string);
+        return txnDate >= start && txnDate <= end && txn.unitPrice;
+      });
+
+      // Group by item and analyze price variations
+      const priceAnalysis = new Map();
+      
+      filteredTransactions.forEach(txn => {
+        const item = allItems.find(i => i.id === txn.itemId);
+        if (!item || !txn.unitPrice) return;
+        
+        if (!priceAnalysis.has(txn.itemId)) {
+          priceAnalysis.set(txn.itemId, {
+            itemId: txn.itemId,
+            itemName: item.name,
+            sku: item.sku,
+            prices: [],
+            minPrice: txn.unitPrice,
+            maxPrice: txn.unitPrice,
+            avgPrice: 0,
+            variationPercent: 0
+          });
+        }
+        
+        const analysis = priceAnalysis.get(txn.itemId);
+        analysis.prices.push(txn.unitPrice);
+        analysis.minPrice = Math.min(analysis.minPrice, txn.unitPrice);
+        analysis.maxPrice = Math.max(analysis.maxPrice, txn.unitPrice);
+      });
+
+      // Calculate averages and variations
+      const priceVariationData = Array.from(priceAnalysis.values()).map(item => {
+        const sum = item.prices.reduce((a, b) => a + b, 0);
+        item.avgPrice = item.prices.length > 0 ? sum / item.prices.length : 0;
+        item.variationPercent = item.minPrice > 0 ? 
+          Math.round(((item.maxPrice - item.minPrice) / item.minPrice) * 100) : 0;
+        delete item.prices; // Remove prices array from response
+        return item;
+      }).sort((a, b) => b.variationPercent - a.variationPercent);
+
+      res.json(priceVariationData);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
