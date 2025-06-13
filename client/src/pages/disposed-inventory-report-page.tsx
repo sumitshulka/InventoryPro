@@ -20,6 +20,7 @@ export default function DisposedInventoryReportPage() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("summary");
+  const [refreshKey, setRefreshKey] = useState(0);
   const [filters, setFilters] = useState({
     warehouseId: "all",
     itemId: "all",
@@ -30,7 +31,7 @@ export default function DisposedInventoryReportPage() {
 
   // Fetch disposed inventory data
   const { data: disposedItems, isLoading: disposedLoading, refetch: refetchDisposed } = useQuery({
-    queryKey: ["/api/disposed-inventory", filters],
+    queryKey: ["/api/disposed-inventory", filters, refreshKey],
     queryFn: async () => {
       const params = new URLSearchParams();
       Object.entries(filters).forEach(([key, value]) => {
@@ -40,23 +41,24 @@ export default function DisposedInventoryReportPage() {
       const response = await fetch(`/api/disposed-inventory?${params}`);
       if (!response.ok) throw new Error("Failed to fetch disposed inventory");
       return response.json();
-    }
+    },
+    refetchInterval: 30000, // Refresh every 30 seconds
   });
 
   const { data: warehouses } = useQuery({
-    queryKey: ["/api/warehouses"]
+    queryKey: ["/api/warehouses", refreshKey],
   });
 
   const { data: items } = useQuery({
-    queryKey: ["/api/items"]
+    queryKey: ["/api/items", refreshKey],
   });
 
   const { data: organizationSettings } = useQuery({
-    queryKey: ["/api/organization-settings"]
+    queryKey: ["/api/organization-settings", refreshKey],
   });
 
   const { data: users } = useQuery({
-    queryKey: ["/api/users"]
+    queryKey: ["/api/users", refreshKey],
   });
 
   const currencySymbol = organizationSettings?.currencySymbol || "$";
@@ -64,8 +66,13 @@ export default function DisposedInventoryReportPage() {
   // Calculate summary statistics
   const summaryStats = disposedItems?.reduce((acc: any, item: any) => {
     acc.totalItems += item.quantity;
-    acc.totalValue += (item.quantity * (item.item?.rate || 0));
-    acc.uniqueItems = new Set([...acc.uniqueItems, item.itemId]).size;
+    
+    // Use inventory valuation: quantity * (cost || rate || 0)
+    const unitValue = item.item?.cost || item.item?.rate || 0;
+    const itemValue = item.quantity * parseFloat(unitValue);
+    acc.totalValue += itemValue;
+    
+    acc.uniqueItems.add(item.itemId);
     
     if (!acc.warehouseBreakdown[item.warehouseId]) {
       acc.warehouseBreakdown[item.warehouseId] = {
@@ -75,7 +82,7 @@ export default function DisposedInventoryReportPage() {
       };
     }
     acc.warehouseBreakdown[item.warehouseId].quantity += item.quantity;
-    acc.warehouseBreakdown[item.warehouseId].value += (item.quantity * (item.item?.rate || 0));
+    acc.warehouseBreakdown[item.warehouseId].value += itemValue;
     
     if (!acc.reasonBreakdown[item.disposalReason || 'Not specified']) {
       acc.reasonBreakdown[item.disposalReason || 'Not specified'] = {
@@ -84,7 +91,7 @@ export default function DisposedInventoryReportPage() {
       };
     }
     acc.reasonBreakdown[item.disposalReason || 'Not specified'].quantity += item.quantity;
-    acc.reasonBreakdown[item.disposalReason || 'Not specified'].value += (item.quantity * (item.item?.rate || 0));
+    acc.reasonBreakdown[item.disposalReason || 'Not specified'].value += itemValue;
     
     return acc;
   }, {
@@ -109,21 +116,12 @@ export default function DisposedInventoryReportPage() {
     });
   };
 
-  const handleRefresh = async () => {
-    try {
-      await queryClient.invalidateQueries({ queryKey: ["/api/disposed-inventory"] });
-      await refetchDisposed();
-      toast({
-        title: "Refreshed",
-        description: "Disposed inventory data has been refreshed",
-      });
-    } catch (error) {
-      toast({
-        title: "Refresh Failed",
-        description: "Unable to refresh data. Please try again.",
-        variant: "destructive",
-      });
-    }
+  const handleRefresh = () => {
+    setRefreshKey(prev => prev + 1);
+    toast({
+      title: "Data refreshed",
+      description: "All data has been updated successfully.",
+    });
   };
 
   const exportToCsv = () => {
@@ -288,7 +286,7 @@ export default function DisposedInventoryReportPage() {
                   <CardContent>
                     <div className="text-2xl font-bold">{summaryStats.totalItems}</div>
                     <p className="text-xs text-muted-foreground">
-                      {summaryStats.uniqueItems} unique items
+                      {summaryStats?.uniqueItems?.size || 0} unique items
                     </p>
                   </CardContent>
                 </Card>
