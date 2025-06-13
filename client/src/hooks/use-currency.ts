@@ -18,14 +18,20 @@ export function useCurrency() {
   const currency = organizationSettings?.currency || 'USD';
   const currencySymbol = organizationSettings?.currencySymbol || '$';
 
-  const formatCurrency = (value: number): string => {
+  const formatCurrency = (value: number | null | undefined): string => {
+    if (value === null || value === undefined || isNaN(value)) {
+      return currencySymbol + '0.00';
+    }
     return currencySymbol + value.toLocaleString(undefined, { 
       minimumFractionDigits: 2, 
       maximumFractionDigits: 2 
     });
   };
 
-  const formatCurrencyCompact = (value: number): string => {
+  const formatCurrencyCompact = (value: number | null | undefined): string => {
+    if (value === null || value === undefined || isNaN(value)) {
+      return currencySymbol + '0.00';
+    }
     if (value >= 1000000) {
       return currencySymbol + (value / 1000000).toFixed(1) + 'M';
     } else if (value >= 1000) {
@@ -34,7 +40,10 @@ export function useCurrency() {
     return currencySymbol + value.toFixed(2);
   };
 
-  const formatCurrencyFull = (value: number): string => {
+  const formatCurrencyFull = (value: number | null | undefined): string => {
+    if (value === null || value === undefined || isNaN(value)) {
+      return currencySymbol + '0.00';
+    }
     return currencySymbol + value.toFixed(2);
   };
 
