@@ -2703,8 +2703,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Create a disposal transfer
-      const transferCode = `DISP-${Date.now()}`;
-      
       const disposalTransfer = await storage.createTransfer({
         sourceWarehouseId: inventory.warehouseId,
         destinationWarehouseId: inventory.warehouseId, // Same warehouse for disposal
@@ -2715,11 +2713,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         approvedBy: user.id,
         transferMode: "disposal",
         notes: `Direct disposal from inventory by admin: ${user.name}`,
-      });
-
-      // Update the transfer with the transfer code (needed after creation)
-      await storage.updateTransfer(disposalTransfer.id, { 
-        transferMode: transferCode 
       });
 
       // Create transfer item
@@ -2739,8 +2732,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await storage.createAuditLog({
         userId: user.id,
         action: "dispose_inventory",
-        tableName: "inventory",
-        recordId: inventoryId,
+        entityType: "inventory",
+        entityId: inventoryId,
         oldValues: JSON.stringify({ quantity: inventory.quantity }),
         newValues: JSON.stringify({ quantity: newQuantity }),
         details: `Disposed ${quantity} units. Reason: ${disposalReason}`
