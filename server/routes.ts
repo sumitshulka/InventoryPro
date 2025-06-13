@@ -4470,8 +4470,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         let matchesDate = reqDate >= start && reqDate <= end;
         let matchesDept = !departmentId || departmentId === 'all' || item.request.userId;
         let matchesWarehouse = !warehouseId || warehouseId === 'all';
+        // Only include completed/approved requests for accurate analytics
+        let isApproved = item.request.status === 'completed' || item.request.status === 'approved';
         
-        return matchesDate && matchesDept && matchesWarehouse;
+        return matchesDate && matchesDept && matchesWarehouse && isApproved;
       });
 
       // Group by item
@@ -4519,12 +4521,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const allUsers = await storage.getAllUsers();
       const allDepartments = await storage.getAllDepartments();
       
-      // Filter requests by date
+      // Filter requests by date and status
       const filteredRequests = allRequests.filter(req => {
         const reqDate = new Date(req.createdAt || '');
         const start = new Date(startDate as string);
         const end = new Date(endDate as string);
-        return reqDate >= start && reqDate <= end;
+        const isApproved = req.status === 'completed' || req.status === 'approved';
+        return reqDate >= start && reqDate <= end && isApproved;
       });
 
       // Group by department
@@ -4615,6 +4618,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         switch (request.status) {
           case 'approved':
+          case 'completed':
             analysis.approvedCount++;
             break;
           case 'rejected':
