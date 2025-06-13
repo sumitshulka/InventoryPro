@@ -11,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from ".
 import { Badge } from "../components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
 import { CalendarIcon, Download, Filter, RefreshCw, Trash2 } from "lucide-react";
-import { formatCurrencyFull } from "../lib/currency-utils";
+import { formatCurrencyFull, getCurrencySymbol } from "../lib/currency-utils";
 import { DataTablePagination } from "../components/ui/data-table-pagination";
 import { useToast } from "../hooks/use-toast";
 import { queryClient } from "../lib/queryClient";
