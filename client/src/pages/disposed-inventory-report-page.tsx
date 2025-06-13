@@ -409,8 +409,8 @@ export default function DisposedInventoryReportPage() {
                                   </div>
                                 </TableCell>
                                 <TableCell>{item.quantity}</TableCell>
-                                <TableCell>{formatCurrencyFull(item.item?.rate || 0, "USD")}</TableCell>
-                                <TableCell>{formatCurrencyFull((item.quantity * (item.item?.rate || 0)), "USD")}</TableCell>
+                                <TableCell>{formatCurrencyFull(item.item?.rate || 0, baseCurrency)}</TableCell>
+                                <TableCell>{formatCurrencyFull((item.quantity * (item.item?.rate || 0)), baseCurrency)}</TableCell>
                                 <TableCell>
                                   {item.disposalDate ? new Date(item.disposalDate).toLocaleDateString() : 'N/A'}
                                 </TableCell>
@@ -455,7 +455,7 @@ export default function DisposedInventoryReportPage() {
                         <TableRow key={reason}>
                           <TableCell className="font-medium">{reason}</TableCell>
                           <TableCell>{data.quantity}</TableCell>
-                          <TableCell>{formatCurrencyFull(data.value, "USD")}</TableCell>
+                          <TableCell>{formatCurrencyFull(data.value, baseCurrency)}</TableCell>
                           <TableCell>
                             {((data.value / summaryStats.totalValue) * 100).toFixed(1)}%
                           </TableCell>
