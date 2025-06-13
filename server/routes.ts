@@ -2733,10 +2733,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         );
       }
 
-      if (disposalReason) {
-        disposedItems = disposedItems.filter(item => 
-          item.disposalReason && item.disposalReason.toLowerCase().includes((disposalReason as string).toLowerCase())
-        );
+      if (approvedBy && approvedBy !== "all") {
+        const approverIdFilter = parseInt(approvedBy as string);
+        disposedItems = disposedItems.filter(item => {
+          // Get the transfer and check who approved the disposal
+          const transfer = disposedTransfers.find(t => t.id === item.transferId);
+          return transfer && transfer.approvedBy === approverIdFilter;
+        });
       }
 
       res.json(disposedItems);

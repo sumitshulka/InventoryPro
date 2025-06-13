@@ -34,7 +34,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Loader2, Search, Plus, Download, RefreshCw } from "lucide-react";
+import { Loader2, Search, Plus, Download, RefreshCw, Trash2, AlertTriangle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { downloadCSV } from "@/lib/utils";
@@ -46,7 +46,13 @@ const formSchema = z.object({
   quantity: z.string().min(1, { message: "Quantity is required" }),
 });
 
+const disposalFormSchema = z.object({
+  quantity: z.string().min(1, { message: "Quantity is required" }),
+  disposalReason: z.string().min(1, { message: "Disposal reason is required" }),
+});
+
 type FormValues = z.infer<typeof formSchema>;
+type DisposalFormValues = z.infer<typeof disposalFormSchema>;
 
 export default function InventoryPage() {
   const { toast } = useToast();
@@ -57,6 +63,8 @@ export default function InventoryPage() {
   const [selectedSku, setSelectedSku] = useState<string | null>(null);
   const [selectedItemId, setSelectedItemId] = useState<number | null>(null);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
+  const [isDisposalDialogOpen, setIsDisposalDialogOpen] = useState(false);
+  const [disposalItem, setDisposalItem] = useState<any>(null);
 
   const { data: inventory, isLoading: inventoryLoading } = useQuery({
     queryKey: ["/api/reports/inventory-stock"],
@@ -85,6 +93,14 @@ export default function InventoryPage() {
     },
   });
 
+  const disposalForm = useForm<DisposalFormValues>({
+    resolver: zodResolver(disposalFormSchema),
+    defaultValues: {
+      quantity: "",
+      disposalReason: "",
+    },
+  });
+
   const updateInventoryMutation = useMutation({
     mutationFn: async (data: FormValues) => {
       const res = await apiRequest("POST", "/api/inventory", {
@@ -102,6 +118,35 @@ export default function InventoryPage() {
       });
       form.reset();
       setIsDialogOpen(false);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const disposeInventoryMutation = useMutation({
+    mutationFn: async (data: DisposalFormValues) => {
+      const res = await apiRequest("POST", "/api/inventory/dispose", {
+        inventoryId: disposalItem.id,
+        quantity: parseInt(data.quantity),
+        disposalReason: data.disposalReason,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/reports/inventory-stock"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/disposed-inventory"] });
+      toast({
+        title: "Inventory disposed",
+        description: "The inventory has been disposed successfully.",
+      });
+      disposalForm.reset();
+      setIsDisposalDialogOpen(false);
+      setDisposalItem(null);
     },
     onError: (error: Error) => {
       toast({
@@ -260,6 +305,7 @@ export default function InventoryPage() {
                       <TableHead>Min Stock</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Last Updated</TableHead>
+                      {user?.role === "admin" && <TableHead>Actions</TableHead>}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
