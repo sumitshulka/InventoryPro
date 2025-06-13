@@ -406,12 +406,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createTransaction(transaction: InsertTransaction): Promise<Transaction> {
-    // Generate transaction code if not provided
-    const transactionData = {
-      ...transaction,
-      transactionCode: transaction.transactionCode || `TXN-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-    };
-    const [newTransaction] = await db.insert(transactions).values(transactionData).returning();
+    const [newTransaction] = await db.insert(transactions).values([transaction]).returning();
     return newTransaction;
   }
 
@@ -453,12 +448,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createRequest(request: InsertRequest): Promise<Request> {
-    // Generate request code if not provided
-    const requestData = {
-      ...request,
-      requestCode: `REQ-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-    };
-    const [newRequest] = await db.insert(requests).values(requestData).returning();
+    const [newRequest] = await db.insert(requests).values([request]).returning();
     return newRequest;
   }
 
@@ -756,12 +746,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createTransfer(transfer: InsertTransfer): Promise<Transfer> {
-    // Generate transfer code if not provided
-    const transferData = {
-      ...transfer,
-      transferCode: `TRF-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-    };
-    const [newTransfer] = await db.insert(transfers).values(transferData).returning();
+    const [newTransfer] = await db.insert(transfers).values([transfer]).returning();
     return newTransfer;
   }
 
@@ -778,7 +763,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createTransferItem(item: InsertTransferItem): Promise<TransferItem> {
-    const [newItem] = await db.insert(transferItems).values(item).returning();
+    const [newItem] = await db.insert(transferItems).values([item]).returning();
     return newItem;
   }
 
@@ -787,7 +772,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createTransferUpdate(update: InsertTransferUpdate): Promise<TransferUpdate> {
-    const [newUpdate] = await db.insert(transferUpdates).values(update).returning();
+    const [newUpdate] = await db.insert(transferUpdates).values([update]).returning();
     return newUpdate;
   }
 
