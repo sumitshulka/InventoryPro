@@ -20,7 +20,10 @@ import {
   ArrowRight,
   ExternalLink,
   Video,
-  MessageSquare
+  MessageSquare,
+  ChevronLeft,
+  ChevronRight,
+  X
 } from "lucide-react";
 
 interface HelpSystemProps {
@@ -579,6 +582,10 @@ export default function HelpSystem({ open, onOpenChange }: HelpSystemProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [selectedArticle, setSelectedArticle] = useState<HelpArticle | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [currentActionsPage, setCurrentActionsPage] = useState(1);
+  const articlesPerPage = 6;
+  const actionsPerPage = 6;
 
   const categories = [
     { id: "all", name: "All Topics", icon: BookOpen },
@@ -613,29 +620,75 @@ export default function HelpSystem({ open, onOpenChange }: HelpSystemProps) {
     selectedCategory === "all" || action.category === selectedCategory
   );
 
+  // Pagination calculations
+  const totalArticles = filteredArticles.length;
+  const totalArticlePages = Math.ceil(totalArticles / articlesPerPage);
+  const startArticleIndex = (currentPage - 1) * articlesPerPage;
+  const endArticleIndex = startArticleIndex + articlesPerPage;
+  const currentArticles = filteredArticles.slice(startArticleIndex, endArticleIndex);
+
+  const totalActions = filteredQuickActions.length;
+  const totalActionPages = Math.ceil(totalActions / actionsPerPage);
+  const startActionIndex = (currentActionsPage - 1) * actionsPerPage;
+  const endActionIndex = startActionIndex + actionsPerPage;
+  const currentActions = filteredQuickActions.slice(startActionIndex, endActionIndex);
+
+  // Reset pagination when filters change
+  const handleCategoryChange = (category: string) => {
+    setSelectedCategory(category);
+    setCurrentPage(1);
+    setCurrentActionsPage(1);
+  };
+
+  const handleSearchChange = (query: string) => {
+    setSearchQuery(query);
+    setCurrentPage(1);
+    setCurrentActionsPage(1);
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-6xl h-[80vh]" aria-describedby="help-system-description">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <HelpCircle className="h-5 w-5" />
-            Help & Documentation
-          </DialogTitle>
+      <DialogContent className="max-w-7xl w-[95vw] h-[90vh] sm:h-[80vh] p-0" aria-describedby="help-system-description">
+        <DialogHeader className="px-6 py-4 border-b">
+          <div className="flex items-center justify-between">
+            <DialogTitle className="flex items-center gap-2">
+              <HelpCircle className="h-5 w-5" />
+              Help & Documentation
+            </DialogTitle>
+            <div className="flex items-center gap-2">
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => onOpenChange(false)}
+                className="text-sm"
+              >
+                <ArrowRight className="h-4 w-4 mr-2" />
+                Back to Application
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onOpenChange(false)}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
           <div id="help-system-description" className="text-sm text-gray-600">
             Search for help topics, view documentation, and find quick actions.
           </div>
         </DialogHeader>
 
-        <div className="flex gap-6 h-full">
-          {/* Sidebar */}
-          <div className="w-64 border-r pr-4">
+        <div className="flex flex-col lg:flex-row gap-4 h-full overflow-hidden">
+          {/* Sidebar - Responsive */}
+          <div className="w-full lg:w-72 border-b lg:border-b-0 lg:border-r px-6 py-4 lg:py-0">
             <div className="space-y-4">
               <div className="relative">
                 <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                 <Input
                   placeholder="Search help topics..."
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onChange={(e) => handleSearchChange(e.target.value)}
                   className="pl-10"
                 />
               </div>
@@ -649,7 +702,7 @@ export default function HelpSystem({ open, onOpenChange }: HelpSystemProps) {
                       variant={selectedCategory === category.id ? "default" : "ghost"}
                       className="w-full justify-start"
                       onClick={() => {
-                        setSelectedCategory(category.id);
+                        handleCategoryChange(category.id);
                         setSelectedArticle(null);
                       }}
                     >
@@ -663,22 +716,23 @@ export default function HelpSystem({ open, onOpenChange }: HelpSystemProps) {
           </div>
 
           {/* Main Content */}
-          <div className="flex-1">
+          <div className="flex-1 px-6 py-4 overflow-hidden flex flex-col">
             {selectedArticle ? (
-              <div className="space-y-4">
-                <div className="flex items-center gap-2">
+              <div className="flex flex-col h-full">
+                <div className="flex items-center gap-2 mb-4">
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={() => setSelectedArticle(null)}
                   >
-                    ← Back to Help Topics
+                    <ChevronLeft className="h-4 w-4 mr-1" />
+                    Back to Help Topics
                   </Button>
                 </div>
                 
-                <div>
-                  <div className="flex items-center gap-2 mb-4">
-                    <h2 className="text-2xl font-bold">{selectedArticle.title}</h2>
+                <div className="flex-1 overflow-hidden">
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-4">
+                    <h2 className="text-xl lg:text-2xl font-bold">{selectedArticle.title}</h2>
                     <Badge variant={
                       selectedArticle.difficulty === 'beginner' ? 'default' :
                       selectedArticle.difficulty === 'intermediate' ? 'secondary' : 'destructive'
@@ -687,7 +741,7 @@ export default function HelpSystem({ open, onOpenChange }: HelpSystemProps) {
                     </Badge>
                   </div>
                   
-                  <div className="flex gap-2 mb-4">
+                  <div className="flex flex-wrap gap-2 mb-4">
                     {selectedArticle.tags.map(tag => (
                       <Badge key={tag} variant="outline" className="text-xs">
                         {tag}
@@ -695,8 +749,8 @@ export default function HelpSystem({ open, onOpenChange }: HelpSystemProps) {
                     ))}
                   </div>
                   
-                  <ScrollArea className="h-[500px]">
-                    <div className="prose max-w-none">
+                  <ScrollArea className="h-full max-h-[calc(100vh-300px)] lg:max-h-[calc(80vh-200px)]">
+                    <div className="prose prose-sm max-w-none pr-4">
                       {selectedArticle.content.split('\n').map((paragraph, index) => {
                         if (paragraph.startsWith('**') && paragraph.endsWith('**')) {
                           return (
@@ -731,84 +785,152 @@ export default function HelpSystem({ open, onOpenChange }: HelpSystemProps) {
                 </div>
               </div>
             ) : (
-              <Tabs defaultValue="topics" className="w-full">
-                <TabsList className="grid w-full grid-cols-2">
-                  <TabsTrigger value="topics">Help Topics</TabsTrigger>
-                  <TabsTrigger value="quick-actions">Quick Actions</TabsTrigger>
-                </TabsList>
+              <div className="flex flex-col h-full">
+                <Tabs defaultValue="topics" className="flex-1 flex flex-col">
+                  <TabsList className="grid w-full grid-cols-2 mb-4">
+                    <TabsTrigger value="topics">Help Topics</TabsTrigger>
+                    <TabsTrigger value="quick-actions">Quick Actions</TabsTrigger>
+                  </TabsList>
 
-                <TabsContent value="topics" className="space-y-4">
-                  <ScrollArea className="h-[500px]">
-                    <div className="space-y-3">
-                      {filteredArticles.map((article) => (
-                        <Card 
-                          key={article.id} 
-                          className="cursor-pointer hover:shadow-md transition-shadow"
-                          onClick={() => setSelectedArticle(article)}
-                        >
-                          <CardHeader className="pb-2">
-                            <div className="flex items-center justify-between">
-                              <CardTitle className="text-lg">{article.title}</CardTitle>
-                              <ArrowRight className="h-4 w-4 text-gray-400" />
-                            </div>
-                          </CardHeader>
-                          <CardContent>
-                            <div className="flex items-center gap-2 mb-2">
-                              <Badge variant="outline" className="text-xs">
-                                {article.category}
-                              </Badge>
-                              <Badge variant={
-                                article.difficulty === 'beginner' ? 'default' :
-                                article.difficulty === 'intermediate' ? 'secondary' : 'destructive'
-                              } className="text-xs">
-                                {article.difficulty}
-                              </Badge>
-                            </div>
-                            <p className="text-sm text-gray-600 line-clamp-2">
-                              {article.content.split('\n')[0]}
-                            </p>
-                          </CardContent>
-                        </Card>
-                      ))}
+                  <TabsContent value="topics" className="flex-1 flex flex-col">
+                    <div className="flex-1 overflow-hidden">
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 max-h-[calc(100vh-400px)] lg:max-h-[calc(80vh-300px)] overflow-y-auto">
+                        {currentArticles.map((article) => (
+                          <Card 
+                            key={article.id} 
+                            className="cursor-pointer hover:shadow-md transition-shadow h-fit"
+                            onClick={() => setSelectedArticle(article)}
+                          >
+                            <CardHeader className="pb-2">
+                              <div className="flex items-center justify-between">
+                                <CardTitle className="text-lg">{article.title}</CardTitle>
+                                <ArrowRight className="h-4 w-4 text-gray-400" />
+                              </div>
+                            </CardHeader>
+                            <CardContent>
+                              <div className="flex items-center gap-2 mb-2">
+                                <Badge variant="outline" className="text-xs">
+                                  {article.category}
+                                </Badge>
+                                <Badge variant={
+                                  article.difficulty === 'beginner' ? 'default' :
+                                  article.difficulty === 'intermediate' ? 'secondary' : 'destructive'
+                                } className="text-xs">
+                                  {article.difficulty}
+                                </Badge>
+                              </div>
+                              <p className="text-sm text-gray-600 line-clamp-2">
+                                {article.content.split('\n')[0]}
+                              </p>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
                     </div>
-                  </ScrollArea>
-                </TabsContent>
+                    
+                    {/* Articles Pagination */}
+                    {totalArticlePages > 1 && (
+                      <div className="flex items-center justify-between mt-4 pt-4 border-t">
+                        <div className="text-sm text-gray-600">
+                          Showing {startArticleIndex + 1} to {Math.min(endArticleIndex, totalArticles)} of {totalArticles} articles
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                            disabled={currentPage === 1}
+                          >
+                            <ChevronLeft className="h-4 w-4" />
+                            Previous
+                          </Button>
+                          <span className="text-sm">
+                            Page {currentPage} of {totalArticlePages}
+                          </span>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setCurrentPage(Math.min(totalArticlePages, currentPage + 1))}
+                            disabled={currentPage === totalArticlePages}
+                          >
+                            Next
+                            <ChevronRight className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </TabsContent>
 
-                <TabsContent value="quick-actions" className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {filteredQuickActions.map((action) => {
-                      const Icon = action.icon;
-                      return (
-                        <Card key={action.id} className="cursor-pointer hover:shadow-md transition-shadow">
-                          <CardHeader>
-                            <div className="flex items-center gap-3">
-                              <div className="p-2 bg-primary/10 rounded-lg">
-                                <Icon className="h-5 w-5 text-primary" />
-                              </div>
-                              <div>
-                                <CardTitle className="text-base">{action.title}</CardTitle>
-                                <CardDescription>{action.description}</CardDescription>
-                              </div>
-                            </div>
-                          </CardHeader>
-                          <CardContent>
-                            <Button 
-                              className="w-full" 
-                              onClick={() => {
-                                onOpenChange(false);
-                                window.location.href = action.action;
-                              }}
-                            >
-                              Go to {action.title}
-                              <ArrowRight className="h-4 w-4 ml-2" />
-                            </Button>
-                          </CardContent>
-                        </Card>
-                      );
-                    })}
-                  </div>
-                </TabsContent>
-              </Tabs>
+                  <TabsContent value="quick-actions" className="flex-1 flex flex-col">
+                    <div className="flex-1 overflow-hidden">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[calc(100vh-400px)] lg:max-h-[calc(80vh-300px)] overflow-y-auto">
+                        {currentActions.map((action) => {
+                          const Icon = action.icon;
+                          return (
+                            <Card key={action.id} className="cursor-pointer hover:shadow-md transition-shadow h-fit">
+                              <CardHeader>
+                                <div className="flex items-center gap-3">
+                                  <div className="p-2 bg-primary/10 rounded-lg">
+                                    <Icon className="h-5 w-5 text-primary" />
+                                  </div>
+                                  <div>
+                                    <CardTitle className="text-base">{action.title}</CardTitle>
+                                    <CardDescription>{action.description}</CardDescription>
+                                  </div>
+                                </div>
+                              </CardHeader>
+                              <CardContent>
+                                <Button 
+                                  className="w-full" 
+                                  onClick={() => {
+                                    onOpenChange(false);
+                                    window.location.href = action.action;
+                                  }}
+                                >
+                                  Go to {action.title}
+                                  <ArrowRight className="h-4 w-4 ml-2" />
+                                </Button>
+                              </CardContent>
+                            </Card>
+                          );
+                        })}
+                      </div>
+                    </div>
+                    
+                    {/* Quick Actions Pagination */}
+                    {totalActionPages > 1 && (
+                      <div className="flex items-center justify-between mt-4 pt-4 border-t">
+                        <div className="text-sm text-gray-600">
+                          Showing {startActionIndex + 1} to {Math.min(endActionIndex, totalActions)} of {totalActions} actions
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setCurrentActionsPage(Math.max(1, currentActionsPage - 1))}
+                            disabled={currentActionsPage === 1}
+                          >
+                            <ChevronLeft className="h-4 w-4" />
+                            Previous
+                          </Button>
+                          <span className="text-sm">
+                            Page {currentActionsPage} of {totalActionPages}
+                          </span>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setCurrentActionsPage(Math.min(totalActionPages, currentActionsPage + 1))}
+                            disabled={currentActionsPage === totalActionPages}
+                          >
+                            Next
+                            <ChevronRight className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </TabsContent>
+                </Tabs>
+              </div>
             )}
           </div>
         </div>
