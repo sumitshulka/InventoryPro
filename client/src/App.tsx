@@ -27,6 +27,7 @@ import SettingsPage from "@/pages/settings-page";
 import AuditTrailPage from "@/pages/audit-trail-page";
 import IssuesPage from "@/pages/issues-page";
 import MyProfilePage from "@/pages/my-profile-page";
+import DisposedInventoryReportPage from "@/pages/disposed-inventory-report-page";
 import { ProtectedRoute } from "./lib/protected-route";
 
 function Router() {
@@ -63,6 +64,7 @@ function Router() {
       <ProtectedRoute path="/movement-report" component={MovementReportPage} />
       <ProtectedRoute path="/reports/inventory-valuation" component={InventoryValuationReportPage} />
       <ProtectedRoute path="/reports/low-stock" component={LowStockReportPage} />
+      <ProtectedRoute path="/reports/disposed-inventory" component={DisposedInventoryReportPage} />
       <ProtectedRoute path="/users" component={UsersManagementPage} />
       <ProtectedRoute path="/users-management" component={UsersManagementPage} />
       <ProtectedRoute path="/categories" component={CategoriesPage} />
