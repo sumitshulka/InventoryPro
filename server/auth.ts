@@ -245,7 +245,23 @@ export function setupAuth(app: Express) {
       }
 
       if (emailService) {
-        const resetUrl = `${req.protocol}://${req.get('host')}/reset-password?token=${resetToken}`;
+        // Generate proper reset URL for Replit hosting
+        const host = req.get('host');
+        const replitDomain = process.env.REPLIT_DOMAINS;
+        
+        let baseUrl;
+        if (replitDomain) {
+          // Use Replit domain if available
+          baseUrl = `https://${replitDomain}`;
+        } else if (host?.includes('.replit.dev') || host?.includes('.replit.app') || host?.includes('.repl.co')) {
+          // Use host if it's a Replit domain
+          baseUrl = `https://${host}`;
+        } else {
+          // Fallback to request protocol and host
+          baseUrl = `${req.protocol}://${host}`;
+        }
+        
+        const resetUrl = `${baseUrl}/reset-password?token=${resetToken}`;
         
         const emailSent = await emailService.sendEmail({
           to: user.email,
