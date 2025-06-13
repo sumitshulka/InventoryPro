@@ -6,7 +6,7 @@ import { createHash, randomBytes } from "crypto";
 import { storage } from "./storage";
 import { User as SelectUser, insertUserSchema } from "@shared/schema";
 import { z } from "zod";
-import sgMail from "@sendgrid/mail";
+import { getEmailService, initializeEmailService } from "./email-service";
 
 declare global {
   namespace Express {
@@ -227,21 +227,28 @@ export function setupAuth(app: Express) {
       const resetToken = randomBytes(32).toString("hex");
       const resetTokenExpiry = new Date(Date.now() + 3600000); // 1 hour from now
 
-      // Store reset token in user record (you might want to add these fields to the schema)
+      // Store reset token in user record
       await storage.updateUser(user.id, {
         resetToken,
         resetTokenExpiry: resetTokenExpiry.toISOString()
       });
 
-      // Send email with reset link
-      if (process.env.SENDGRID_API_KEY) {
-        sgMail.setApiKey(process.env.SENDGRID_API_KEY);
-        
+      // Get email service and send reset email
+      let emailService = getEmailService();
+      
+      if (!emailService) {
+        // Initialize email service with current settings
+        const emailSettings = await storage.getEmailSettings();
+        if (emailSettings && emailSettings.isActive) {
+          emailService = initializeEmailService(emailSettings);
+        }
+      }
+
+      if (emailService) {
         const resetUrl = `${req.protocol}://${req.get('host')}/reset-password?token=${resetToken}`;
         
-        const msg = {
+        const emailSent = await emailService.sendEmail({
           to: user.email,
-          from: process.env.FROM_EMAIL || 'noreply@inventorymanagement.com',
           subject: 'Password Reset Request',
           html: `
             <h2>Password Reset Request</h2>
@@ -251,9 +258,22 @@ export function setupAuth(app: Express) {
             <p>This link will expire in 1 hour.</p>
             <p>If you didn't request this reset, please ignore this email.</p>
           `,
-        };
+          text: `Password Reset Request
+          
+You requested a password reset for your inventory management account.
+          
+Click the link below to reset your password:
+${resetUrl}
 
-        await sgMail.send(msg);
+This link will expire in 1 hour.
+If you didn't request this reset, please ignore this email.`
+        });
+
+        if (!emailSent) {
+          console.error("Failed to send password reset email");
+        }
+      } else {
+        console.error("Email service not configured");
       }
 
       res.status(200).json({ 
