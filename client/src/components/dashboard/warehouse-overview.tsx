@@ -19,6 +19,11 @@ export default function WarehouseOverview({ warehouses }: WarehouseProps) {
   // Fetch warehouses with archived option when needed
   const { data: allWarehouses } = useQuery({
     queryKey: ["/api/warehouses/stats", { includeArchived: showArchived }],
+    queryFn: async () => {
+      const params = showArchived ? '?includeArchived=true' : '';
+      const response = await fetch(`/api/warehouses/stats${params}`);
+      return response.json();
+    },
     enabled: showArchived,
   });
 
@@ -51,7 +56,15 @@ export default function WarehouseOverview({ warehouses }: WarehouseProps) {
     <Card>
       <CardHeader className="p-6 border-b">
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-medium text-gray-800">Warehouse Overview</h3>
+          <div>
+            <h3 className="text-lg font-medium text-gray-800">Warehouse Overview</h3>
+            <p className="text-sm text-gray-500 mt-1">
+              {showArchived ? 
+                `Showing ${warehousesArray.length} total warehouses (including archived)` : 
+                `Showing ${warehousesArray.length} active warehouses`
+              }
+            </p>
+          </div>
           <div className="flex items-center space-x-2">
             <Button
               variant={showArchived ? "default" : "outline"}
