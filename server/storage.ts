@@ -28,6 +28,18 @@ import {
   TransferNotification,
   InsertTransferNotification,
   Transfer,
+  Notification,
+  InsertNotification,
+  Issue,
+  InsertIssue,
+  IssueActivity,
+  InsertIssueActivity,
+  EmailSettings,
+  InsertEmailSettings,
+  TransferItem,
+  InsertTransferItem,
+  RejectedGoods,
+  InsertRejectedGoods,
   InsertTransfer,
   TransferItem,
   InsertTransferItem,
@@ -939,12 +951,271 @@ export class DatabaseStorage implements IStorage {
   async markNotificationAsRead(id: number): Promise<any> {
     try {
       const result = await db.update(notifications)
-        .set({ status: 'read', readAt: new Date() })
+        .set({ status: 'read', updatedAt: new Date() })
         .where(eq(notifications.id, id))
         .returning();
       return result[0];
     } catch (error) {
       console.error('Error marking notification as read:', error);
+      throw error;
+    }
+  }
+
+  async getNotificationsByCategory(userId: number, category: string): Promise<any[]> {
+    try {
+      const result = await db.select()
+        .from(notifications)
+        .where(and(eq(notifications.recipientId, userId), eq(notifications.category, category)))
+        .orderBy(desc(notifications.createdAt));
+      return result;
+    } catch (error) {
+      console.error('Error fetching notifications by category:', error);
+      return [];
+    }
+  }
+
+  async getNotificationThread(notificationId: number): Promise<any[]> {
+    try {
+      const notification = await db.select()
+        .from(notifications)
+        .where(eq(notifications.id, notificationId));
+      
+      if (!notification.length) return [];
+      
+      const rootId = notification[0].parentId || notificationId;
+      
+      const result = await db.select()
+        .from(notifications)
+        .where(or(eq(notifications.id, rootId), eq(notifications.parentId, rootId)))
+        .orderBy(notifications.createdAt);
+      return result;
+    } catch (error) {
+      console.error('Error fetching notification thread:', error);
+      return [];
+    }
+  }
+
+  async getNotification(id: number): Promise<any> {
+    try {
+      const result = await db.select()
+        .from(notifications)
+        .where(eq(notifications.id, id));
+      return result[0];
+    } catch (error) {
+      console.error('Error fetching notification:', error);
+      throw error;
+    }
+  }
+
+  async markNotificationAsReplied(id: number): Promise<any> {
+    try {
+      const result = await db.update(notifications)
+        .set({ status: 'replied', updatedAt: new Date() })
+        .where(eq(notifications.id, id))
+        .returning();
+      return result[0];
+    } catch (error) {
+      console.error('Error marking notification as replied:', error);
+      throw error;
+    }
+  }
+
+  async markNotificationAsClosed(id: number): Promise<any> {
+    try {
+      const result = await db.update(notifications)
+        .set({ status: 'closed', updatedAt: new Date() })
+        .where(eq(notifications.id, id))
+        .returning();
+      return result[0];
+    } catch (error) {
+      console.error('Error marking notification as closed:', error);
+      throw error;
+    }
+  }
+
+  async archiveNotification(id: number): Promise<any> {
+    try {
+      const result = await db.update(notifications)
+        .set({ isArchived: true, archivedAt: new Date(), updatedAt: new Date() })
+        .where(eq(notifications.id, id))
+        .returning();
+      return result[0];
+    } catch (error) {
+      console.error('Error archiving notification:', error);
+      throw error;
+    }
+  }
+
+  async cleanupArchivedNotifications(): Promise<void> {
+    try {
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      
+      await db.delete(notifications)
+        .where(and(eq(notifications.isArchived, true), lt(notifications.archivedAt, thirtyDaysAgo)));
+    } catch (error) {
+      console.error('Error cleaning up archived notifications:', error);
+    }
+  }
+
+  async closeIssue(id: number, userId: number, resolutionNotes: string): Promise<any> {
+    try {
+      const result = await db.update(issues)
+        .set({ 
+          status: 'closed', 
+          closedBy: userId, 
+          closedAt: new Date(),
+          resolutionNotes: resolutionNotes,
+          updatedAt: new Date()
+        })
+        .where(eq(issues.id, id))
+        .returning();
+      return result[0];
+    } catch (error) {
+      console.error('Error closing issue:', error);
+      throw error;
+    }
+  }
+
+  async reopenIssue(id: number, userId: number): Promise<any> {
+    try {
+      const result = await db.update(issues)
+        .set({ 
+          status: 'open', 
+          reopenedBy: userId, 
+          reopenedAt: new Date(),
+          updatedAt: new Date()
+        })
+        .where(eq(issues.id, id))
+        .returning();
+      return result[0];
+    } catch (error) {
+      console.error('Error reopening issue:', error);
+      throw error;
+    }
+  }
+
+  async getIssueActivityWithUser(issueId: number): Promise<any[]> {
+    try {
+      const result = await db.select({
+        id: issueActivities.id,
+        action: issueActivities.action,
+        previousValue: issueActivities.previousValue,
+        newValue: issueActivities.newValue,
+        comment: issueActivities.comment,
+        createdAt: issueActivities.createdAt,
+        user: {
+          id: users.id,
+          name: users.name,
+          username: users.username
+        }
+      })
+      .from(issueActivities)
+      .leftJoin(users, eq(issueActivities.userId, users.id))
+      .where(eq(issueActivities.issueId, issueId))
+      .orderBy(issueActivities.createdAt);
+      return result;
+    } catch (error) {
+      console.error('Error fetching issue activities:', error);
+      return [];
+    }
+  }
+
+  async getEmailSettings(): Promise<any> {
+    try {
+      const result = await db.select()
+        .from(emailSettings)
+        .where(eq(emailSettings.isActive, true))
+        .limit(1);
+      return result[0];
+    } catch (error) {
+      console.error('Error fetching email settings:', error);
+      return null;
+    }
+  }
+
+  async createEmailSettings(settings: any): Promise<any> {
+    try {
+      const result = await db.insert(emailSettings).values(settings).returning();
+      return result[0];
+    } catch (error) {
+      console.error('Error creating email settings:', error);
+      throw error;
+    }
+  }
+
+  async updateEmailSettings(id: number, settings: any): Promise<any> {
+    try {
+      const result = await db.update(emailSettings)
+        .set({ ...settings, updatedAt: new Date() })
+        .where(eq(emailSettings.id, id))
+        .returning();
+      return result[0];
+    } catch (error) {
+      console.error('Error updating email settings:', error);
+      throw error;
+    }
+  }
+
+  async markEmailSettingsAsVerified(id: number): Promise<any> {
+    try {
+      const result = await db.update(emailSettings)
+        .set({ isVerified: true, lastTestedAt: new Date(), updatedAt: new Date() })
+        .where(eq(emailSettings.id, id))
+        .returning();
+      return result[0];
+    } catch (error) {
+      console.error('Error marking email settings as verified:', error);
+      throw error;
+    }
+  }
+
+  async deleteEmailSettings(id: number): Promise<boolean> {
+    try {
+      const result = await db.delete(emailSettings).where(eq(emailSettings.id, id));
+      return result.rowCount ? result.rowCount > 0 : false;
+    } catch (error) {
+      console.error('Error deleting email settings:', error);
+      return false;
+    }
+  }
+
+  async getUserById(id: number): Promise<any> {
+    return this.getUser(id);
+  }
+
+  async updateUserStatus(id: number, isActive: boolean): Promise<any> {
+    try {
+      const result = await db.update(users)
+        .set({ isActive })
+        .where(eq(users.id, id))
+        .returning();
+      return result[0];
+    } catch (error) {
+      console.error('Error updating user status:', error);
+      throw error;
+    }
+  }
+
+  async updateTransferItem(id: number, data: any): Promise<any> {
+    try {
+      const result = await db.update(transferItems)
+        .set(data)
+        .where(eq(transferItems.id, id))
+        .returning();
+      return result[0];
+    } catch (error) {
+      console.error('Error updating transfer item:', error);
+      throw error;
+    }
+  }
+
+  async createRejectedGoods(data: any): Promise<any> {
+    try {
+      const result = await db.insert(rejectedGoods).values(data).returning();
+      return result[0];
+    } catch (error) {
+      console.error('Error creating rejected goods:', error);
       throw error;
     }
   }
