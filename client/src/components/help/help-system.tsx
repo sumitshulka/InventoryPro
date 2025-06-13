@@ -541,6 +541,209 @@ Configure department-based permissions ensuring users only access inventory and 
     category: "administration",
     tags: ["departments", "organization", "hierarchy", "management"],
     difficulty: "intermediate"
+  },
+  {
+    id: "approval-workflows",
+    title: "Approval Workflows and Request Management",
+    content: `Comprehensive approval system for managing inventory requests, transfers, and other business processes requiring authorization.
+
+**Approval Types:**
+- Inventory request approvals for item procurement
+- Transfer approvals for inter-warehouse movements
+- Purchase order approvals for supplier transactions
+- Budget approval workflows for cost management
+- User access approvals for system permissions
+- Disposal approvals for inventory write-offs
+
+**Workflow Configuration:**
+- Multi-level approval hierarchies with escalation rules
+- Conditional approval routing based on request values
+- Department-specific approval chains and authorities
+- Time-based escalation and automatic routing
+- Parallel and sequential approval processing
+- Emergency override procedures for urgent requests
+
+**Approval Dashboard:**
+- Centralized view of all pending approvals
+- Priority-based request sorting and filtering
+- Bulk approval capabilities for routine requests
+- Approval history and audit trail tracking
+- Performance metrics and processing time analysis
+- Mobile-friendly interface for remote approvals
+
+**Request Management:**
+- Request creation with detailed specifications
+- Attachment support for supporting documentation
+- Comment threads for approval communication
+- Status tracking and real-time updates
+- Automatic notifications for all stakeholders
+- Integration with procurement and inventory systems
+
+**Approval Rules and Policies:**
+- Value-based approval thresholds and limits
+- Category-specific approval requirements
+- Vendor-specific approval workflows
+- Geographic location-based routing rules
+- Time-sensitive approval processing
+- Compliance-driven approval documentation
+
+**Reporting and Analytics:**
+- Approval processing time and bottleneck analysis
+- Approval rate statistics and trends
+- User performance metrics for approvers
+- Request volume analysis and forecasting
+- Compliance reporting for audit purposes
+- Cost impact analysis of approved requests
+
+**Integration Features:**
+Seamless integration with inventory, procurement, and financial systems for complete request-to-fulfillment workflows.`,
+    category: "approvals",
+    tags: ["workflows", "requests", "authorization", "management"],
+    difficulty: "intermediate"
+  },
+  {
+    id: "notification-system",
+    title: "Notification System and Alert Management",
+    content: `Comprehensive notification system for keeping users informed of critical inventory events, system updates, and workflow changes.
+
+**Notification Categories:**
+- Inventory alerts for stock levels and reorder points
+- Transfer notifications for shipment status updates
+- Approval notifications for pending and completed requests
+- System maintenance and security alerts
+- Performance notifications for KPI thresholds
+- User activity notifications for account changes
+
+**Delivery Channels:**
+- In-system notifications with priority indicators
+- Email notifications with customizable templates
+- SMS alerts for critical and urgent notifications
+- Mobile push notifications for real-time updates
+- Dashboard widgets and notification centers
+- Integration with external communication platforms
+
+**Notification Preferences:**
+- User-specific notification settings and preferences
+- Frequency controls for different notification types
+- Quiet hours and do-not-disturb settings
+- Role-based default notification configurations
+- Department-specific notification routing
+- Emergency notification override capabilities
+
+**Alert Rules and Triggers:**
+- Threshold-based alerts for inventory levels
+- Time-based notifications for pending actions
+- Event-driven notifications for system changes
+- Conditional alerts based on business rules
+- Escalation notifications for overdue items
+- Batch processing for high-volume notifications
+
+**Template Management:**
+- Customizable email and SMS templates
+- Dynamic content insertion with system data
+- Multi-language template support
+- Brand-consistent notification formatting
+- Template versioning and approval workflows
+- A/B testing for notification effectiveness
+
+**Notification Analytics:**
+- Delivery rate monitoring and troubleshooting
+- User engagement metrics and click-through rates
+- Response time analysis for critical notifications
+- Notification volume trends and optimization
+- System performance impact assessment
+- User feedback collection and satisfaction tracking
+
+**Administrative Controls:**
+- Global notification settings and policies
+- User permission management for notification access
+- Notification archival and retention policies
+- Integration with external monitoring systems
+- Compliance logging for regulatory requirements
+- Performance optimization and scaling configurations
+
+**Mobile and Remote Access:**
+Ensure critical notifications reach users regardless of location with mobile-optimized delivery and offline notification queuing.`,
+    category: "notifications",
+    tags: ["alerts", "communication", "messaging", "monitoring"],
+    difficulty: "intermediate"
+  },
+  {
+    id: "troubleshooting-guide",
+    title: "Troubleshooting and Problem Resolution",
+    content: `Comprehensive troubleshooting guide for resolving common issues and maintaining optimal system performance.
+
+**Common Issues and Solutions:**
+
+**Login and Access Problems:**
+- Password reset procedures and account recovery
+- Browser compatibility issues and recommended settings
+- Network connectivity troubleshooting
+- Session timeout and authentication problems
+- Role-based access permission issues
+- Multi-factor authentication setup and problems
+
+**Inventory Data Issues:**
+- Stock discrepancies and reconciliation procedures
+- Barcode scanning problems and device configuration
+- Data synchronization issues between systems
+- Transaction processing errors and recovery
+- Price update failures and correction methods
+- Category and classification data inconsistencies
+
+**Transfer and Workflow Problems:**
+- Transfer approval delays and escalation procedures
+- Shipment tracking and status update issues
+- Rejected goods processing and return workflows
+- Approval workflow stuck or frozen processes
+- Notification delivery failures and resending
+- Integration failures with external systems
+
+**Performance and System Issues:**
+- Slow page loading and performance optimization
+- Database connection problems and recovery
+- Report generation timeouts and alternatives
+- Search functionality problems and indexing
+- Mobile app synchronization issues
+- Backup and recovery procedures
+
+**Data Export and Import Problems:**
+- CSV/Excel file format requirements and validation
+- Bulk upload failures and error correction
+- Report generation errors and troubleshooting
+- Data mapping issues during imports
+- Character encoding and special character problems
+- File size limitations and workaround solutions
+
+**Integration and API Issues:**
+- Third-party system connection failures
+- API authentication and permission problems
+- Data mapping and transformation errors
+- Webhook configuration and testing
+- Real-time synchronization delays
+- Error logging and diagnostic procedures
+
+**Diagnostic Tools:**
+- System health monitoring dashboards
+- Error log analysis and interpretation
+- Performance monitoring and bottleneck identification
+- User activity tracking for issue reproduction
+- Database query optimization tools
+- Network connectivity testing utilities
+
+**Escalation Procedures:**
+- Internal IT support contact information
+- Vendor support escalation processes
+- Emergency contact procedures for critical issues
+- Documentation requirements for support tickets
+- Remote assistance setup and security protocols
+- Known issue tracking and status updates
+
+**Preventive Maintenance:**
+Regular system maintenance schedules, backup verification, and proactive monitoring to prevent common issues before they impact operations.`,
+    category: "troubleshooting",
+    tags: ["problems", "solutions", "support", "maintenance"],
+    difficulty: "beginner"
   }
 ];
 
