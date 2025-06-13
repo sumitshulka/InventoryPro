@@ -55,8 +55,7 @@ export default function DisposedInventoryReportPage() {
     queryKey: ["/api/organization-settings"]
   });
 
-  const baseCurrency = organizationSettings?.baseCurrency || "USD";
-  const currencySymbol = getCurrencySymbol(baseCurrency);
+  const currencySymbol = organizationSettings?.currencySymbol || "$";
 
   // Calculate summary statistics
   const summaryStats = disposedItems?.reduce((acc: any, item: any) => {
