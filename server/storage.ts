@@ -393,6 +393,424 @@ export class DatabaseStorage implements IStorage {
     const result = await db.delete(inventory).where(eq(inventory.id, id));
     return result.rowCount ? result.rowCount > 0 : false;
   }
+
+  // Transaction operations
+  async getTransaction(id: number): Promise<Transaction | undefined> {
+    const [transaction] = await db.select().from(transactions).where(eq(transactions.id, id));
+    return transaction;
+  }
+
+  async getTransactionByCode(code: string): Promise<Transaction | undefined> {
+    const [transaction] = await db.select().from(transactions).where(eq(transactions.transactionCode, code));
+    return transaction;
+  }
+
+  async createTransaction(transaction: InsertTransaction): Promise<Transaction> {
+    // Generate transaction code if not provided
+    const transactionData = {
+      ...transaction,
+      transactionCode: transaction.transactionCode || `TXN-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+    };
+    const [newTransaction] = await db.insert(transactions).values(transactionData).returning();
+    return newTransaction;
+  }
+
+  async getAllTransactions(): Promise<Transaction[]> {
+    return await db.select().from(transactions);
+  }
+
+  async getTransactionsByType(type: TransactionType): Promise<Transaction[]> {
+    return await db.select().from(transactions).where(eq(transactions.transactionType, type));
+  }
+
+  async getTransactionsByWarehouse(warehouseId: number): Promise<Transaction[]> {
+    return await db.select().from(transactions)
+      .where(or(eq(transactions.sourceWarehouseId, warehouseId), eq(transactions.destinationWarehouseId, warehouseId)));
+  }
+
+  async updateTransaction(id: number, transactionData: Partial<InsertTransaction>): Promise<Transaction | undefined> {
+    const [updatedTransaction] = await db.update(transactions)
+      .set(transactionData)
+      .where(eq(transactions.id, id))
+      .returning();
+    return updatedTransaction;
+  }
+
+  async deleteTransaction(id: number): Promise<boolean> {
+    const result = await db.delete(transactions).where(eq(transactions.id, id));
+    return result.rowCount ? result.rowCount > 0 : false;
+  }
+
+  // Request operations
+  async getRequest(id: number): Promise<Request | undefined> {
+    const [request] = await db.select().from(requests).where(eq(requests.id, id));
+    return request;
+  }
+
+  async getRequestByCode(code: string): Promise<Request | undefined> {
+    const [request] = await db.select().from(requests).where(eq(requests.requestCode, code));
+    return request;
+  }
+
+  async createRequest(request: InsertRequest): Promise<Request> {
+    // Generate request code if not provided
+    const requestData = {
+      ...request,
+      requestCode: `REQ-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+    };
+    const [newRequest] = await db.insert(requests).values(requestData).returning();
+    return newRequest;
+  }
+
+  async getAllRequests(): Promise<Request[]> {
+    return await db.select().from(requests);
+  }
+
+  async getRequestsByStatus(status: string): Promise<Request[]> {
+    return await db.select().from(requests).where(eq(requests.status, status));
+  }
+
+  async getRequestsByUser(userId: number): Promise<Request[]> {
+    return await db.select().from(requests).where(eq(requests.userId, userId));
+  }
+
+  async updateRequest(id: number, requestData: Partial<InsertRequest>): Promise<Request | undefined> {
+    const [updatedRequest] = await db.update(requests)
+      .set(requestData)
+      .where(eq(requests.id, id))
+      .returning();
+    return updatedRequest;
+  }
+
+  async deleteRequest(id: number): Promise<boolean> {
+    const result = await db.delete(requests).where(eq(requests.id, id));
+    return result.rowCount ? result.rowCount > 0 : false;
+  }
+
+  // Request Item operations
+  async getRequestItem(id: number): Promise<RequestItem | undefined> {
+    const [requestItem] = await db.select().from(requestItems).where(eq(requestItems.id, id));
+    return requestItem;
+  }
+
+  async getRequestItemsByRequest(requestId: number): Promise<RequestItem[]> {
+    return await db.select().from(requestItems).where(eq(requestItems.requestId, requestId));
+  }
+
+  async createRequestItem(requestItem: InsertRequestItem): Promise<RequestItem> {
+    const [newRequestItem] = await db.insert(requestItems).values(requestItem).returning();
+    return newRequestItem;
+  }
+
+  async updateRequestItem(id: number, requestItemData: Partial<InsertRequestItem>): Promise<RequestItem | undefined> {
+    const [updatedRequestItem] = await db.update(requestItems)
+      .set(requestItemData)
+      .where(eq(requestItems.id, id))
+      .returning();
+    return updatedRequestItem;
+  }
+
+  async deleteRequestItem(id: number): Promise<boolean> {
+    const result = await db.delete(requestItems).where(eq(requestItems.id, id));
+    return result.rowCount ? result.rowCount > 0 : false;
+  }
+
+  // Request Approval operations
+  async getRequestApproval(id: number): Promise<RequestApproval | undefined> {
+    const [approval] = await db.select().from(requestApprovals).where(eq(requestApprovals.id, id));
+    return approval;
+  }
+
+  async getRequestApprovalsByRequest(requestId: number): Promise<RequestApproval[]> {
+    return await db.select().from(requestApprovals).where(eq(requestApprovals.requestId, requestId));
+  }
+
+  async getRequestApprovalsByApprover(approverId: number): Promise<RequestApproval[]> {
+    return await db.select().from(requestApprovals).where(eq(requestApprovals.approverId, approverId));
+  }
+
+  async createRequestApproval(approval: InsertRequestApproval): Promise<RequestApproval> {
+    const [newApproval] = await db.insert(requestApprovals).values(approval).returning();
+    return newApproval;
+  }
+
+  async updateRequestApproval(id: number, approvalData: Partial<InsertRequestApproval>): Promise<RequestApproval | undefined> {
+    const [updatedApproval] = await db.update(requestApprovals)
+      .set(approvalData)
+      .where(eq(requestApprovals.id, id))
+      .returning();
+    return updatedApproval;
+  }
+
+  async deleteRequestApproval(id: number): Promise<boolean> {
+    const result = await db.delete(requestApprovals).where(eq(requestApprovals.id, id));
+    return result.rowCount ? result.rowCount > 0 : false;
+  }
+
+  // Category operations
+  async getCategory(id: number): Promise<Category | undefined> {
+    const [category] = await db.select().from(categories).where(eq(categories.id, id));
+    return category;
+  }
+
+  async getCategoryByName(name: string): Promise<Category | undefined> {
+    const [category] = await db.select().from(categories).where(eq(categories.name, name));
+    return category;
+  }
+
+  async createCategory(category: InsertCategory): Promise<Category> {
+    const [newCategory] = await db.insert(categories).values(category).returning();
+    return newCategory;
+  }
+
+  async getAllCategories(): Promise<Category[]> {
+    return await db.select().from(categories);
+  }
+
+  async updateCategory(id: number, categoryData: Partial<InsertCategory>): Promise<Category | undefined> {
+    const [updatedCategory] = await db.update(categories)
+      .set(categoryData)
+      .where(eq(categories.id, id))
+      .returning();
+    return updatedCategory;
+  }
+
+  async deleteCategory(id: number): Promise<boolean> {
+    const result = await db.delete(categories).where(eq(categories.id, id));
+    return result.rowCount ? result.rowCount > 0 : false;
+  }
+
+  // Additional methods needed by routes
+  async getActiveUsers(): Promise<User[]> {
+    return await db.select().from(users).where(eq(users.isActive, true));
+  }
+
+  async createAuditLog(auditLog: InsertAuditLog): Promise<AuditLog> {
+    const [newAuditLog] = await db.insert(auditLogs).values(auditLog).returning();
+    return newAuditLog;
+  }
+
+  async getUserManager(userId: number): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.id, userId));
+    if (!user?.managerId) return undefined;
+    return await this.getUser(user.managerId);
+  }
+
+  async canApproveRequest(userId: number, requestId: number): Promise<boolean> {
+    // Simple implementation - can be enhanced based on business rules
+    const user = await this.getUser(userId);
+    return user?.role === 'admin' || user?.role === 'manager';
+  }
+
+  async createTransferNotification(notification: InsertTransferNotification): Promise<TransferNotification> {
+    const [newNotification] = await db.insert(transferNotifications).values(notification).returning();
+    return newNotification;
+  }
+
+  async getPendingTransferNotifications(): Promise<TransferNotification[]> {
+    return await db.select().from(transferNotifications).where(eq(transferNotifications.status, 'pending'));
+  }
+
+  async getTransferNotificationsByWarehouse(warehouseId: number): Promise<TransferNotification[]> {
+    return await db.select().from(transferNotifications).where(eq(transferNotifications.warehouseId, warehouseId));
+  }
+
+  async updateTransferNotification(id: number, data: Partial<InsertTransferNotification>): Promise<TransferNotification | undefined> {
+    const [updated] = await db.update(transferNotifications)
+      .set(data)
+      .where(eq(transferNotifications.id, id))
+      .returning();
+    return updated;
+  }
+
+  // Approval Settings operations
+  async getApprovalSettings(id: number): Promise<ApprovalSettings | undefined> {
+    const [settings] = await db.select().from(approvalSettings).where(eq(approvalSettings.id, id));
+    return settings;
+  }
+
+  async getApprovalSettingsByType(requestType: string): Promise<ApprovalSettings[]> {
+    return await db.select().from(approvalSettings).where(eq(approvalSettings.requestType, requestType));
+  }
+
+  async createApprovalSettings(settings: InsertApprovalSettings): Promise<ApprovalSettings> {
+    const [newSettings] = await db.insert(approvalSettings).values(settings).returning();
+    return newSettings;
+  }
+
+  async getAllApprovalSettings(): Promise<ApprovalSettings[]> {
+    return await db.select().from(approvalSettings);
+  }
+
+  async updateApprovalSettings(id: number, settingsData: Partial<InsertApprovalSettings>): Promise<ApprovalSettings | undefined> {
+    const [updatedSettings] = await db.update(approvalSettings)
+      .set(settingsData)
+      .where(eq(approvalSettings.id, id))
+      .returning();
+    return updatedSettings;
+  }
+
+  async deleteApprovalSettings(id: number): Promise<boolean> {
+    const result = await db.delete(approvalSettings).where(eq(approvalSettings.id, id));
+    return result.rowCount ? result.rowCount > 0 : false;
+  }
+
+  // Warehouse Operator operations
+  async getWarehouseOperator(id: number): Promise<WarehouseOperator | undefined> {
+    const [operator] = await db.select().from(warehouseOperators).where(eq(warehouseOperators.id, id));
+    return operator;
+  }
+
+  async getWarehouseOperatorsByUser(userId: number): Promise<WarehouseOperator[]> {
+    return await db.select().from(warehouseOperators).where(eq(warehouseOperators.userId, userId));
+  }
+
+  async getWarehouseOperatorsByWarehouse(warehouseId: number): Promise<WarehouseOperator[]> {
+    return await db.select().from(warehouseOperators).where(eq(warehouseOperators.warehouseId, warehouseId));
+  }
+
+  async getAllWarehouseOperators(): Promise<WarehouseOperator[]> {
+    return await db.select().from(warehouseOperators);
+  }
+
+  async createWarehouseOperator(operator: InsertWarehouseOperator): Promise<WarehouseOperator> {
+    const [newOperator] = await db.insert(warehouseOperators).values(operator).returning();
+    return newOperator;
+  }
+
+  async updateWarehouseOperator(id: number, operatorData: Partial<InsertWarehouseOperator>): Promise<WarehouseOperator | undefined> {
+    const [updatedOperator] = await db.update(warehouseOperators)
+      .set(operatorData)
+      .where(eq(warehouseOperators.id, id))
+      .returning();
+    return updatedOperator;
+  }
+
+  async deleteWarehouseOperator(id: number): Promise<boolean> {
+    const result = await db.delete(warehouseOperators).where(eq(warehouseOperators.id, id));
+    return result.rowCount ? result.rowCount > 0 : false;
+  }
+
+  // Helper method for user hierarchy
+  async getUserHierarchy(userId: number): Promise<User[]> {
+    const hierarchy: User[] = [];
+    let currentUser = await this.getUser(userId);
+    
+    while (currentUser) {
+      hierarchy.push(currentUser);
+      if (currentUser.managerId) {
+        currentUser = await this.getUser(currentUser.managerId);
+      } else {
+        break;
+      }
+    }
+    
+    return hierarchy;
+  }
+
+  // Additional missing methods for complete functionality
+  async getUserOperatedWarehouses(userId: number): Promise<Warehouse[]> {
+    const operators = await this.getWarehouseOperatorsByUser(userId);
+    const warehouses: Warehouse[] = [];
+    for (const operator of operators) {
+      const warehouse = await this.getWarehouse(operator.warehouseId);
+      if (warehouse) warehouses.push(warehouse);
+    }
+    return warehouses;
+  }
+
+  async isUserWarehouseOperator(userId: number, warehouseId: number): Promise<boolean> {
+    const operators = await this.getWarehouseOperatorsByUser(userId);
+    return operators.some(op => op.warehouseId === warehouseId && op.isActive);
+  }
+
+  // Stub implementations for complex methods that need full implementation
+  async getAllRejectedGoods(): Promise<RejectedGoods[]> {
+    return await db.select().from(rejectedGoods);
+  }
+
+  async getRejectedGoodsByWarehouse(warehouseId: number): Promise<RejectedGoods[]> {
+    return await db.select().from(rejectedGoods).where(eq(rejectedGoods.warehouseId, warehouseId));
+  }
+
+  async updateRejectedGoods(id: number, data: Partial<InsertRejectedGoods>): Promise<RejectedGoods | undefined> {
+    const [updated] = await db.update(rejectedGoods)
+      .set(data)
+      .where(eq(rejectedGoods.id, id))
+      .returning();
+    return updated;
+  }
+
+  // Transfer-related methods
+  async getTransfer(id: number): Promise<Transfer | undefined> {
+    const [transfer] = await db.select().from(transfers).where(eq(transfers.id, id));
+    return transfer;
+  }
+
+  async getAllTransfers(): Promise<Transfer[]> {
+    return await db.select().from(transfers);
+  }
+
+  async getTransfersByStatus(status: string): Promise<Transfer[]> {
+    return await db.select().from(transfers).where(eq(transfers.status, status));
+  }
+
+  async createTransfer(transfer: InsertTransfer): Promise<Transfer> {
+    // Generate transfer code if not provided
+    const transferData = {
+      ...transfer,
+      transferCode: `TRF-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+    };
+    const [newTransfer] = await db.insert(transfers).values(transferData).returning();
+    return newTransfer;
+  }
+
+  async updateTransfer(id: number, data: Partial<InsertTransfer>): Promise<Transfer | undefined> {
+    const [updated] = await db.update(transfers)
+      .set(data)
+      .where(eq(transfers.id, id))
+      .returning();
+    return updated;
+  }
+
+  async getTransferItemsByTransfer(transferId: number): Promise<TransferItem[]> {
+    return await db.select().from(transferItems).where(eq(transferItems.transferId, transferId));
+  }
+
+  async createTransferItem(item: InsertTransferItem): Promise<TransferItem> {
+    const [newItem] = await db.insert(transferItems).values(item).returning();
+    return newItem;
+  }
+
+  async getTransferUpdatesByTransfer(transferId: number): Promise<TransferUpdate[]> {
+    return await db.select().from(transferUpdates).where(eq(transferUpdates.transferId, transferId));
+  }
+
+  async createTransferUpdate(update: InsertTransferUpdate): Promise<TransferUpdate> {
+    const [newUpdate] = await db.insert(transferUpdates).values(update).returning();
+    return newUpdate;
+  }
+
+  // Simplified implementations for complex business logic methods
+  async approveReturn(transferId: number, userId: number): Promise<boolean> {
+    await this.updateTransfer(transferId, { status: 'return_approved', approvedBy: userId });
+    return true;
+  }
+
+  async approveDisposal(transferId: number, userId: number): Promise<boolean> {
+    await this.updateTransfer(transferId, { status: 'disposal_approved', approvedBy: userId });
+    return true;
+  }
+
+  async recordReturnShipment(transferId: number, data: any): Promise<boolean> {
+    await this.updateTransfer(transferId, { status: 'return_shipped', ...data });
+    return true;
+  }
+
+  async recordReturnDelivery(transferId: number, data: any): Promise<boolean> {
+    await this.updateTransfer(transferId, { status: 'return_delivered', ...data });
+    return true;
+  }
 }
 
 // Create a global storage instance
