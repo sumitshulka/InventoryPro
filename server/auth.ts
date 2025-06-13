@@ -274,9 +274,32 @@ export function setupAuth(app: Express) {
         console.log(`Attempting to send reset email to: ${user.email}`);
         console.log(`Reset URL generated: ${resetUrl}`);
         
+        // Generate random subject line with timestamp
+        const subjectOptions = [
+          'You requested for a change in password',
+          'Reset information for your password',
+          'Password change request received',
+          'Your password reset link is ready',
+          'Security alert: Password reset requested',
+          'Action required: Reset your account password',
+          'Password recovery assistance',
+          'Account security: Password reset link'
+        ];
+        
+        const randomSubject = subjectOptions[Math.floor(Math.random() * subjectOptions.length)];
+        const timestamp = new Date().toLocaleString('en-US', {
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+          timeZoneName: 'short'
+        });
+        const subjectWithTimestamp = `${randomSubject} - ${timestamp}`;
+        
         const emailSent = await emailService.sendEmail({
           to: user.email,
-          subject: 'Password Reset Request',
+          subject: subjectWithTimestamp,
           html: `
             <h2>Password Reset Request</h2>
             <p>You requested a password reset for your inventory management account.</p>
