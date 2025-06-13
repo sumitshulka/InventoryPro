@@ -2785,6 +2785,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get all disposed transfers
       const disposedTransfers = await storage.getTransfersByStatus("disposed");
       
+      // Calculate global item unit values as of current date
+      const { itemUnitValues } = await calculateItemUnitValues(new Date());
+      
       let disposedItems: any[] = [];
 
       // Get items from disposed transfers
@@ -2796,6 +2799,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const warehouse = await storage.getWarehouse(transfer.destinationWarehouseId);
           const approvedByUser = transfer.approvedBy ? await storage.getUser(transfer.approvedBy) : null;
           
+          // Get the global unit value for this item
+          const unitValue = itemUnitValues.get(transferItem.itemId) || 0;
+          const quantity = transferItem.actualQuantity || transferItem.requestedQuantity;
+          const totalValue = unitValue * quantity;
+          
           disposedItems.push({
             transferId: transfer.id,
             transferCode: transfer.transferCode || `DISP-${transfer.id}`,
@@ -2803,7 +2811,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             item,
             warehouse,
             warehouseId: transfer.destinationWarehouseId,
-            quantity: transferItem.actualQuantity || transferItem.requestedQuantity,
+            quantity: quantity,
+            unitValue: unitValue,
+            totalValue: totalValue,
             disposalDate: transfer.disposalDate,
             disposalReason: transfer.disposalReason,
             approvedBy: approvedByUser?.name || 'System',

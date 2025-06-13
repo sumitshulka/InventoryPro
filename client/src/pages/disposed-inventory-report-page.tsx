@@ -63,13 +63,12 @@ export default function DisposedInventoryReportPage() {
 
   const currencySymbol = organizationSettings?.currencySymbol || "$";
 
-  // Calculate summary statistics
+  // Calculate summary statistics using backend-provided unit values
   const summaryStats = disposedItems?.reduce((acc: any, item: any) => {
     acc.totalItems += item.quantity;
     
-    // Use inventory valuation: quantity * (cost || rate || 0)
-    const unitValue = item.item?.cost || item.item?.rate || 0;
-    const itemValue = item.quantity * parseFloat(unitValue);
+    // Use the unit value and total value from the backend
+    const itemValue = item.totalValue || 0;
     acc.totalValue += itemValue;
     
     acc.uniqueItems.add(item.itemId);
@@ -418,8 +417,8 @@ export default function DisposedInventoryReportPage() {
                                   </div>
                                 </TableCell>
                                 <TableCell>{item.quantity}</TableCell>
-                                <TableCell>{formatCurrencyFull(item.item?.rate || 0, currencySymbol)}</TableCell>
-                                <TableCell>{formatCurrencyFull((item.quantity * (item.item?.rate || 0)), currencySymbol)}</TableCell>
+                                <TableCell>{formatCurrencyFull(item.unitValue || 0, currencySymbol)}</TableCell>
+                                <TableCell>{formatCurrencyFull(item.totalValue || 0, currencySymbol)}</TableCell>
                                 <TableCell>
                                   {item.disposalDate ? new Date(item.disposalDate).toLocaleDateString() : 'N/A'}
                                 </TableCell>
