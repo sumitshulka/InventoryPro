@@ -491,24 +491,15 @@ export default function HelpSystem({ open, onOpenChange }: HelpSystemProps) {
               <HelpCircle className="h-5 w-5" />
               Help & Documentation
             </DialogTitle>
-            <div className="flex items-center gap-2">
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={() => onOpenChange(false)}
-                className="text-sm"
-              >
-                <ArrowRight className="h-4 w-4 mr-2" />
-                Back to Application
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => onOpenChange(false)}
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => onOpenChange(false)}
+              className="text-sm"
+            >
+              <ArrowRight className="h-4 w-4 mr-2" />
+              Back to Application
+            </Button>
           </div>
           <div id="help-system-description" className="text-sm text-gray-600">
             Search for help topics, view documentation, and find quick actions.
@@ -630,8 +621,8 @@ export default function HelpSystem({ open, onOpenChange }: HelpSystemProps) {
                     <TabsTrigger value="quick-actions">Quick Actions</TabsTrigger>
                   </TabsList>
 
-                  <TabsContent value="topics" className="space-y-4 h-[calc(100%-80px)]">
-                    <ScrollArea className="h-full">
+                  <TabsContent value="topics" className="space-y-4">
+                    <div className="max-h-[400px] overflow-y-auto">
                       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 p-2">
                         {currentArticles.map((article) => (
                           <Card 
@@ -664,7 +655,7 @@ export default function HelpSystem({ open, onOpenChange }: HelpSystemProps) {
                           </Card>
                         ))}
                       </div>
-                    </ScrollArea>
+                    </div>
                     
                     {/* Articles Pagination */}
                     {totalArticlePages > 1 && (
@@ -699,8 +690,8 @@ export default function HelpSystem({ open, onOpenChange }: HelpSystemProps) {
                     )}
                   </TabsContent>
 
-                  <TabsContent value="quick-actions" className="space-y-4 h-[calc(100%-80px)]">
-                    <ScrollArea className="h-full">
+                  <TabsContent value="quick-actions" className="space-y-4">
+                    <div className="max-h-[400px] overflow-y-auto">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-2">
                         {currentActions.map((action) => {
                           const Icon = action.icon;
@@ -733,7 +724,7 @@ export default function HelpSystem({ open, onOpenChange }: HelpSystemProps) {
                           );
                         })}
                       </div>
-                    </ScrollArea>
+                    </div>
                     
                     {/* Quick Actions Pagination */}
                     {totalActionPages > 1 && (
