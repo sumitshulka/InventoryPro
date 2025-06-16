@@ -1,7 +1,7 @@
 import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { setupAuth } from "./auth";
+import { setupAuth, hashPassword } from "./auth";
 import { z } from "zod";
 import { 
   insertItemSchema, 
@@ -110,6 +110,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(401).json({ message: "Unauthorized" });
     }
     res.json(req.user);
+  });
+
+  // Check if any admin users exist (for superadmin creation)
+  app.get("/api/check-admin-exists", async (req, res) => {
+    try {
+      const users = await storage.getAllUsers();
+      const adminExists = users.some(user => user.role === 'admin');
+      res.json({ adminExists });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Create superadmin user (only if no admin exists)
+  app.post("/api/create-superadmin", async (req, res) => {
+    try {
+      const users = await storage.getAllUsers();
+      const adminExists = users.some(user => user.role === 'admin');
+      
+      if (adminExists) {
+        return res.status(400).json({ message: "Admin user already exists" });
+      }
+
+      const hashedPassword = await hashPassword("superadmin123!");
+      
+      const superadminUser = {
+        username: "superadmin",
+        password: hashedPassword,
+        name: "Super Administrator",
+        email: "superadmin@system.local",
+        role: "admin" as const,
+        managerId: null,
+        warehouseId: null,
+        departmentId: null,
+        isWarehouseOperator: false,
+        isActive: true,
+        resetToken: null,
+        resetTokenExpiry: null
+      };
+
+      const createdUser = await storage.createUser(superadminUser);
+      
+      // Remove password from response
+      const { password, ...userResponse } = createdUser;
+      res.json({ message: "Superadmin created successfully", user: userResponse });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
   });
 
   // ==== User Management Routes ====
@@ -4470,8 +4518,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         let matchesDate = reqDate >= start && reqDate <= end;
         let matchesDept = !departmentId || departmentId === 'all' || item.request.userId;
         let matchesWarehouse = !warehouseId || warehouseId === 'all';
+        // Only include completed/approved requests for accurate analytics
+        let isApproved = item.request.status === 'completed' || item.request.status === 'approved';
         
-        return matchesDate && matchesDept && matchesWarehouse;
+        return matchesDate && matchesDept && matchesWarehouse && isApproved;
       });
 
       // Group by item
@@ -4519,12 +4569,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const allUsers = await storage.getAllUsers();
       const allDepartments = await storage.getAllDepartments();
       
-      // Filter requests by date
+      // Filter requests by date and status
       const filteredRequests = allRequests.filter(req => {
         const reqDate = new Date(req.createdAt || '');
         const start = new Date(startDate as string);
         const end = new Date(endDate as string);
-        return reqDate >= start && reqDate <= end;
+        const isApproved = req.status === 'completed' || req.status === 'approved';
+        return reqDate >= start && reqDate <= end && isApproved;
       });
 
       // Group by department
@@ -4615,6 +4666,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         switch (request.status) {
           case 'approved':
+          case 'completed':
             analysis.approvedCount++;
             break;
           case 'rejected':

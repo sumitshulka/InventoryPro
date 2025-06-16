@@ -75,6 +75,7 @@ export class EmailService {
 
   async sendEmail(params: EmailParams): Promise<boolean> {
     if (!this.transporter || !this.settings) {
+      console.error('Email service not configured - transporter or settings missing');
       throw new Error('Email service not configured');
     }
 
@@ -87,7 +88,9 @@ export class EmailService {
         html: params.html,
       };
 
-      await this.transporter.sendMail(mailOptions);
+      console.log(`Sending email from: ${mailOptions.from} to: ${mailOptions.to}`);
+      const result = await this.transporter.sendMail(mailOptions);
+      console.log('Email sent successfully:', result.messageId);
       return true;
     } catch (error) {
       console.error('Email sending failed:', error);
