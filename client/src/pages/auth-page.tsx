@@ -3,7 +3,7 @@ import { useLocation } from "wouter";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -30,6 +30,39 @@ export default function AuthPage() {
   const { user, loginMutation } = useAuth();
   const [_, setLocation] = useLocation();
   const { toast } = useToast();
+
+  // Check if admin exists in the system
+  const { data: adminCheckData, isLoading: isCheckingAdmin } = useQuery({
+    queryKey: ["/api/check-admin-exists"],
+    queryFn: () => fetch("/api/check-admin-exists").then(res => res.json()),
+    retry: false
+  });
+
+  // Create superadmin mutation
+  const createSuperadminMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest("/api/create-superadmin", "POST", {});
+    },
+    onSuccess: () => {
+      toast({
+        title: "Superadmin Created",
+        description: "Superadmin account created successfully. You can now login with username 'superadmin' and password 'superadmin123!'",
+      });
+      // Refetch admin check to hide the link
+      adminCheckData && (adminCheckData.adminExists = true);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create superadmin account",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleCreateSuperadmin = () => {
+    createSuperadminMutation.mutate();
+  };
   
   useEffect(() => {
     console.log("AuthPage effect, user:", user);
@@ -280,7 +313,28 @@ export default function AuthPage() {
                       )}
                     </div>
                     
-                    <div className="flex justify-end">
+                    <div className="flex justify-between">
+                      {/* Show Create Superadmin link only if no admin exists */}
+                      <div>
+                        {!isCheckingAdmin && adminCheckData && !adminCheckData.adminExists && (
+                          <button
+                            type="button"
+                            onClick={handleCreateSuperadmin}
+                            disabled={createSuperadminMutation.isPending}
+                            className="text-sm text-green-600 hover:text-green-700 hover:underline transition-colors font-medium"
+                          >
+                            {createSuperadminMutation.isPending ? (
+                              <>
+                                <Loader2 className="mr-1 h-3 w-3 animate-spin inline" />
+                                Creating...
+                              </>
+                            ) : (
+                              "Create Superadmin"
+                            )}
+                          </button>
+                        )}
+                      </div>
+                      
                       <button
                         type="button"
                         onClick={() => setActiveView("forgot-password")}
