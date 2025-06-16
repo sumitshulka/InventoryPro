@@ -14,7 +14,7 @@ declare global {
   }
 }
 
-async function hashPassword(password: string): Promise<string> {
+export async function hashPassword(password: string): Promise<string> {
   const salt = randomBytes(16).toString("hex");
   const hashedPassword = createHash('md5').update(password + salt).digest('hex');
   return `${hashedPassword}.${salt}`;
@@ -420,5 +420,4 @@ If you didn't request this reset, please ignore this email.`
   });
 }
 
-// Export hash function for external use
-export { hashPassword };
+// hashPassword is already exported above
