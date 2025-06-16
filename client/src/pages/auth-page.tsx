@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { useQueryClient } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 
 const loginSchema = z.object({
@@ -30,6 +31,7 @@ export default function AuthPage() {
   const { user, loginMutation } = useAuth();
   const [_, setLocation] = useLocation();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   // Check if admin exists in the system
   const { data: adminCheckData, isLoading: isCheckingAdmin } = useQuery({
@@ -41,15 +43,16 @@ export default function AuthPage() {
   // Create superadmin mutation
   const createSuperadminMutation = useMutation({
     mutationFn: async () => {
-      return apiRequest("/api/create-superadmin", "POST", {});
+      const response = await apiRequest("POST", "/api/create-superadmin", {});
+      return response.json();
     },
     onSuccess: () => {
       toast({
         title: "Superadmin Created",
         description: "Superadmin account created successfully. You can now login with username 'superadmin' and password 'superadmin123!'",
       });
-      // Refetch admin check to hide the link
-      adminCheckData && (adminCheckData.adminExists = true);
+      // Invalidate the admin check query to refetch and hide the link
+      queryClient.invalidateQueries({ queryKey: ["/api/check-admin-exists"] });
     },
     onError: (error: Error) => {
       toast({
