@@ -126,6 +126,35 @@ export class LicenseManager {
 
       const licenseResponse: LicenseAcquisitionResponse = await response.json();
 
+      console.log('========== LICENSE MANAGER RESPONSE ==========');
+      console.log('Raw Response:', JSON.stringify(licenseResponse, null, 2));
+      console.log('========================================');
+
+      // Validate response structure according to expected schema
+      if (!licenseResponse.license_key) {
+        throw new Error(`Missing license_key in response. Received: ${JSON.stringify(licenseResponse)}`);
+      }
+      if (!licenseResponse.subscription_type) {
+        throw new Error(`Missing subscription_type in response. Received: ${JSON.stringify(licenseResponse)}`);
+      }
+      if (!licenseResponse.valid_till) {
+        throw new Error(`Missing valid_till in response. Received: ${JSON.stringify(licenseResponse)}`);
+      }
+      if (!licenseResponse.checksum) {
+        throw new Error(`Missing checksum in response. Received: ${JSON.stringify(licenseResponse)}`);
+      }
+      if (!licenseResponse.subscription_data) {
+        throw new Error(`Missing subscription_data in response. Received: ${JSON.stringify(licenseResponse)}`);
+      }
+
+      // Validate subscription_data structure
+      const subData = licenseResponse.subscription_data;
+      if (!subData.properties) {
+        throw new Error(`Missing properties in subscription_data. Expected object with properties like Users, Products. Received: ${JSON.stringify(subData)}`);
+      }
+
+      console.log('License response validation passed');
+
       // Store the license in database with encryption
       const encryptedMutualKey = encrypt(licenseResponse.checksum); // Using checksum as mutual key
       const encryptedSubscriptionData = encrypt(JSON.stringify(licenseResponse.subscription_data));

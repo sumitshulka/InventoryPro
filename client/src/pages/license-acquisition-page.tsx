@@ -60,8 +60,12 @@ export default function LicenseAcquisitionPage({ onLicenseAcquired }: LicenseAcq
       // Store request for debug panel
       setLastRequest(requestData);
       
+      console.log('Frontend: Sending license request:', requestData);
+      
       const response = await apiRequest("POST", "/api/license/acquire", requestData);
       const responseData = await response.json();
+      
+      console.log('Frontend: Received license response:', responseData);
       
       // Store response for debug panel
       setLastResponse(responseData);
