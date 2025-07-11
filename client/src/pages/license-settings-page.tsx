@@ -44,6 +44,8 @@ export default function LicenseSettingsPage() {
           description = "This application is not registered with the external license manager. Please contact your administrator to register the application or use local validation instead.";
         } else if (data.message && data.message.includes("Domain validation required")) {
           description = "The external license manager requires domain validation. Your current domain may not be authorized for this license. Please contact your administrator to update the license domain settings.";
+        } else if (data.message && data.message.includes("License is not in valid status")) {
+          description = "The license is not in a valid status according to the external license manager. This may be due to checksum mismatch, expiry, or deactivation. Please contact your administrator.";
         }
         
         toast({

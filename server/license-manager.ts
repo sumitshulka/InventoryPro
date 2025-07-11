@@ -68,10 +68,11 @@ export function generateChecksum(
   clientId: string,
   appId: string,
   licenseKey: string,
-  expiryDate: string
+  endDateISOString: string
 ): string {
-  const dataString = `${clientId}${appId}${licenseKey}${expiryDate}`;
-  return crypto.createHmac('sha256', mutualKey).update(dataString).digest('hex');
+  const checksumData = clientId + appId + licenseKey + endDateISOString;
+  const checksum = crypto.createHmac('sha256', mutualKey).update(checksumData).digest('hex');
+  return checksum;
 }
 
 export class LicenseManager {
