@@ -138,6 +138,7 @@ A comprehensive inventory management system built with React (frontend) and Expr
 - June 16, 2025. Initial setup
 - July 11, 2025. Implemented comprehensive license management system with external license manager integration, HMAC-SHA256 checksum validation, and user limit enforcement
 - July 11, 2025. Fixed license acquisition flow with proper JSON response validation, debug panel for troubleshooting, and improved license status checking. Added comprehensive logging for license validation process. Updated API endpoints to use /api/validate-license format as per external license manager specification.
+- July 11, 2025. Resolved critical checksum calculation bug by fixing mutual key storage (was storing checksum instead of actual mutual_key from response). Updated license acquisition to properly extract mutual_key field from external license manager response. Implemented validation response parsing to handle {"status": "Valid"} format. Added request deduplication with 30-second caching to prevent multiple simultaneous validation calls to external license server.
 
 ## User Preferences
 
