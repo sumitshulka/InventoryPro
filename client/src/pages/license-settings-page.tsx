@@ -186,7 +186,7 @@ export default function LicenseSettingsPage() {
                     onChange={(e) => setLicenseManagerUrl(e.target.value)}
                   />
                   <p className="text-sm text-gray-500 mt-1">
-                    Application ID: a17ba122-e7db-4568-8928-9f749f65e1fe
+                    Application ID: 0ce1df0ffe4d4ce2634025e956a4f801
                   </p>
                 </div>
                 <div className="flex justify-end gap-2">

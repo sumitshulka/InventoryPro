@@ -4,7 +4,7 @@ import { licenses, type License, type InsertLicense } from '../shared/schema.js'
 import { eq, and, desc } from 'drizzle-orm';
 
 // Application constants
-export const APP_ID = 'a17ba122-e7db-4568-8928-9f749f65e1fe';
+export const APP_ID = '0ce1df0ffe4d4ce2634025e956a4f801';
 const ENCRYPTION_KEY = process.env.LICENSE_ENCRYPTION_KEY || 'inventory-license-key-2024';
 
 // License API types
