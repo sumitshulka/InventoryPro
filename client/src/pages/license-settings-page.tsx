@@ -39,9 +39,11 @@ export default function LicenseSettingsPage() {
       } else {
         let description = data.message || 'License validation failed';
         
-        // Provide better messaging for application not found error
+        // Provide better messaging for specific errors
         if (data.message && data.message.includes("Application not found")) {
           description = "This application is not registered with the external license manager. Please contact your administrator to register the application or use local validation instead.";
+        } else if (data.message && data.message.includes("Domain validation required")) {
+          description = "The external license manager requires domain validation. Your current domain may not be authorized for this license. Please contact your administrator to update the license domain settings.";
         }
         
         toast({
@@ -174,7 +176,9 @@ export default function LicenseSettingsPage() {
                 <Alert>
                   <AlertCircle className="h-4 w-4" />
                   <AlertDescription>
-                    External validation requires your application to be registered with the license manager. If you receive "Application not found" errors, contact your administrator to register this application first.
+                    External validation requires your application to be registered with the license manager and your domain to be authorized. Common issues include:
+                    • "Application not found" - Contact administrator to register this application
+                    • "Domain validation required" - Your current domain may need to be authorized for this license
                   </AlertDescription>
                 </Alert>
                 <div>
