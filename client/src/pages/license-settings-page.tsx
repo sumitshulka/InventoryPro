@@ -5,12 +5,17 @@ import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Shield, CheckCircle, AlertCircle, RefreshCw, Clock, Users, Package } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useState } from "react";
 
 export default function LicenseSettingsPage() {
   const { toast } = useToast();
+  const [licenseManagerUrl, setLicenseManagerUrl] = useState("");
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   // Get current license status
   const { data: licenseStatus, isLoading, refetch } = useQuery({
@@ -19,8 +24,9 @@ export default function LicenseSettingsPage() {
 
   // Validate license mutation
   const validateLicenseMutation = useMutation({
-    mutationFn: async () => {
-      const response = await apiRequest("POST", "/api/license/validate", {});
+    mutationFn: async (url?: string) => {
+      const payload = url ? { license_manager_url: url } : {};
+      const response = await apiRequest("POST", "/api/license/validate", payload);
       return response.json();
     },
     onSuccess: (data) => {
@@ -48,7 +54,17 @@ export default function LicenseSettingsPage() {
   });
 
   const handleValidateLicense = () => {
-    validateLicenseMutation.mutate();
+    if (licenseManagerUrl.trim()) {
+      validateLicenseMutation.mutate(licenseManagerUrl.trim());
+      setIsDialogOpen(false);
+    } else {
+      // Try local validation first
+      validateLicenseMutation.mutate();
+    }
+  };
+
+  const handleValidateWithUrl = () => {
+    setIsDialogOpen(true);
   };
 
   if (isLoading) {
@@ -114,23 +130,61 @@ export default function LicenseSettingsPage() {
           <h1 className="text-3xl font-bold text-gray-900">License Management</h1>
           <p className="text-gray-600 mt-1">View and manage your application license</p>
         </div>
-        <Button 
-          onClick={handleValidateLicense}
-          disabled={validateLicenseMutation.isPending}
-          variant="outline"
-        >
-          {validateLicenseMutation.isPending ? (
-            <>
-              <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-              Validating...
-            </>
-          ) : (
-            <>
-              <Shield className="h-4 w-4 mr-2" />
-              Validate License
-            </>
-          )}
-        </Button>
+        <div className="flex gap-2">
+          <Button 
+            onClick={handleValidateLicense}
+            disabled={validateLicenseMutation.isPending}
+            variant="outline"
+          >
+            {validateLicenseMutation.isPending ? (
+              <>
+                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                Validating...
+              </>
+            ) : (
+              <>
+                <Shield className="h-4 w-4 mr-2" />
+                Validate License
+              </>
+            )}
+          </Button>
+          
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <Button 
+                onClick={handleValidateWithUrl}
+                disabled={validateLicenseMutation.isPending}
+                variant="default"
+              >
+                External Validation
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>External License Validation</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="license-manager-url">License Manager URL</Label>
+                  <Input
+                    id="license-manager-url"
+                    placeholder="https://license-manager.example.com"
+                    value={licenseManagerUrl}
+                    onChange={(e) => setLicenseManagerUrl(e.target.value)}
+                  />
+                </div>
+                <div className="flex justify-end gap-2">
+                  <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button onClick={handleValidateLicense} disabled={!licenseManagerUrl.trim()}>
+                    Validate
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       {/* License Status Alert */}

@@ -211,8 +211,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Validate license manually
   app.post("/api/license/validate", async (req, res) => {
     try {
-      const clientId = process.env.CLIENT_ID || req.headers['x-client-id'] as string;
-      const baseUrl = `${req.protocol}://${req.get('host')}`;
+      const { license_manager_url } = req.body;
+      
+      // Try to get client ID from various sources
+      let clientId = process.env.CLIENT_ID || req.headers['x-client-id'] as string;
+      
+      // If no client ID, check if there's any license in the database
+      if (!clientId) {
+        const anyLicense = await licenseManager.getCurrentLicense('');
+        if (anyLicense) {
+          clientId = anyLicense.clientId;
+          console.log('Using client ID from existing license:', clientId);
+        }
+      }
       
       if (!clientId) {
         return res.status(400).json({ 
@@ -221,6 +232,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
+      // Set license manager URL if provided for external validation
+      if (license_manager_url) {
+        licenseManager.setLicenseManagerUrl(license_manager_url);
+        console.log('License manager URL set for validation:', license_manager_url);
+      }
+
+      const baseUrl = `${req.protocol}://${req.get('host')}`;
       const validation = await licenseManager.validateLicense(clientId, baseUrl);
       
       res.json({
