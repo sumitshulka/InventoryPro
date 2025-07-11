@@ -214,6 +214,39 @@ export const insertInventorySchema = createInsertSchema(inventory).pick({
 // Transaction types (check-in, issue, transfer)
 export type TransactionType = "check-in" | "issue" | "transfer";
 
+// License management schema
+export const licenses = pgTable("licenses", {
+  id: serial("id").primaryKey(),
+  applicationId: text("application_id").notNull(),
+  clientId: text("client_id").notNull(),
+  licenseKey: text("license_key").notNull().unique(),
+  subscriptionType: text("subscription_type").notNull(),
+  validTill: timestamp("valid_till").notNull(),
+  mutualKey: text("mutual_key").notNull(), // Encrypted
+  checksum: text("checksum").notNull(),
+  subscriptionData: text("subscription_data").notNull(), // JSON string, encrypted
+  baseUrl: text("base_url").notNull(),
+  isActive: boolean("is_active").notNull().default(true),
+  lastValidated: timestamp("last_validated").defaultNow().notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at"),
+}, (table) => ({
+  licensesApplicationIdx: index("licenses_application_idx").on(table.applicationId),
+  licensesClientIdx: index("licenses_client_idx").on(table.clientId),
+  licensesActiveIdx: index("licenses_active_idx").on(table.isActive),
+  licensesValidTillIdx: index("licenses_valid_till_idx").on(table.validTill),
+  licensesLastValidatedIdx: index("licenses_last_validated_idx").on(table.lastValidated),
+}));
+
+export const insertLicenseSchema = createInsertSchema(licenses).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type License = typeof licenses.$inferSelect;
+export type InsertLicense = z.infer<typeof insertLicenseSchema>;
+
 // Inventory transactions
 export const transactions = pgTable("transactions", {
   id: serial("id").primaryKey(),

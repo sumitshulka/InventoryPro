@@ -36,6 +36,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { apiRequest, queryClient, invalidateRelatedQueries } from "@/lib/queryClient";
 import { Loader2, Plus, Edit, Trash2, Settings, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import LicenseSettingsPage from "./license-settings-page";
 
 const approvalSettingsSchema = z.object({
   requestType: z.string().min(1, "Request type is required"),
@@ -636,6 +637,7 @@ export default function SettingsPage() {
             <TabsTrigger value="office-locations">Office Locations</TabsTrigger>
             <TabsTrigger value="organization">Organization</TabsTrigger>
             <TabsTrigger value="email-config">Email Configuration</TabsTrigger>
+            <TabsTrigger value="license-management">License Management</TabsTrigger>
             <TabsTrigger value="system-config">System Configuration</TabsTrigger>
           </TabsList>
 
@@ -1664,6 +1666,10 @@ export default function SettingsPage() {
                 )}
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="license-management" className="space-y-4">
+            <LicenseSettingsPage />
           </TabsContent>
 
           <TabsContent value="system-config" className="space-y-4">

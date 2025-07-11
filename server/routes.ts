@@ -2,6 +2,8 @@ import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, hashPassword } from "./auth";
+import { licenseManager } from "./license-manager.js";
+import { requireValidLicense, checkUserLimit } from "./license-middleware.js";
 import { z } from "zod";
 import { 
   insertItemSchema, 
@@ -104,6 +106,136 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Setup authentication routes
   setupAuth(app);
 
+  // License acquisition endpoint (no middleware required)
+  app.post("/api/license/acquire", async (req, res) => {
+    try {
+      const { client_id, base_url, license_manager_url } = req.body;
+      
+      if (!client_id || !base_url) {
+        return res.status(400).json({ 
+          error: 'MISSING_PARAMETERS',
+          message: 'client_id and base_url are required' 
+        });
+      }
+
+      // Set license manager URL if provided
+      if (license_manager_url) {
+        licenseManager.setLicenseManagerUrl(license_manager_url);
+      }
+
+      const result = await licenseManager.acquireLicense(client_id, base_url);
+      
+      if (result.success) {
+        res.json({ 
+          success: true, 
+          message: result.message,
+          license: {
+            clientId: result.license?.clientId,
+            licenseKey: result.license?.licenseKey,
+            subscriptionType: result.license?.subscriptionType,
+            validTill: result.license?.validTill,
+            isActive: result.license?.isActive
+          }
+        });
+      } else {
+        res.status(400).json({ 
+          error: 'LICENSE_ACQUISITION_FAILED',
+          message: result.message 
+        });
+      }
+    } catch (error: any) {
+      console.error('License acquisition error:', error);
+      res.status(500).json({ 
+        error: 'INTERNAL_ERROR',
+        message: 'Failed to acquire license' 
+      });
+    }
+  });
+
+  // Get current license status
+  app.get("/api/license/status", async (req, res) => {
+    try {
+      const clientId = process.env.CLIENT_ID || req.headers['x-client-id'] as string;
+      
+      if (!clientId) {
+        return res.json({ 
+          hasLicense: false, 
+          message: 'Client ID not configured' 
+        });
+      }
+
+      const license = await licenseManager.getCurrentLicense(clientId);
+      
+      if (!license) {
+        return res.json({ 
+          hasLicense: false, 
+          message: 'No license found' 
+        });
+      }
+
+      const isExpired = new Date() > new Date(license.validTill);
+      const subscriptionData = await licenseManager.getSubscriptionData(clientId);
+
+      res.json({
+        hasLicense: true,
+        isActive: license.isActive && !isExpired,
+        isExpired,
+        license: {
+          clientId: license.clientId,
+          licenseKey: license.licenseKey,
+          subscriptionType: license.subscriptionType,
+          validTill: license.validTill,
+          lastValidated: license.lastValidated,
+          subscriptionData
+        }
+      });
+    } catch (error: any) {
+      console.error('License status error:', error);
+      res.status(500).json({ 
+        error: 'INTERNAL_ERROR',
+        message: 'Failed to get license status' 
+      });
+    }
+  });
+
+  // Validate license manually
+  app.post("/api/license/validate", async (req, res) => {
+    try {
+      const clientId = process.env.CLIENT_ID || req.headers['x-client-id'] as string;
+      const baseUrl = `${req.protocol}://${req.get('host')}`;
+      
+      if (!clientId) {
+        return res.status(400).json({ 
+          error: 'MISSING_CLIENT_ID',
+          message: 'Client ID not configured' 
+        });
+      }
+
+      const validation = await licenseManager.validateLicense(clientId, baseUrl);
+      
+      res.json({
+        valid: validation.valid,
+        message: validation.message,
+        license: validation.license ? {
+          clientId: validation.license.clientId,
+          licenseKey: validation.license.licenseKey,
+          subscriptionType: validation.license.subscriptionType,
+          validTill: validation.license.validTill,
+          lastValidated: validation.license.lastValidated
+        } : null
+      });
+    } catch (error: any) {
+      console.error('License validation error:', error);
+      res.status(500).json({ 
+        error: 'INTERNAL_ERROR',
+        message: 'Failed to validate license' 
+      });
+    }
+  });
+
+  // Apply license middleware to all protected routes
+  app.use(requireValidLicense);
+
   // Get current user
   app.get("/api/current-user", (req, res) => {
     if (!req.isAuthenticated()) {
@@ -203,7 +335,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Create new user (admin only)
-  app.post("/api/users", checkRole("admin"), async (req, res) => {
+  app.post("/api/users", checkRole("admin"), checkUserLimit, async (req, res) => {
     try {
       const existingUser = await storage.getUserByUsername(req.body.username);
       if (existingUser) {

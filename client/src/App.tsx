@@ -1,6 +1,7 @@
 import { Switch, Route } from "wouter";
 import { Toaster } from "@/components/ui/toaster";
 import { AuthProvider, useAuth } from "@/hooks/use-auth";
+import LicenseGuard from "@/components/license-guard";
 import NotFound from "@/pages/not-found";
 import AuthPage from "@/pages/auth-page";
 import ResetPasswordPage from "@/pages/reset-password-page";
@@ -83,7 +84,9 @@ function Router() {
 function App() {
   return (
     <AuthProvider>
-      <Router />
+      <LicenseGuard>
+        <Router />
+      </LicenseGuard>
       <Toaster />
     </AuthProvider>
   );
