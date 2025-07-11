@@ -45,6 +45,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { useAuth } from "@/hooks/use-auth";
+import { useLicense } from "@/hooks/use-license";
 
 // Item and Category types
 interface Item {
@@ -80,6 +81,7 @@ type FormValues = z.infer<typeof formSchema>;
 export default function ItemMasterPage() {
   const { toast } = useToast();
   const { user } = useAuth();
+  const { getProductLimit, hasProductLimit, isValidLicense } = useLicense();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [editItemId, setEditItemId] = useState<number | null>(null);
@@ -130,6 +132,15 @@ export default function ItemMasterPage() {
 
   const createItemMutation = useMutation({
     mutationFn: async (data: FormValues) => {
+      // Check product limit for new item creation
+      if (!isEditMode && hasProductLimit()) {
+        const activeItems = items?.filter(item => item.status === 'active').length || 0;
+        const productLimit = getProductLimit();
+        if (activeItems >= productLimit!) {
+          throw new Error(`Cannot create item. License allows maximum ${productLimit} active products. Currently have ${activeItems} active products.`);
+        }
+      }
+
       // Explicitly convert the values to match the expected types
       const payload = {
         name: data.name,
@@ -297,11 +308,36 @@ export default function ItemMasterPage() {
     <AppLayout>
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-medium text-gray-800">Item Master</h1>
-          <p className="text-gray-600">Manage your product catalog</p>
+          <h1 className="text-2xl font-medium text-gray-800">
+            Item Master
+            {hasProductLimit() && (
+              <span className="text-lg font-normal text-gray-500 ml-2">
+                ({items?.filter(item => item.status === 'active').length || 0}/{getProductLimit()})
+              </span>
+            )}
+          </h1>
+          <p className="text-gray-600">
+            Manage your product catalog
+            {hasProductLimit() && (
+              <span className="ml-2 text-sm">
+                • License allows maximum {getProductLimit()} products
+              </span>
+            )}
+            {!hasProductLimit() && (
+              <span className="ml-2 text-sm">
+                • Unlimited products allowed
+              </span>
+            )}
+          </p>
         </div>
         {isManager && (
-          <Button onClick={() => setIsDialogOpen(true)}>
+          <Button 
+            onClick={() => setIsDialogOpen(true)}
+            disabled={hasProductLimit() && items?.filter(item => item.status === 'active').length >= getProductLimit()!}
+            title={hasProductLimit() && items?.filter(item => item.status === 'active').length >= getProductLimit()! 
+              ? `Product limit reached (${getProductLimit()})` 
+              : undefined}
+          >
             <Plus className="mr-2 h-4 w-4" />
             Add Item
           </Button>

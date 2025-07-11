@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, hashPassword } from "./auth";
 import { licenseManager } from "./license-manager.js";
-import { requireValidLicense, checkUserLimit } from "./license-middleware.js";
+import { requireValidLicense, checkUserLimit, checkProductLimit } from "./license-middleware.js";
 import { z } from "zod";
 import { 
   insertItemSchema, 
@@ -738,7 +738,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Create item (manager+)
-  app.post("/api/items", checkRole("manager"), async (req, res) => {
+  app.post("/api/items", checkRole("manager"), checkProductLimit, async (req, res) => {
     try {
       const itemData = insertItemSchema.parse(req.body);
       const existingItem = await storage.getItemBySku(itemData.sku);

@@ -46,6 +46,7 @@ import { apiRequest, queryClient, invalidateRelatedQueries } from "@/lib/queryCl
 import { Loader2, Plus, Edit, Users, Trash, RefreshCw, Power, PowerOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
+import { useLicense } from "@/hooks/use-license";
 
 const formSchema = z.object({
   username: z.string().min(3, { message: "Username must be at least 3 characters" }),
@@ -64,6 +65,7 @@ type FormValues = z.infer<typeof formSchema>;
 export default function UsersManagementPage() {
   const { toast } = useToast();
   const { user } = useAuth();
+  const { getUserLimit, hasUserLimit, isValidLicense } = useLicense();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [editUserId, setEditUserId] = useState<number | null>(null);
@@ -109,6 +111,15 @@ export default function UsersManagementPage() {
       // Validate password requirement based on mode
       if (!isEditMode && (!data.password || data.password.trim() === "")) {
         throw new Error("Password is required when creating a new user");
+      }
+
+      // Check user limit for new user creation
+      if (!isEditMode && hasUserLimit()) {
+        const activeUsers = (users as any[])?.filter(u => u.isActive).length || 0;
+        const userLimit = getUserLimit();
+        if (activeUsers >= userLimit!) {
+          throw new Error(`Cannot create user. License allows maximum ${userLimit} active users. Currently have ${activeUsers} active users.`);
+        }
       }
 
       const payload: any = {
@@ -301,12 +312,24 @@ export default function UsersManagementPage() {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">User Management</h1>
+            <h1 className="text-3xl font-bold tracking-tight">
+              User Management
+              {hasUserLimit() && (
+                <span className="text-lg font-normal text-muted-foreground ml-2">
+                  ({(users as any[])?.filter(u => u.isActive).length || 0}/{getUserLimit()})
+                </span>
+              )}
+            </h1>
             <p className="text-muted-foreground">
               {isAdmin 
                 ? "Manage system users and their permissions" 
                 : "View users you manage"
               }
+              {hasUserLimit() && (
+                <span className="ml-2 text-sm">
+                  • License allows maximum {getUserLimit()} users
+                </span>
+              )}
             </p>
           </div>
           <div className="flex gap-2">
@@ -319,7 +342,13 @@ export default function UsersManagementPage() {
               Refresh
             </Button>
             {canEdit && (
-              <Button onClick={() => setIsDialogOpen(true)}>
+              <Button 
+                onClick={() => setIsDialogOpen(true)}
+                disabled={hasUserLimit() && (users as any[])?.filter(u => u.isActive).length >= getUserLimit()!}
+                title={hasUserLimit() && (users as any[])?.filter(u => u.isActive).length >= getUserLimit()! 
+                  ? `User limit reached (${getUserLimit()})` 
+                  : undefined}
+              >
                 <Plus className="mr-2 h-4 w-4" />
                 Add User
               </Button>

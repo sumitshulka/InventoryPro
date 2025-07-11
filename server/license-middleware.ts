@@ -119,6 +119,43 @@ export async function checkUserLimit(req: Request, res: Response, next: NextFunc
   }
 }
 
+// Middleware to check product limits
+export async function checkProductLimit(req: Request, res: Response, next: NextFunction) {
+  try {
+    const clientId = process.env.CLIENT_ID || req.headers['x-client-id'] as string;
+    if (!clientId) {
+      return next(); // Skip if no client ID
+    }
+
+    // Only check on item creation endpoints
+    if (req.method === 'POST' && req.path === '/api/items') {
+      const limits = await licenseManager.checkLimits(clientId, 'Products');
+      
+      // If Products limit is not specified in license, allow unlimited
+      if (!limits.allowed) {
+        return next(); // Allow unlimited products if not specified
+      }
+
+      // Get current item count
+      const { storage } = await import('./storage.js');
+      const items = await storage.getAllItems();
+      const activeItems = items.filter(item => item.status === 'active').length;
+
+      if (activeItems >= limits.limit) {
+        return res.status(403).json({
+          error: 'PRODUCT_LIMIT_EXCEEDED',
+          message: `License allows maximum ${limits.limit} products. Currently have ${activeItems} active products.`
+        });
+      }
+    }
+
+    next();
+  } catch (error: any) {
+    console.error('Product limit check error:', error);
+    next(); // Continue on error to avoid blocking
+  }
+}
+
 // Declare license property on Express Request type
 declare global {
   namespace Express {
