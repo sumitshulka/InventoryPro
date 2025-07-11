@@ -1,0 +1,11 @@
+We need to implement a license management in this application now. The workflow is as below:
+1. There will be a license schema in which there will be application id, client id, license key and a json stored that will be essential to read the license information for the installation of the application.
+2. The license manager is going to be hosted at a pre-defined URL which this application need to ask when there will be request to acquire license to start function.
+3. The application cannot run or let the admin or any user navigate the system unless the valid license has been acquired.
+4. The license response will send a package detail which have scheme name, and the package fields. The fields for this application would be users and products where users is mandatorty to be present in the response. The license schema will store that information in a way that cannot be modified by external interferance and can be managed or modified by the application only. 
+5. There will be a need of license page in the Settings where the user can see the license details like Client ID, Product ID, License Key, Validity, Expiry Date in a non editable way. 
+6. The license response from the api will also contain a mutual key and a checksum which will be used to always sent to the hosted license manager for license validation. The checksum will need to be calculated on the basis of the document “.CHECKSUM_CALCULATION_GUIDE.md” attached with this message.
+7. The license manager will check the license and checksum and return a success if there is no problem with the license.
+Let me know if you have understood the requirement clearly and describe your plan, approach and components that you will need. Take approval before starting to build the license manager.
+
+Please note that no existing functionality needs to be changed except for stopping the admin to perform any action till the time license is acquired. You will need to create a separate license management and not put any change in the existing application.
