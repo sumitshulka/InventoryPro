@@ -109,12 +109,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // License acquisition endpoint (no middleware required)
   app.post("/api/license/acquire", async (req, res) => {
     try {
-      const { client_id, base_url, license_manager_url } = req.body;
+      const { client_id, product_id, base_url, license_manager_url } = req.body;
       
-      if (!client_id || !base_url) {
+      if (!client_id || !product_id || !base_url) {
         return res.status(400).json({ 
           error: 'MISSING_PARAMETERS',
-          message: 'client_id and base_url are required' 
+          message: 'client_id, product_id and base_url are required' 
         });
       }
 
@@ -123,7 +123,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         licenseManager.setLicenseManagerUrl(license_manager_url);
       }
 
-      const result = await licenseManager.acquireLicense(client_id, base_url);
+      const result = await licenseManager.acquireLicense(client_id, product_id, base_url);
       
       if (result.success) {
         res.json({ 

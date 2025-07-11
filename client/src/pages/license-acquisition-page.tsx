@@ -14,6 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 
 const licenseAcquisitionSchema = z.object({
   client_id: z.string().min(1, "Client ID is required"),
+  product_id: z.string().min(1, "Product ID is required"),
   license_manager_url: z.string().url("Please enter a valid URL"),
 });
 
@@ -38,6 +39,7 @@ export default function LicenseAcquisitionPage({ onLicenseAcquired }: LicenseAcq
     resolver: zodResolver(licenseAcquisitionSchema),
     defaultValues: {
       client_id: "",
+      product_id: "",
       license_manager_url: "",
     },
   });
@@ -47,6 +49,7 @@ export default function LicenseAcquisitionPage({ onLicenseAcquired }: LicenseAcq
       const baseUrl = window.location.origin;
       const requestData = {
         client_id: data.client_id,
+        product_id: data.product_id,
         base_url: baseUrl,
         license_manager_url: data.license_manager_url,
       };
@@ -211,6 +214,20 @@ export default function LicenseAcquisitionPage({ onLicenseAcquired }: LicenseAcq
                   {form.formState.errors.client_id && (
                     <p className="text-sm text-red-500">
                       {form.formState.errors.client_id.message}
+                    </p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="product_id">Product ID</Label>
+                  <Input
+                    id="product_id"
+                    placeholder="Enter your product ID"
+                    {...form.register("product_id")}
+                  />
+                  {form.formState.errors.product_id && (
+                    <p className="text-sm text-red-500">
+                      {form.formState.errors.product_id.message}
                     </p>
                   )}
                 </div>

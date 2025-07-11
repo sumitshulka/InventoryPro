@@ -83,13 +83,9 @@ function Router() {
   // If user is not authenticated, show auth routes without license guard
   return (
     <Switch>
-      <Route path="/auth">
-        <AuthPage />
-      </Route>
+      <Route path="/auth" component={AuthPage} />
       <Route path="/reset-password" component={ResetPasswordPage} />
-      <Route>
-        <AuthPage />
-      </Route>
+      <Route component={AuthPage} />
     </Switch>
   );
 }

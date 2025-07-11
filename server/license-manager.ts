@@ -88,6 +88,7 @@ export class LicenseManager {
   // Acquire license from external license manager
   async acquireLicense(
     clientId: string,
+    productId: string,
     baseUrl: string
   ): Promise<{ success: boolean; message: string; license?: License }> {
     if (!this.licenseManagerUrl) {
@@ -97,7 +98,7 @@ export class LicenseManager {
     try {
       const requestPayload: LicenseAcquisitionRequest = {
         client_id: clientId,
-        app_id: APP_ID,
+        app_id: productId, // Use productId as the app_id in the request
         base_url: baseUrl
       };
 
