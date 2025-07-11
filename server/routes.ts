@@ -155,7 +155,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get current license status
   app.get("/api/license/status", async (req, res) => {
     try {
-      const clientId = process.env.CLIENT_ID || req.headers['x-client-id'] as string;
+      // Try to get client ID from various sources
+      let clientId = process.env.CLIENT_ID || req.headers['x-client-id'] as string;
+      
+      // If no client ID, check if there's any license in the database
+      if (!clientId) {
+        const anyLicense = await licenseManager.getCurrentLicense('');
+        if (anyLicense) {
+          clientId = anyLicense.clientId;
+        }
+      }
       
       if (!clientId) {
         return res.json({ 

@@ -75,9 +75,11 @@ export default function LicenseAcquisitionPage({ onLicenseAcquired }: LicenseAcq
           title: "License Acquired Successfully",
           description: "Your application license has been activated.",
         });
+        // Refresh license status and redirect immediately
         setTimeout(() => {
           onLicenseAcquired();
-        }, 2000);
+          window.location.href = "/";
+        }, 1000);
       } else {
         setErrorMessage(data.message || 'Failed to acquire license');
         setStep('error');
@@ -281,7 +283,13 @@ export default function LicenseAcquisitionPage({ onLicenseAcquired }: LicenseAcq
             <CardContent className="text-center py-8">
               <CheckCircle className="h-12 w-12 text-green-600 mx-auto mb-4" />
               <h3 className="text-lg font-semibold text-green-700 mb-2">License Acquired Successfully</h3>
-              <p className="text-gray-600">Redirecting to application...</p>
+              <p className="text-gray-600 mb-4">Your license has been activated successfully!</p>
+              <Button 
+                onClick={() => window.location.href = "/"} 
+                className="w-full"
+              >
+                Go to Dashboard
+              </Button>
             </CardContent>
           </Card>
         )}

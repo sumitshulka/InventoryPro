@@ -26,8 +26,14 @@ export default function LicenseGuard({ children }: LicenseGuardProps) {
 
   // Handle license acquisition success
   const handleLicenseAcquired = () => {
+    // Force immediate refetch after license acquisition
     refetch();
     setShouldCheckLicense(true);
+    
+    // Also force a page reload after a short delay to ensure fresh state
+    setTimeout(() => {
+      window.location.reload();
+    }, 2000);
   };
 
   if (isLoading) {

@@ -293,16 +293,22 @@ export class LicenseManager {
   // Get current license information
   async getCurrentLicense(clientId: string): Promise<License | null> {
     try {
-      const [currentLicense] = await db
-        .select()
-        .from(licenses)
-        .where(
-          and(
+      // If clientId is empty, get any active license for this application
+      const whereClause = clientId 
+        ? and(
             eq(licenses.applicationId, APP_ID),
             eq(licenses.clientId, clientId),
             eq(licenses.isActive, true)
           )
-        )
+        : and(
+            eq(licenses.applicationId, APP_ID),
+            eq(licenses.isActive, true)
+          );
+
+      const [currentLicense] = await db
+        .select()
+        .from(licenses)
+        .where(whereClause)
         .orderBy(desc(licenses.createdAt))
         .limit(1);
 
