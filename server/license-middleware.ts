@@ -25,8 +25,17 @@ export async function requireValidLicense(req: Request, res: Response, next: Nex
       return next();
     }
 
-    // Get client ID from environment or request
-    const clientId = process.env.CLIENT_ID || req.headers['x-client-id'] as string;
+    // Try to get client ID from various sources
+    let clientId = process.env.CLIENT_ID || req.headers['x-client-id'] as string;
+    
+    // If no client ID, check if there's any license in the database
+    if (!clientId) {
+      const anyLicense = await licenseManager.getCurrentLicense('');
+      if (anyLicense) {
+        clientId = anyLicense.clientId;
+      }
+    }
+    
     if (!clientId) {
       // If no client ID is configured, let the frontend handle license acquisition
       return res.status(403).json({ 

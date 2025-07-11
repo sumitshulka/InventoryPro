@@ -121,6 +121,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Set license manager URL if provided
       if (license_manager_url) {
         licenseManager.setLicenseManagerUrl(license_manager_url);
+        console.log('License manager URL set to:', license_manager_url);
       }
 
       const result = await licenseManager.acquireLicense(client_id, product_id, base_url);

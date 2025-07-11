@@ -204,6 +204,11 @@ export class LicenseManager {
     domain: string
   ): Promise<{ valid: boolean; message: string; license?: License }> {
     try {
+      console.log('=== LICENSE VALIDATION START ===');
+      console.log('Validating license for clientId:', clientId);
+      console.log('Domain:', domain);
+      console.log('License Manager URL:', this.licenseManagerUrl);
+      
       // Get current license from database
       const [currentLicense] = await db
         .select()
@@ -219,14 +224,30 @@ export class LicenseManager {
         .limit(1);
 
       if (!currentLicense) {
+        console.log('No active license found in database');
         return {
           valid: false,
           message: 'No active license found'
         };
       }
 
+      console.log('Found license:', {
+        id: currentLicense.id,
+        licenseKey: currentLicense.licenseKey,
+        subscriptionType: currentLicense.subscriptionType,
+        validTill: currentLicense.validTill,
+        isActive: currentLicense.isActive
+      });
+
       // Check if license is expired
-      if (new Date() > new Date(currentLicense.validTill)) {
+      const isExpired = new Date() > new Date(currentLicense.validTill);
+      console.log('License expiry check:', {
+        now: new Date().toISOString(),
+        validTill: currentLicense.validTill.toISOString(),
+        isExpired
+      });
+      
+      if (isExpired) {
         return {
           valid: false,
           message: 'License has expired'
@@ -256,8 +277,15 @@ export class LicenseManager {
 
       // Make validation request to license manager
       if (!this.licenseManagerUrl) {
+        console.log('No license manager URL configured, doing local validation');
         // If no license manager URL, do local validation
         const isChecksumValid = calculatedChecksum === currentLicense.checksum;
+        console.log('Local checksum validation:', {
+          calculated: calculatedChecksum,
+          stored: currentLicense.checksum,
+          isValid: isChecksumValid
+        });
+        
         if (isChecksumValid) {
           // Update last validated timestamp
           await db
@@ -265,12 +293,14 @@ export class LicenseManager {
             .set({ lastValidated: new Date() })
             .where(eq(licenses.id, currentLicense.id));
 
+          console.log('=== LICENSE VALIDATION SUCCESS (LOCAL) ===');
           return {
             valid: true,
             message: 'License is valid',
             license: currentLicense
           };
         } else {
+          console.log('=== LICENSE VALIDATION FAILED (LOCAL) ===');
           return {
             valid: false,
             message: 'License checksum validation failed'
@@ -278,7 +308,18 @@ export class LicenseManager {
         }
       }
 
-      const response = await fetch(`${this.licenseManagerUrl}/validate`, {
+      // Ensure proper URL construction - remove trailing slash if present
+      const licenseManagerBaseUrl = this.licenseManagerUrl.endsWith('/') ? 
+        this.licenseManagerUrl.slice(0, -1) : this.licenseManagerUrl;
+      const validationUrl = `${licenseManagerBaseUrl}/api/validate-license`;
+      
+      console.log('License validation request:', {
+        url: validationUrl,
+        method: 'POST',
+        payload: validationRequest
+      });
+
+      const response = await fetch(validationUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -286,11 +327,16 @@ export class LicenseManager {
         body: JSON.stringify(validationRequest)
       });
 
+      console.log('License validation response status:', response.status);
+      
       if (!response.ok) {
-        throw new Error(`License validation failed with status: ${response.status}`);
+        const errorText = await response.text();
+        console.log('License validation error response:', errorText);
+        throw new Error(`License validation failed with status: ${response.status} - ${errorText}`);
       }
 
       const validationResponse: LicenseValidationResponse = await response.json();
+      console.log('License validation response:', JSON.stringify(validationResponse, null, 2));
 
       if (validationResponse.valid) {
         // Update last validated timestamp
