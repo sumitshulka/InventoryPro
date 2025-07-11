@@ -14,12 +14,14 @@ export async function requireValidLicense(req: Request, res: Response, next: Nex
       return next();
     }
 
-    // Skip license check for auth endpoints
+    // Skip license check for auth endpoints - these must work for login flow
     if (req.path.startsWith('/api/login') || 
         req.path.startsWith('/api/logout') || 
         req.path.startsWith('/api/user') ||
         req.path.startsWith('/api/check-admin-exists') ||
-        req.path.startsWith('/api/create-superadmin')) {
+        req.path.startsWith('/api/create-superadmin') ||
+        req.path.startsWith('/api/forgot-password') ||
+        req.path.startsWith('/api/reset-password')) {
       return next();
     }
 

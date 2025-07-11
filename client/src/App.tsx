@@ -85,7 +85,7 @@ function Router() {
     <Switch>
       <Route path="/auth" component={AuthPage} />
       <Route path="/reset-password" component={ResetPasswordPage} />
-      <Route component={AuthPage} />
+      <Route path="*" component={AuthPage} />
     </Switch>
   );
 }
