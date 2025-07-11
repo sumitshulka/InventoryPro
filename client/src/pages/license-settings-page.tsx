@@ -37,9 +37,16 @@ export default function LicenseSettingsPage() {
         });
         refetch();
       } else {
+        let description = data.message || 'License validation failed';
+        
+        // Provide better messaging for application not found error
+        if (data.message && data.message.includes("Application not found")) {
+          description = "This application is not registered with the external license manager. Please contact your administrator to register the application or use local validation instead.";
+        }
+        
         toast({
           title: "License Validation Failed",
-          description: data.message || 'License validation failed',
+          description,
           variant: "destructive",
         });
       }
@@ -164,6 +171,12 @@ export default function LicenseSettingsPage() {
                 <DialogTitle>External License Validation</DialogTitle>
               </DialogHeader>
               <div className="space-y-4">
+                <Alert>
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>
+                    External validation requires your application to be registered with the license manager. If you receive "Application not found" errors, contact your administrator to register this application first.
+                  </AlertDescription>
+                </Alert>
                 <div>
                   <Label htmlFor="license-manager-url">License Manager URL</Label>
                   <Input
@@ -172,6 +185,9 @@ export default function LicenseSettingsPage() {
                     value={licenseManagerUrl}
                     onChange={(e) => setLicenseManagerUrl(e.target.value)}
                   />
+                  <p className="text-sm text-gray-500 mt-1">
+                    Application ID: a17ba122-e7db-4568-8928-9f749f65e1fe
+                  </p>
                 </div>
                 <div className="flex justify-end gap-2">
                   <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
