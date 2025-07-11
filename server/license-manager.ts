@@ -43,8 +43,11 @@ export interface LicenseValidationRequest {
 }
 
 export interface LicenseValidationResponse {
-  valid: boolean;
+  valid?: boolean;
+  status?: string; // "Valid" or "Invalid"
   message: string;
+  validated_at?: string;
+  expires_at?: string;
   subscription_data?: any;
 }
 
@@ -347,22 +350,37 @@ export class LicenseManager {
         throw new Error(`License validation failed with status: ${response.status} - ${errorText}`);
       }
 
-      const validationResponse: LicenseValidationResponse = await response.json();
+      const validationResponse: any = await response.json();
       console.log('License validation response:', JSON.stringify(validationResponse, null, 2));
 
-      if (validationResponse.valid) {
+      // Handle different response formats from license manager
+      const isValid = validationResponse.valid === true || 
+                      validationResponse.status === 'Valid' ||
+                      validationResponse.status === 'valid';
+
+      console.log('Validation result analysis:', {
+        hasValidField: 'valid' in validationResponse,
+        validFieldValue: validationResponse.valid,
+        hasStatusField: 'status' in validationResponse,
+        statusFieldValue: validationResponse.status,
+        finalIsValid: isValid
+      });
+
+      if (isValid) {
         // Update last validated timestamp
         await db
           .update(licenses)
           .set({ lastValidated: new Date() })
           .where(eq(licenses.id, currentLicense.id));
 
+        console.log('=== LICENSE VALIDATION SUCCESS (EXTERNAL) ===');
         return {
           valid: true,
-          message: 'License is valid',
+          message: validationResponse.message || 'License is valid',
           license: currentLicense
         };
       } else {
+        console.log('=== LICENSE VALIDATION FAILED (EXTERNAL) ===');
         return {
           valid: false,
           message: validationResponse.message || 'License validation failed'
