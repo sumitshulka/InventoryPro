@@ -19,6 +19,7 @@ export interface LicenseAcquisitionResponse {
   subscription_type: string;
   valid_till: string; // ISO 8601 format
   checksum: string;
+  mutual_key?: string; // Optional: if provided by license manager
   subscription_data: {
     type: string;
     properties: {
@@ -60,6 +61,18 @@ function decrypt(encryptedText: string): string {
   let decrypted = decipher.update(encryptedText, 'hex', 'utf8');
   decrypted += decipher.final('utf8');
   return decrypted;
+}
+
+// Helper function to generate a mutual key from license data (fallback)
+function generateMutualKeyFromLicense(
+  clientId: string,
+  appId: string,
+  licenseKey: string,
+  validTill: string
+): string {
+  // Generate a deterministic mutual key based on license data
+  const keyData = `${clientId}-${appId}-${licenseKey}-${validTill}`;
+  return crypto.createHash('sha256').update(keyData).digest('hex');
 }
 
 // Checksum calculation following the HMAC-SHA256 guide
@@ -157,7 +170,10 @@ export class LicenseManager {
       console.log('License response validation passed');
 
       // Store the license in database with encryption
-      const encryptedMutualKey = encrypt(licenseResponse.checksum); // Using checksum as mutual key
+      // Use mutual_key from response if provided, otherwise derive from license data
+      const mutualKeyToStore = licenseResponse.mutual_key || 
+        generateMutualKeyFromLicense(clientId, APP_ID, licenseResponse.license_key, licenseResponse.valid_till);
+      const encryptedMutualKey = encrypt(mutualKeyToStore);
       const encryptedSubscriptionData = encrypt(JSON.stringify(licenseResponse.subscription_data));
 
       const licenseData: InsertLicense = {
