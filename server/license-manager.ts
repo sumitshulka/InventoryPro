@@ -101,7 +101,7 @@ export class LicenseManager {
         base_url: baseUrl
       };
 
-      const response = await fetch(this.licenseManagerUrl, {
+      const response = await fetch(`${this.licenseManagerUrl}/api/acquire-license`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'

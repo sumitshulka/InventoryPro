@@ -43,40 +43,53 @@ function Router() {
       </div>
     );
   }
+
+  // If user is authenticated, wrap protected routes with license guard
+  if (user) {
+    return (
+      <LicenseGuard>
+        <Switch>
+          <ProtectedRoute path="/my-profile" component={MyProfilePage} />
+          <ProtectedRoute path="/" component={DashboardPage} />
+          <ProtectedRoute path="/inventory" component={InventoryPage} />
+          <ProtectedRoute path="/items" component={ItemMasterPage} />
+          <ProtectedRoute path="/warehouses" component={WarehousesPage} />
+          <ProtectedRoute path="/check-in" component={CheckInPage} />
+          <ProtectedRoute path="/issues" component={IssuesPage} />
+          <ProtectedRoute path="/requests" component={RequestsPage} />
+          <ProtectedRoute path="/transfers" component={EnhancedTransfersPage} />
+          <ProtectedRoute path="/transfer-notifications" component={TransferNotificationsPage} />
+          <ProtectedRoute path="/rejected-goods" component={RejectedGoodsPage} />
+          <ProtectedRoute path="/my-requests" component={MyRequestsPage} />
+          <ProtectedRoute path="/stock-report" component={StockReportPage} />
+          <ProtectedRoute path="/movement-report" component={MovementReportPage} />
+          <ProtectedRoute path="/reports/inventory-valuation" component={InventoryValuationReportPage} />
+          <ProtectedRoute path="/reports/low-stock" component={LowStockReportPage} />
+          <ProtectedRoute path="/reports/disposed-inventory" component={DisposedInventoryReportPage} />
+          <ProtectedRoute path="/users" component={UsersManagementPage} />
+          <ProtectedRoute path="/users-management" component={UsersManagementPage} />
+          <ProtectedRoute path="/categories" component={CategoriesPage} />
+          <ProtectedRoute path="/departments" component={DepartmentsPage} />
+          <ProtectedRoute path="/approvals" component={ApprovalManagementPage} />
+          <ProtectedRoute path="/audit-trail" component={AuditTrailPage} />
+          <ProtectedRoute path="/analytics" component={AnalyticsReportPage} />
+          <ProtectedRoute path="/settings" component={SettingsPage} />
+          <Route component={NotFound} />
+        </Switch>
+      </LicenseGuard>
+    );
+  }
   
+  // If user is not authenticated, show auth routes without license guard
   return (
     <Switch>
       <Route path="/auth">
-        {user ? <Route path="/" component={DashboardPage} /> : <AuthPage />}
+        <AuthPage />
       </Route>
       <Route path="/reset-password" component={ResetPasswordPage} />
-      <ProtectedRoute path="/my-profile" component={MyProfilePage} />
-      <ProtectedRoute path="/" component={DashboardPage} />
-      <ProtectedRoute path="/inventory" component={InventoryPage} />
-      <ProtectedRoute path="/items" component={ItemMasterPage} />
-      <ProtectedRoute path="/warehouses" component={WarehousesPage} />
-      <ProtectedRoute path="/check-in" component={CheckInPage} />
-      <ProtectedRoute path="/issues" component={IssuesPage} />
-      <ProtectedRoute path="/requests" component={RequestsPage} />
-      <ProtectedRoute path="/transfers" component={EnhancedTransfersPage} />
-      <ProtectedRoute path="/transfer-notifications" component={TransferNotificationsPage} />
-      <ProtectedRoute path="/rejected-goods" component={RejectedGoodsPage} />
-      <ProtectedRoute path="/my-requests" component={MyRequestsPage} />
-      <ProtectedRoute path="/stock-report" component={StockReportPage} />
-      <ProtectedRoute path="/movement-report" component={MovementReportPage} />
-      <ProtectedRoute path="/reports/inventory-valuation" component={InventoryValuationReportPage} />
-      <ProtectedRoute path="/reports/low-stock" component={LowStockReportPage} />
-      <ProtectedRoute path="/reports/disposed-inventory" component={DisposedInventoryReportPage} />
-      <ProtectedRoute path="/users" component={UsersManagementPage} />
-      <ProtectedRoute path="/users-management" component={UsersManagementPage} />
-      <ProtectedRoute path="/categories" component={CategoriesPage} />
-      <ProtectedRoute path="/departments" component={DepartmentsPage} />
-      <ProtectedRoute path="/approvals" component={ApprovalManagementPage} />
-      <ProtectedRoute path="/audit-trail" component={AuditTrailPage} />
-      <ProtectedRoute path="/analytics" component={AnalyticsReportPage} />
-
-      <ProtectedRoute path="/settings" component={SettingsPage} />
-      <Route component={NotFound} />
+      <Route>
+        <AuthPage />
+      </Route>
     </Switch>
   );
 }
@@ -84,9 +97,7 @@ function Router() {
 function App() {
   return (
     <AuthProvider>
-      <LicenseGuard>
-        <Router />
-      </LicenseGuard>
+      <Router />
       <Toaster />
     </AuthProvider>
   );
