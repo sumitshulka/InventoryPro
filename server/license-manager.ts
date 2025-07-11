@@ -63,17 +63,8 @@ function decrypt(encryptedText: string): string {
   return decrypted;
 }
 
-// Helper function to generate a mutual key from license data (fallback)
-function generateMutualKeyFromLicense(
-  clientId: string,
-  appId: string,
-  licenseKey: string,
-  validTill: string
-): string {
-  // Generate a deterministic mutual key based on license data
-  const keyData = `${clientId}-${appId}-${licenseKey}-${validTill}`;
-  return crypto.createHash('sha256').update(keyData).digest('hex');
-}
+// Note: mutual_key is now required from the license manager response
+// No fallback generation - the external license manager must provide this value
 
 // Checksum calculation following the HMAC-SHA256 guide
 export function generateChecksum(
@@ -142,6 +133,8 @@ export class LicenseManager {
 
       console.log('========== LICENSE MANAGER RESPONSE ==========');
       console.log('Raw Response:', JSON.stringify(licenseResponse, null, 2));
+      console.log('Mutual Key Present:', !!licenseResponse.mutual_key);
+      console.log('Mutual Key Value:', licenseResponse.mutual_key ? `${licenseResponse.mutual_key.substring(0, 10)}...` : 'NOT FOUND');
       console.log('========================================');
 
       // Validate response structure according to expected schema
@@ -170,10 +163,11 @@ export class LicenseManager {
       console.log('License response validation passed');
 
       // Store the license in database with encryption
-      // Use mutual_key from response if provided, otherwise derive from license data
-      const mutualKeyToStore = licenseResponse.mutual_key || 
-        generateMutualKeyFromLicense(clientId, APP_ID, licenseResponse.license_key, licenseResponse.valid_till);
-      const encryptedMutualKey = encrypt(mutualKeyToStore);
+      // Extract mutual_key from response - this is now required for proper checksum validation
+      if (!licenseResponse.mutual_key) {
+        throw new Error(`Missing mutual_key in response. The license manager must provide mutual_key for checksum validation. Received: ${JSON.stringify(licenseResponse)}`);
+      }
+      const encryptedMutualKey = encrypt(licenseResponse.mutual_key);
       const encryptedSubscriptionData = encrypt(JSON.stringify(licenseResponse.subscription_data));
 
       const licenseData: InsertLicense = {
