@@ -102,7 +102,17 @@ export class LicenseManager {
         base_url: baseUrl
       };
 
-      const response = await fetch(`${this.licenseManagerUrl}/api/acquire-license`, {
+      // Ensure proper URL construction - remove trailing slash if present
+      const baseUrl = this.licenseManagerUrl.endsWith('/') ? 
+        this.licenseManagerUrl.slice(0, -1) : this.licenseManagerUrl;
+      const fullUrl = `${baseUrl}/api/acquire-license`;
+      console.log('License acquisition request:', {
+        url: fullUrl,
+        method: 'POST',
+        payload: requestPayload
+      });
+      
+      const response = await fetch(fullUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
