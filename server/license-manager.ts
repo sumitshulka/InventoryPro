@@ -84,6 +84,9 @@ export function generateChecksum(
 
 export class LicenseManager {
   private licenseManagerUrl: string | null = null;
+  private validationCache: Map<string, { result: any; timestamp: number }> = new Map();
+  private readonly CACHE_DURATION = 30 * 1000; // 30 seconds cache
+  private pendingValidations: Map<string, Promise<any>> = new Map(); // Track pending validations
 
   constructor(licenseManagerUrl?: string) {
     this.licenseManagerUrl = licenseManagerUrl || process.env.LICENSE_MANAGER_URL || null;
@@ -218,10 +221,49 @@ export class LicenseManager {
     domain: string
   ): Promise<{ valid: boolean; message: string; license?: License }> {
     try {
+      // Check cache first to avoid multiple simultaneous requests
+      const cacheKey = `${clientId}:${domain}`;
+      const cachedResult = this.validationCache.get(cacheKey);
+      
+      if (cachedResult && (Date.now() - cachedResult.timestamp) < this.CACHE_DURATION) {
+        console.log('=== RETURNING CACHED LICENSE VALIDATION ===');
+        return cachedResult.result;
+      }
+
+      // Check if there's already a pending validation for this key
+      const pendingValidation = this.pendingValidations.get(cacheKey);
+      if (pendingValidation) {
+        console.log('=== RETURNING PENDING LICENSE VALIDATION ===');
+        return await pendingValidation;
+      }
+
       console.log('=== LICENSE VALIDATION START ===');
       console.log('Validating license for clientId:', clientId);
       console.log('Domain:', domain);
       console.log('License Manager URL:', this.licenseManagerUrl);
+
+      // Create a promise for this validation and store it
+      const validationPromise = this.performLicenseValidation(clientId, domain, cacheKey);
+      this.pendingValidations.set(cacheKey, validationPromise);
+
+      try {
+        const result = await validationPromise;
+        return result;
+      } finally {
+        // Remove from pending validations when done
+        this.pendingValidations.delete(cacheKey);
+      }
+    } catch (error: any) {
+      console.error('License validation error:', error);
+      return {
+        valid: false,
+        message: error.message || 'License validation failed'
+      };
+    }
+  }
+
+  private async performLicenseValidation(clientId: string, domain: string, cacheKey: string): Promise<{ valid: boolean; message: string; license?: License }> {
+    try {
       
       // Get current license from database
       const [currentLicense] = await db
@@ -316,11 +358,19 @@ export class LicenseManager {
           .where(eq(licenses.id, currentLicense.id));
 
         console.log('=== LICENSE VALIDATION SUCCESS (LOCAL) ===');
-        return {
+        const result = {
           valid: true,
           message: 'License is valid (local validation)',
           license: currentLicense
         };
+        
+        // Cache the local validation result
+        this.validationCache.set(cacheKey, {
+          result,
+          timestamp: Date.now()
+        });
+        
+        return result;
       }
 
       // Ensure proper URL construction - remove trailing slash if present
@@ -374,17 +424,33 @@ export class LicenseManager {
           .where(eq(licenses.id, currentLicense.id));
 
         console.log('=== LICENSE VALIDATION SUCCESS (EXTERNAL) ===');
-        return {
+        const result = {
           valid: true,
           message: validationResponse.message || 'License is valid',
           license: currentLicense
         };
+        
+        // Cache the successful result
+        this.validationCache.set(cacheKey, {
+          result,
+          timestamp: Date.now()
+        });
+        
+        return result;
       } else {
         console.log('=== LICENSE VALIDATION FAILED (EXTERNAL) ===');
-        return {
+        const result = {
           valid: false,
           message: validationResponse.message || 'License validation failed'
         };
+        
+        // Cache the failed result for a shorter time (5 seconds)
+        this.validationCache.set(cacheKey, {
+          result,
+          timestamp: Date.now() - (this.CACHE_DURATION - 5000)
+        });
+        
+        return result;
       }
     } catch (error: any) {
       console.error('License validation error:', error);
