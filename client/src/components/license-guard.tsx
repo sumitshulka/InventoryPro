@@ -53,5 +53,6 @@ export default function LicenseGuard({ children }: LicenseGuardProps) {
   }
 
   // License is valid, show the app
+  console.log("License is valid, showing app:", licenseStatus);
   return <>{children}</>;
 }

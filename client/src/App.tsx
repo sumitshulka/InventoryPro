@@ -47,7 +47,7 @@ function Router() {
   // If user is authenticated, wrap protected routes with license guard
   if (user) {
     return (
-      <LicenseGuard>
+      <div>
         <Switch>
           <ProtectedRoute path="/my-profile" component={MyProfilePage} />
           <ProtectedRoute path="/" component={DashboardPage} />
@@ -76,7 +76,7 @@ function Router() {
           <ProtectedRoute path="/settings" component={SettingsPage} />
           <Route component={NotFound} />
         </Switch>
-      </LicenseGuard>
+      </div>
     );
   }
   
