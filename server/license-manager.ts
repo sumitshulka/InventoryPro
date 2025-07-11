@@ -103,9 +103,9 @@ export class LicenseManager {
       };
 
       // Ensure proper URL construction - remove trailing slash if present
-      const baseUrl = this.licenseManagerUrl.endsWith('/') ? 
+      const licenseManagerBaseUrl = this.licenseManagerUrl.endsWith('/') ? 
         this.licenseManagerUrl.slice(0, -1) : this.licenseManagerUrl;
-      const fullUrl = `${baseUrl}/api/acquire-license`;
+      const fullUrl = `${licenseManagerBaseUrl}/api/acquire-license`;
       console.log('License acquisition request:', {
         url: fullUrl,
         method: 'POST',

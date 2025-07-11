@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Shield, AlertCircle, CheckCircle, RefreshCw } from "lucide-react";
+import { Shield, AlertCircle, CheckCircle, RefreshCw, Eye, EyeOff } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
@@ -27,6 +27,9 @@ interface LicenseAcquisitionPageProps {
 export default function LicenseAcquisitionPage({ onLicenseAcquired }: LicenseAcquisitionPageProps) {
   const [step, setStep] = useState<'form' | 'acquiring' | 'success' | 'error'>('form');
   const [errorMessage, setErrorMessage] = useState<string>('');
+  const [showDebugPanel, setShowDebugPanel] = useState(false);
+  const [lastRequest, setLastRequest] = useState<any>(null);
+  const [lastResponse, setLastResponse] = useState<any>(null);
   const { toast } = useToast();
 
   // Get current license status
@@ -54,8 +57,16 @@ export default function LicenseAcquisitionPage({ onLicenseAcquired }: LicenseAcq
         license_manager_url: data.license_manager_url,
       };
       
+      // Store request for debug panel
+      setLastRequest(requestData);
+      
       const response = await apiRequest("POST", "/api/license/acquire", requestData);
-      return response.json();
+      const responseData = await response.json();
+      
+      // Store response for debug panel
+      setLastResponse(responseData);
+      
+      return responseData;
     },
     onSuccess: (data) => {
       if (data.success) {
@@ -294,6 +305,51 @@ export default function LicenseAcquisitionPage({ onLicenseAcquired }: LicenseAcq
             </CardContent>
           </Card>
         )}
+
+        {/* Debug Panel */}
+        <Card className="mt-6">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm">Debug Information</CardTitle>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setShowDebugPanel(!showDebugPanel)}
+              >
+                {showDebugPanel ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                {showDebugPanel ? 'Hide' : 'Show'} Debug
+              </Button>
+            </div>
+          </CardHeader>
+          {showDebugPanel && (
+            <CardContent className="space-y-4">
+              {lastRequest && (
+                <div>
+                  <Label className="text-sm font-medium">Last Request:</Label>
+                  <div className="mt-1 p-3 bg-gray-50 rounded-md">
+                    <pre className="text-xs overflow-x-auto">
+                      {JSON.stringify(lastRequest, null, 2)}
+                    </pre>
+                  </div>
+                </div>
+              )}
+              {lastResponse && (
+                <div>
+                  <Label className="text-sm font-medium">Last Response:</Label>
+                  <div className="mt-1 p-3 bg-gray-50 rounded-md">
+                    <pre className="text-xs overflow-x-auto">
+                      {JSON.stringify(lastResponse, null, 2)}
+                    </pre>
+                  </div>
+                </div>
+              )}
+              {!lastRequest && !lastResponse && (
+                <p className="text-sm text-gray-500">Submit the form to see request/response data</p>
+              )}
+            </CardContent>
+          )}
+        </Card>
       </div>
     </div>
   );
