@@ -53,17 +53,51 @@ export interface LicenseValidationResponse {
 
 // Encryption utilities
 function encrypt(text: string): string {
-  const cipher = crypto.createCipher('aes-256-cbc', ENCRYPTION_KEY);
+  // Generate a random IV for each encryption
+  const iv = crypto.randomBytes(16);
+  
+  // Create a 32-byte key from the encryption key using SHA-256
+  const key = crypto.createHash('sha256').update(ENCRYPTION_KEY).digest();
+  
+  // Create cipher with explicit key and IV
+  const cipher = crypto.createCipheriv('aes-256-cbc', key, iv);
   let encrypted = cipher.update(text, 'utf8', 'hex');
   encrypted += cipher.final('hex');
-  return encrypted;
+  
+  // Prepend IV to encrypted data (IV + encrypted)
+  return iv.toString('hex') + ':' + encrypted;
 }
 
 function decrypt(encryptedText: string): string {
-  const decipher = crypto.createDecipher('aes-256-cbc', ENCRYPTION_KEY);
-  let decrypted = decipher.update(encryptedText, 'hex', 'utf8');
-  decrypted += decipher.final('utf8');
-  return decrypted;
+  // Check if this is the new format (contains ':' separator)
+  const parts = encryptedText.split(':');
+  
+  if (parts.length === 2) {
+    // New format: IV:encrypted
+    const iv = Buffer.from(parts[0], 'hex');
+    const encrypted = parts[1];
+    
+    // Create a 32-byte key from the encryption key using SHA-256
+    const key = crypto.createHash('sha256').update(ENCRYPTION_KEY).digest();
+    
+    // Create decipher with explicit key and IV
+    const decipher = crypto.createDecipheriv('aes-256-cbc', key, iv);
+    let decrypted = decipher.update(encrypted, 'hex', 'utf8');
+    decrypted += decipher.final('utf8');
+    
+    return decrypted;
+  } else {
+    // Old format: backward compatibility with deprecated createDecipher
+    // This will be used for existing data until it's re-encrypted
+    try {
+      const decipher = crypto.createDecipher('aes-256-cbc', ENCRYPTION_KEY);
+      let decrypted = decipher.update(encryptedText, 'hex', 'utf8');
+      decrypted += decipher.final('utf8');
+      return decrypted;
+    } catch (error) {
+      throw new Error('Failed to decrypt data - invalid format or corrupted data');
+    }
+  }
 }
 
 // Note: mutual_key is now required from the license manager response
