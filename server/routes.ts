@@ -425,7 +425,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log("Clean user data for update:", JSON.stringify(cleanUserData, null, 2));
       
       // Validate warehouse manager assignments - check if any warehouses are being managed by this user
-      if (cleanUserData.warehouseId !== undefined) {
+      // Only validate if the warehouse assignment is actually changing
+      if (cleanUserData.warehouseId !== undefined && cleanUserData.warehouseId !== existingUser.warehouseId) {
         const allWarehouses = await storage.getAllWarehouses();
         const managedWarehouses = allWarehouses.filter(w => w.managerId === userId);
         
