@@ -1232,9 +1232,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
     
     try {
+      // Generate unique request code
+      const allRequests = await storage.getAllRequests();
+      const requestCode = `REQ-${String(allRequests.length + 1000).padStart(4, '0')}`;
+      
       const requestData = insertRequestSchema.parse({
         ...req.body,
-        userId: req.user!.id
+        userId: req.user!.id,
+        requestCode: requestCode
       });
       
       // Create request
