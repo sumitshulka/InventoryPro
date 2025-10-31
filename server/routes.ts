@@ -3308,16 +3308,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         destinationWarehouse?.managerId === user.id || 
         user.warehouseId === transfer.destinationWarehouseId;
       
-      console.log('=== TRANSFER UPDATE PERMISSION DEBUG ===');
-      console.log('Transfer ID:', transferId);
-      console.log('Transfer status:', transfer.status);
-      console.log('User:', { id: user.id, role: user.role, warehouseId: user.warehouseId });
-      console.log('Source warehouse:', { id: sourceWarehouse?.id, managerId: sourceWarehouse?.managerId });
-      console.log('Destination warehouse:', { id: destinationWarehouse?.id, managerId: destinationWarehouse?.managerId });
-      console.log('Manages source:', managesSourceWarehouse);
-      console.log('Manages destination:', managesDestinationWarehouse);
-      console.log('Request body:', req.body);
-      
       // Define field permissions based on role and warehouse management
       const sourceWarehouseFields = [
         'receiptNumber', 'handoverPersonName', 'handoverPersonContact', 'handoverDate',
@@ -3334,11 +3324,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (newStatus === 'approved' && transfer.status === 'pending') {
           return user.role === 'admin' || managesSourceWarehouse || managesDestinationWarehouse;
         }
+        // Source warehouse marks as in-transit
         if (newStatus === 'in-transit' && transfer.status === 'approved') {
           return managesSourceWarehouse;
         }
-        if ((newStatus === 'completed' || newStatus === 'rejected' || newStatus === 'returned') && transfer.status === 'in-transit') {
+        // Destination warehouse can complete or request return from in-transit
+        if ((newStatus === 'completed' || newStatus === 'return_requested') && transfer.status === 'in-transit') {
           return managesDestinationWarehouse;
+        }
+        // Admin approves return or disposal
+        if ((newStatus === 'return_approved' || newStatus === 'disposed') && transfer.status === 'return_requested') {
+          return user.role === 'admin';
+        }
+        // Destination warehouse ships return back
+        if (newStatus === 'return_shipped' && transfer.status === 'return_approved') {
+          return managesDestinationWarehouse;
+        }
+        // Source warehouse confirms return delivery
+        if (newStatus === 'returned' && transfer.status === 'return_shipped') {
+          return managesSourceWarehouse;
         }
         // Allow admins or relevant warehouse managers to reject pending transfers
         if (newStatus === 'rejected' && transfer.status === 'pending') {
@@ -3377,8 +3381,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
               message: `Only destination warehouse managers can update ${field}` 
             });
           }
-        } else if (['items', 'rejectionReason'].includes(field)) {
-          // Items and rejection reason can be updated by destination warehouse managers
+        } else if (['items', 'rejectionReason', 'returnReason'].includes(field)) {
+          // Items, rejection reason, and return reason can be updated by destination warehouse managers
           if (managesDestinationWarehouse) {
             filteredData[field] = value;
           } else {

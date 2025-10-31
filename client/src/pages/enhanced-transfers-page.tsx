@@ -389,9 +389,10 @@ export default function EnhancedTransfersPage() {
       receivedDate: new Date(data.receivedDate),
       overallCondition: data.overallCondition,
       receiverNotes: data.receiverNotes,
-      status: isAccepted ? 'completed' : 'returned',
+      status: isAccepted ? 'completed' : 'return_requested',
+      returnReason: isAccepted ? undefined : data.receiverNotes,
       updateType: 'receipt_confirmation',
-      updateDescription: isAccepted ? 'Transfer completed and accepted' : 'Transfer returned due to issues',
+      updateDescription: isAccepted ? 'Transfer completed and accepted' : 'Return requested - awaiting admin approval',
     });
     
     setAcceptanceDialogOpen(false);
