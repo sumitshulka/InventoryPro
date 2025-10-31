@@ -3424,6 +3424,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               );
 
               // Create transaction records for transfer out
+              const allTransactions1 = await storage.getAllTransactions();
               await storage.createTransaction({
                 itemId: item.itemId,
                 sourceWarehouseId: updatedTransfer.sourceWarehouseId,
@@ -3431,9 +3432,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 requesterId: req.user!.id,
                 transactionType: 'check-out',
                 quantity: item.requestedQuantity,
+                transactionCode: `TRX-${allTransactions1.length + 1}`,
               });
 
               // Create transaction records for transfer in
+              const allTransactions2 = await storage.getAllTransactions();
               await storage.createTransaction({
                 itemId: item.itemId,
                 destinationWarehouseId: updatedTransfer.destinationWarehouseId,
@@ -3441,6 +3444,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 requesterId: filteredData.receivedBy || req.user!.id,
                 transactionType: 'check-in',
                 quantity: item.actualQuantity || item.requestedQuantity,
+                transactionCode: `TRX-${allTransactions2.length + 1}`,
               });
             }
           } else if (filteredData.status === 'rejected') {
@@ -3466,6 +3470,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               });
 
               // Create transaction record for rejection
+              const allTransactions3 = await storage.getAllTransactions();
               await storage.createTransaction({
                 itemId: item.itemId,
                 sourceWarehouseId: updatedTransfer.sourceWarehouseId,
@@ -3473,6 +3478,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 requesterId: req.user!.id,
                 transactionType: 'check-out',
                 quantity: item.requestedQuantity,
+                transactionCode: `TRX-${allTransactions3.length + 1}`,
               });
             }
           }
