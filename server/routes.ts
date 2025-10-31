@@ -3308,6 +3308,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         destinationWarehouse?.managerId === user.id || 
         user.warehouseId === transfer.destinationWarehouseId;
       
+      console.log('=== TRANSFER UPDATE PERMISSION DEBUG ===');
+      console.log('Transfer ID:', transferId);
+      console.log('Transfer status:', transfer.status);
+      console.log('User:', { id: user.id, role: user.role, warehouseId: user.warehouseId });
+      console.log('Source warehouse:', { id: sourceWarehouse?.id, managerId: sourceWarehouse?.managerId });
+      console.log('Destination warehouse:', { id: destinationWarehouse?.id, managerId: destinationWarehouse?.managerId });
+      console.log('Manages source:', managesSourceWarehouse);
+      console.log('Manages destination:', managesDestinationWarehouse);
+      console.log('Request body:', req.body);
+      
       // Define field permissions based on role and warehouse management
       const sourceWarehouseFields = [
         'receiptNumber', 'handoverPersonName', 'handoverPersonContact', 'handoverDate',
