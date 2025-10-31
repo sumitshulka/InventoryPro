@@ -3191,8 +3191,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      // Generate unique transfer code
+      const allTransfers = await storage.getAllTransfers();
+      const transferCode = `TRF-${String(allTransfers.length + 1).padStart(4, '0')}`;
+      
       const transferData = insertTransferSchema.parse({
         ...req.body,
+        transferCode: transferCode,
         initiatedBy: req.user!.id,
         expectedShipmentDate: req.body.expectedShipmentDate ? new Date(req.body.expectedShipmentDate) : null,
         expectedArrivalDate: req.body.expectedArrivalDate ? new Date(req.body.expectedArrivalDate) : null
