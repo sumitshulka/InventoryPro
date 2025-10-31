@@ -3327,7 +3327,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (newStatus === 'in-transit' && transfer.status === 'approved') {
           return managesSourceWarehouse;
         }
-        if ((newStatus === 'completed' || newStatus === 'rejected') && transfer.status === 'in-transit') {
+        if ((newStatus === 'completed' || newStatus === 'rejected' || newStatus === 'returned') && transfer.status === 'in-transit') {
           return managesDestinationWarehouse;
         }
         // Allow admins or relevant warehouse managers to reject pending transfers
