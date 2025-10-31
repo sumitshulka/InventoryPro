@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation,useQueryClient } from "@tanstack/react-query";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { getTransactionTypeColor, formatDateTime } from "@/lib/utils";
 import { z } from "zod";
@@ -33,7 +33,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest } from "@/lib/queryClient";
 import { Loader2, Search, Plus, Download, RefreshCw, Trash2, AlertTriangle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
@@ -66,6 +66,7 @@ export default function InventoryPage() {
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [isDisposalDialogOpen, setIsDisposalDialogOpen] = useState(false);
   const [disposalItem, setDisposalItem] = useState<any>(null);
+  const queryClient=useQueryClient();
 
   const { data: inventory, isLoading: inventoryLoading } = useQuery({
     queryKey: ["/api/reports/inventory-stock", refreshKey],

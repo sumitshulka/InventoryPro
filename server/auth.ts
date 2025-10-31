@@ -206,113 +206,150 @@ export function setupAuth(app: Express) {
   });
 
   // Forgot password route
-  app.post("/api/forgot-password", async (req, res, next) => {
-    try {
-      const { email } = req.body;
-      
-      if (!email) {
-        return res.status(400).json({ message: "Email is required" });
-      }
+app.post("/api/forgot-password", async (req, res, next) => {
+  try {
+    const { email } = req.body;
+    
+    console.log("=== FORGOT PASSWORD REQUEST ===");
+    console.log("Request email:", email);
+    console.log("Request body:", req.body);
+    
+    if (!email) {
+      console.log("❌ No email provided in request");
+      return res.status(400).json({ message: "Email is required" });
+    }
 
-      // Find user by email
-      const user = await storage.getUserByEmail(email);
-      if (!user) {
-        // For security, don't reveal if email exists or not
-        return res.status(200).json({ 
-          message: "If an account with this email exists, you will receive a password reset link." 
-        });
-      }
-
-      // Generate reset token
-      const resetToken = randomBytes(32).toString("hex");
-      const resetTokenExpiry = new Date(Date.now() + 3600000); // 1 hour from now
-
-      // Store reset token in user record
-      await storage.updateUser(user.id, {
-        resetToken,
-        resetTokenExpiry: resetTokenExpiry.toISOString()
+    // Find user by email
+    console.log("🔍 Searching for user by email:", email);
+    const user = await storage.getUserByEmail(email);
+    
+    if (!user) {
+      console.log("❌ No user found with email:", email);
+      // For security, don't reveal if email exists or not
+      return res.status(200).json({ 
+        message: "If an account with this email exists, you will receive a password reset link." 
       });
+    }
 
-      // Get email service and send reset email
-      let emailService = getEmailService();
+    console.log("✅ User found:", { id: user.id, username: user.username, email: user.email });
+
+    // Generate reset token
+    const resetToken = randomBytes(32).toString("hex");
+    const resetTokenExpiry = new Date(Date.now() + 3600000); // 1 hour from now
+
+    console.log("🔐 Generated reset token:", resetToken.substring(0, 10) + "...");
+    console.log("⏰ Token expiry:", resetTokenExpiry);
+
+    // Store reset token in user record
+    console.log("💾 Storing reset token in user record...");
+    await storage.updateUser(user.id, {
+      resetToken,
+      resetTokenExpiry: resetTokenExpiry.toISOString()
+    });
+    console.log("✅ Reset token stored successfully");
+
+    // Get email service and send reset email
+    let emailService = getEmailService();
+    console.log("📧 Email service status:", emailService ? "Available" : "Not available");
+    
+    if (!emailService) {
+      console.log("🔄 Email service not found, initializing...");
+      const emailSettings = await storage.getEmailSettings();
+      console.log("📋 Email settings from storage:", emailSettings);
       
-      if (!emailService) {
-        // Initialize email service with current settings
-        const emailSettings = await storage.getEmailSettings();
-        if (emailSettings && emailSettings.isActive) {
-          emailService = initializeEmailService(emailSettings);
-        }
+      if (emailSettings && emailSettings.isActive) {
+        console.log("✅ Email settings are active, initializing service...");
+        emailService = initializeEmailService(emailSettings);
+        console.log("📧 Email service initialized:", emailService ? "Success" : "Failed");
+      } else {
+        console.log("❌ Email settings are inactive or not found");
+        console.log("Settings active?:", emailSettings?.isActive);
+        console.log("Settings exists?:", !!emailSettings);
       }
+    }
 
-      if (emailService) {
-        // Generate proper reset URL - prioritize actual request host for custom domains
-        const host = req.get('host');
-        const protocol = req.protocol;
-        const replitDomain = process.env.REPLIT_DOMAINS;
+    if (emailService) {
+      console.log("🎯 Email service is available, generating reset URL...");
+      
+      // Generate proper reset URL - prioritize actual request host for custom domains
+      const host = req.get('host');
+      const protocol = req.protocol;
+      const replitDomain = process.env.REPLIT_DOMAINS;
+      
+      console.log("🌐 Host:", host);
+      console.log("🔗 Protocol:", protocol);
+      console.log("🏠 Replit domain:", replitDomain);
+      
+      let baseUrl;
+      if (host) {
+        // Always prioritize the actual request host (works for custom domains)
+        // Use HTTPS for production domains, follow request protocol otherwise
+        const useHttps = host.includes('.sumits.me') || 
+                        host.includes('.replit.dev') || 
+                        host.includes('.replit.app') || 
+                        host.includes('.repl.co') ||
+                        protocol === 'https';
         
-        let baseUrl;
-        if (host) {
-          // Always prioritize the actual request host (works for custom domains)
-          // Use HTTPS for production domains, follow request protocol otherwise
-          const useHttps = host.includes('.sumits.me') || 
-                          host.includes('.replit.dev') || 
-                          host.includes('.replit.app') || 
-                          host.includes('.repl.co') ||
-                          protocol === 'https';
-          
-          baseUrl = `${useHttps ? 'https' : protocol}://${host}`;
-        } else if (replitDomain) {
-          // Fallback to Replit domain if host is not available
-          baseUrl = `https://${replitDomain}`;
-        } else {
-          // Final fallback
-          baseUrl = `${protocol}://${host || 'localhost:5000'}`;
-        }
-        
-        const resetUrl = `${baseUrl}/reset-password?token=${resetToken}`;
-        
-        console.log(`Attempting to send reset email to: ${user.email}`);
-        console.log(`Reset URL generated: ${resetUrl}`);
-        
-        // Generate random subject line with timestamp
-        const subjectOptions = [
-          'You requested for a change in password',
-          'Reset information for your password',
-          'Password change request received',
-          'Your password reset link is ready',
-          'Security alert: Password reset requested',
-          'Action required: Reset your account password',
-          'Password recovery assistance',
-          'Account security: Password reset link'
-        ];
-        
-        const randomSubject = subjectOptions[Math.floor(Math.random() * subjectOptions.length)];
-        const timestamp = new Date().toLocaleString('en-US', {
-          year: 'numeric',
-          month: 'short',
-          day: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit',
-          timeZoneName: 'short'
-        });
-        const subjectWithTimestamp = `${randomSubject} - ${timestamp}`;
-        
-        const emailSent = await emailService.sendEmail({
-          to: user.email,
-          subject: subjectWithTimestamp,
-          html: `
-            <h2>Password Reset Request</h2>
-            <p>You requested a password reset for your inventory management account.</p>
-            <p>Click the button below to reset your password:</p>
-            <p style="margin: 20px 0;">
-              <a href="${resetUrl}" style="background-color: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; display: inline-block;">Reset Password</a>
-            </p>
-            <p><strong>If the button doesn't work, copy and paste this link into your browser:</strong></p>
-            <p style="background-color: #f5f5f5; padding: 10px; border-radius: 4px; word-break: break-all; font-family: monospace; font-size: 14px;">${resetUrl}</p>
-            <p>This link will expire in 1 hour.</p>
-            <p>If you didn't request this reset, please ignore this email.</p>
-          `,
-          text: `Password Reset Request
+        console.log("🔒 Use HTTPS:", useHttps);
+        baseUrl = `${useHttps ? 'https' : protocol}://${host}`;
+      } else if (replitDomain) {
+        // Fallback to Replit domain if host is not available
+        console.log("🔄 Using Replit domain fallback");
+        baseUrl = `https://${replitDomain}`;
+      } else {
+        // Final fallback
+        console.log("🔄 Using localhost fallback");
+        baseUrl = `${protocol}://${host || 'localhost:5000'}`;
+      }
+      
+      const resetUrl = `${baseUrl}/reset-password?token=${resetToken}`;
+      
+      console.log("📍 Base URL:", baseUrl);
+      console.log("🔗 Reset URL:", resetUrl);
+      console.log("📤 Attempting to send reset email to:", user.email);
+      
+      // Generate random subject line with timestamp
+      const subjectOptions = [
+        'You requested for a change in password',
+        'Reset information for your password',
+        'Password change request received',
+        'Your password reset link is ready',
+        'Security alert: Password reset requested',
+        'Action required: Reset your account password',
+        'Password recovery assistance',
+        'Account security: Password reset link'
+      ];
+      
+      const randomSubject = subjectOptions[Math.floor(Math.random() * subjectOptions.length)];
+      const timestamp = new Date().toLocaleString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        timeZoneName: 'short'
+      });
+      const subjectWithTimestamp = `${randomSubject} - ${timestamp}`;
+      
+      console.log("✉️ Email subject:", subjectWithTimestamp);
+      
+      console.log("🚀 Sending email via email service...");
+      const emailSent = await emailService.sendEmail({
+        to: user.email,
+        subject: subjectWithTimestamp,
+        html: `
+          <h2>Password Reset Request</h2>
+          <p>You requested a password reset for your inventory management account.</p>
+          <p>Click the button below to reset your password:</p>
+          <p style="margin: 20px 0;">
+            <a href="${resetUrl}" style="background-color: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; display: inline-block;">Reset Password</a>
+          </p>
+          <p><strong>If the button doesn't work, copy and paste this link into your browser:</strong></p>
+          <p style="background-color: #f5f5f5; padding: 10px; border-radius: 4px; word-break: break-all; font-family: monospace; font-size: 14px;">${resetUrl}</p>
+          <p>This link will expire in 1 hour.</p>
+          <p>If you didn't request this reset, please ignore this email.</p>
+        `,
+        text: `Password Reset Request
           
 You requested a password reset for your inventory management account.
           
@@ -321,26 +358,30 @@ ${resetUrl}
 
 This link will expire in 1 hour.
 If you didn't request this reset, please ignore this email.`
-        });
-
-        console.log(`Email send result: ${emailSent}`);
-        if (!emailSent) {
-          console.error("Failed to send password reset email");
-        } else {
-          console.log("Password reset email sent successfully");
-        }
-      } else {
-        console.error("Email service not configured");
-      }
-
-      res.status(200).json({ 
-        message: "If an account with this email exists, you will receive a password reset link." 
       });
-    } catch (error: any) {
-      console.error("Forgot password error:", error);
-      res.status(500).json({ message: "Failed to process password reset request" });
+
+      console.log(`📨 Email send result: ${emailSent}`);
+      if (!emailSent) {
+        console.error("❌ Failed to send password reset email");
+      } else {
+        console.log("✅ Password reset email sent successfully");
+      }
+    } else {
+      console.error("❌ Email service not configured - cannot send reset email");
+      console.log("💡 Please configure email settings using /api/email-settings endpoint");
     }
-  });
+
+    console.log("✅ Forgot password process completed");
+    res.status(200).json({ 
+      message: "If an account with this email exists, you will receive a password reset link." 
+    });
+    
+  } catch (error: any) {
+    console.error("❌ Forgot password error:", error);
+    console.error("Error stack:", error.stack);
+    res.status(500).json({ message: "Failed to process password reset request" });
+  }
+});
 
   // Reset password route
   app.post("/api/reset-password", async (req, res, next) => {

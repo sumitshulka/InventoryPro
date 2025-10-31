@@ -204,9 +204,10 @@ export default function CheckInPage() {
       });
     },
     onError: (error: Error) => {
+      
       toast({
         title: "Error",
-        description: `Failed to check in items: ${error.message}`,
+        description: `${error.message}`,
         variant: "destructive",
       });
     },

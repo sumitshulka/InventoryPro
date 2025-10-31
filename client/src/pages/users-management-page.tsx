@@ -148,7 +148,7 @@ export default function UsersManagementPage() {
     },
     onSuccess: async () => {
       // Force immediate cache invalidation and refetch
-      await invalidateRelatedQueries('user', isEditMode ? 'update' : 'create');
+      await invalidateRelatedQueries(queryClient,'user', isEditMode ? 'update' : 'create');
       toast({
         title: isEditMode ? "User updated" : "User created",
         description: isEditMode
@@ -185,7 +185,7 @@ export default function UsersManagementPage() {
       return res;
     },
     onSuccess: async () => {
-      await invalidateRelatedQueries('user', 'delete');
+      await invalidateRelatedQueries(queryClient,'user', 'delete');
       toast({
         title: "User deleted",
         description: "The user has been deleted successfully.",
@@ -529,13 +529,15 @@ export default function UsersManagementPage() {
               </DialogDescription>
             </DialogHeader>
 
-            <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+            <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4" autoComplete="off">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
+                  
                   <Label htmlFor="username">Username</Label>
                   <Input
                     id="username"
                     placeholder="Enter username"
+                    autoComplete="username"
                     {...form.register("username")}
                   />
                   {form.formState.errors.username && (
@@ -548,6 +550,7 @@ export default function UsersManagementPage() {
                   <Input
                     id="password"
                     type="password"
+                    autoComplete="new-password"
                     placeholder={isEditMode ? "Leave blank to keep current password" : "Enter password"}
                     {...form.register("password")}
                   />

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation,useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -38,7 +38,7 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest } from "@/lib/queryClient";
 import { Loader2, Plus, CheckCircle, X, Eye, Download, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
@@ -67,6 +67,7 @@ export default function RequestsPage() {
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState<any>(null);
   const [activeTab, setActiveTab] = useState("all");
+  const queryClient=useQueryClient();
 
   const { data: requests, isLoading: requestsLoading, refetch: refetchRequests } = useQuery({
     queryKey: ["/api/requests"],
@@ -211,19 +212,44 @@ export default function RequestsPage() {
   // Filter requests based on user permissions
   const isWarehouseOperator = userOperatedWarehouses.length > 0;
   const canViewAllRequests = user?.role === 'admin' || user?.role === 'manager' || isWarehouseOperator;
+  const sortedRequests = (requests && Array.isArray(requests) ? [...requests] : [])
+    .sort((a: any, b: any) => {
+      // Sort by createdAt in descending order (newest first)
+      // Note: Your prompt mentioned 'createdAtDate', but your code uses 'createdAt'.
+      // I've used 'createdAt' as it appears in your code.
+      // If the field name is different, just change 'b.createdAt' and 'a.createdAt'.
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
 
-  const filteredRequests = (requests as any[])
-    ? (requests as any[]).filter((request: any) => {
+  const filteredRequests = (sortedRequests as any[])
+    ? (sortedRequests as any[]).filter((sortedRequest: any) => {
         // Role-based filtering: employees can only see their own requests unless they're warehouse operators
-        if (!canViewAllRequests && request.userId !== user?.id) {
+        if (!canViewAllRequests && sortedRequest.userId !== user?.id) {
           return false;
         }
         
         if (activeTab === "all") return true;
-        return request.status === activeTab;
+        return sortedRequest.status === activeTab;
       })
     : [];
-
+  const getFilteredWarehouses = () => {
+    if (!warehouses) return [];
+    
+    // Admin, managers, and warehouse operators can see all active warehouses
+    if (user?.role === 'admin' || user?.role === 'manager' || isWarehouseOperator) {
+      return warehouses.filter((w: any) => w.isActive);
+    }
+    
+    // Employees can only see their assigned warehouse (if any)
+    if (user?.role === 'employee' && user?.warehouseId) {
+      return warehouses.filter((w: any) => 
+        w.isActive && w.id === user.warehouseId
+      );
+    }
+    
+    // Fallback: return empty array if no permissions
+    return [];
+  };
   const getUserName = (userId: number, request?: any) => {
     // If request object is provided and has userName, use it
     if (request?.userName) return request.userName;
@@ -419,11 +445,16 @@ export default function RequestsPage() {
                     <SelectValue placeholder="Select a warehouse" />
                   </SelectTrigger>
                   <SelectContent>
-                    {warehouses?.filter((w: any) => w.isActive).map((warehouse: any) => (
+                    {getFilteredWarehouses().map((warehouse: any) => (
                       <SelectItem key={warehouse.id} value={warehouse.id.toString()}>
                         {warehouse.name}
                       </SelectItem>
                     ))}
+                    {getFilteredWarehouses().length === 0 && (
+                      <div className="p-2 text-sm text-gray-500">
+                        No warehouses available for your account.
+                      </div>
+                    )}
                   </SelectContent>
                 </Select>
                 {form.formState.errors.warehouseId && (

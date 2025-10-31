@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -33,7 +33,7 @@ import {
 } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { apiRequest, queryClient, invalidateRelatedQueries } from "@/lib/queryClient";
+import { apiRequest, invalidateRelatedQueries } from "@/lib/queryClient";
 import { Loader2, Plus, Edit, Trash2, Settings, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import LicenseSettingsPage from "./license-settings-page";
@@ -103,6 +103,7 @@ export default function SettingsPage() {
   const [editingSettings, setEditingSettings] = useState<any>(null);
   const [editingLocation, setEditingLocation] = useState<any>(null);
   const [editingDepartment, setEditingDepartment] = useState<any>(null);
+  const queryClient = useQueryClient()
 
   const { data: approvalSettings, isLoading } = useQuery({
     queryKey: ["/api/approval-settings"],
@@ -230,7 +231,7 @@ export default function SettingsPage() {
       return res.json();
     },
     onSuccess: async () => {
-      await invalidateRelatedQueries('approval-settings', 'create');
+      await invalidateRelatedQueries(queryClient,'approval-settings', 'create');
       toast({
         title: "Approval settings created",
         description: "The approval settings have been created successfully.",
@@ -257,7 +258,7 @@ export default function SettingsPage() {
       return res.json();
     },
     onSuccess: async () => {
-      await invalidateRelatedQueries('approval-settings', 'update');
+      await invalidateRelatedQueries(queryClient,'approval-settings', 'update');
       toast({
         title: "Approval settings updated",
         description: "The approval settings have been updated successfully.",
@@ -281,7 +282,7 @@ export default function SettingsPage() {
       return res.json();
     },
     onSuccess: async () => {
-      await invalidateRelatedQueries('approval-settings', 'delete');
+      await invalidateRelatedQueries(queryClient,'approval-settings', 'delete');
       toast({
         title: "Approval settings deleted",
         description: "The approval settings have been deleted successfully.",
@@ -302,7 +303,7 @@ export default function SettingsPage() {
       return res.json();
     },
     onSuccess: async () => {
-      await invalidateRelatedQueries('organization-settings', 'update');
+      await invalidateRelatedQueries(queryClient,'organization-settings', 'update');
       toast({
         title: "Organization settings updated",
         description: "The organization settings have been updated successfully.",
@@ -323,7 +324,7 @@ export default function SettingsPage() {
       return res.json();
     },
     onSuccess: async () => {
-      await invalidateRelatedQueries('location', 'create');
+      await invalidateRelatedQueries(queryClient,'location', 'create');
       toast({
         title: "Location created",
         description: "The office location has been created successfully.",
@@ -347,7 +348,7 @@ export default function SettingsPage() {
       return res.json();
     },
     onSuccess: async () => {
-      await invalidateRelatedQueries('location', 'update');
+      await invalidateRelatedQueries(queryClient,'location', 'update');
       toast({
         title: "Location updated",
         description: "The office location has been updated successfully.",
@@ -371,7 +372,7 @@ export default function SettingsPage() {
       return res.json();
     },
     onSuccess: async () => {
-      await invalidateRelatedQueries('location', 'delete');
+      await invalidateRelatedQueries(queryClient,'location', 'delete');
       toast({
         title: "Location deleted",
         description: "The office location has been deleted successfully.",
@@ -393,7 +394,7 @@ export default function SettingsPage() {
       return res.json();
     },
     onSuccess: async () => {
-      await invalidateRelatedQueries('department', 'create');
+      await invalidateRelatedQueries(queryClient,'department', 'create');
       toast({
         title: "Department created",
         description: "The department has been created successfully.",
@@ -417,7 +418,8 @@ export default function SettingsPage() {
       return res.json();
     },
     onSuccess: async () => {
-      await invalidateRelatedQueries('department', 'update');
+      await invalidateRelatedQueries(queryClient,'department', 'update');
+
       toast({
         title: "Department updated",
         description: "The department has been updated successfully.",
@@ -441,7 +443,7 @@ export default function SettingsPage() {
       return res.json();
     },
     onSuccess: async () => {
-      await invalidateRelatedQueries('department', 'delete');
+      await invalidateRelatedQueries(queryClient,'department', 'delete');
       toast({
         title: "Department deleted",
         description: "The department has been deleted successfully.",
@@ -876,6 +878,8 @@ export default function SettingsPage() {
                     variant="outline"
                     size="sm"
                     onClick={async () => {
+                      console.log('Cached keys:', queryClient.getQueryCache().getAll().map(q => q.queryKey));
+
                       await queryClient.invalidateQueries({ queryKey: ['/api/locations'] });
                       await queryClient.refetchQueries({ queryKey: ['/api/locations'] });
                       toast({

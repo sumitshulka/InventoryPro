@@ -76,7 +76,7 @@ export default function TransferNotificationsPage() {
 
   const updateNotificationMutation = useMutation({
     mutationFn: async ({ id, status, notes }: { id: number; status: string; notes?: string }) => {
-      return await apiRequest(`/api/transfer-notifications/${id}`, "PATCH", {
+      return await apiRequest("PATCH",`/api/transfer-notifications/${id}`,  {
         status,
         notes,
         resolvedAt: status !== 'pending' ? new Date().toISOString() : null

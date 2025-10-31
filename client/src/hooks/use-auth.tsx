@@ -56,9 +56,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       window.location.href = "/";
     },
     onError: (error: Error) => {
+      let description = error.message; // Default fallback
+     
+
+      try {
+        // Try to parse the error message string as JSON
+        const errorData = JSON.parse(error.message);
+        console.log('errordata',errorData)
+        
+        // If it's valid JSON and has a 'message' key, use that
+        if (errorData && errorData.message) {
+          description = errorData.message;
+          
+        }
+      } catch (e) {
+        // It wasn't JSON, so we'll just use the original error.message
+      }
+
       toast({
         title: "Login failed",
-        description: error.message,
+        description: description, // This will now be "Invalid username or password"
         variant: "destructive",
       });
     },

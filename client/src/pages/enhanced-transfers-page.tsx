@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation,useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -39,7 +39,7 @@ import {
   TabsTrigger,
 } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest } from "@/lib/queryClient";
 import { 
   Loader2, 
   Plus, 
@@ -87,6 +87,11 @@ const receiptSchema = z.object({
   handoverDate: z.string().min(1, "Handover date is required"),
   notes: z.string().optional(),
 });
+const returnShippedSchema = z.object({
+  returnCourierName: z.string().min(1, "Return Courier Name is required"),
+  returnTrackingNumber: z.string().min(1, "Return Tracking Number is required"),
+  returnShippedDate: z.string().min(1, "Return Shipped Date is required"),
+});
 
 const acceptanceSchema = z.object({
   receivedDate: z.string().min(1, "Received date is required"),
@@ -102,6 +107,7 @@ const acceptanceSchema = z.object({
 
 type ReceiptFormValues = z.infer<typeof receiptSchema>;
 type AcceptanceFormValues = z.infer<typeof acceptanceSchema>;
+type ReturnShippedFormValues=z.infer<typeof returnShippedSchema>;
 
 export default function EnhancedTransfersPage() {
   const { toast } = useToast();
@@ -109,6 +115,7 @@ export default function EnhancedTransfersPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
   const [receiptDialogOpen, setReceiptDialogOpen] = useState(false);
+  const [returnShippedDialogOpen,setReturnShippedDialogOpen]= useState(false);
   const [acceptanceDialogOpen, setAcceptanceDialogOpen] = useState(false);
   const [auditDialogOpen, setAuditDialogOpen] = useState(false);
   const [rejectionDialogOpen, setRejectionDialogOpen] = useState(false);
@@ -116,6 +123,7 @@ export default function EnhancedTransfersPage() {
   const [activeTab, setActiveTab] = useState("all");
   const [refreshKey, setRefreshKey] = useState(0);
   const [rejectionReason, setRejectionReason] = useState("");
+  const queryClient=useQueryClient();
 
   const { data: transfers, isLoading: transfersLoading } = useQuery({
     queryKey: ["/api/transfers", refreshKey],
@@ -163,6 +171,15 @@ export default function EnhancedTransfersPage() {
       notes: "",
     },
   });
+  const return_shippmentForm = useForm<ReturnShippedFormValues>({
+    resolver: zodResolver(returnShippedSchema),
+    defaultValues: {
+      returnCourierName:"",
+      returnTrackingNumber:"",
+      returnShippedDate:""
+    },
+  });
+
 
   const acceptanceForm = useForm<AcceptanceFormValues>({
     resolver: zodResolver(acceptanceSchema),
@@ -254,6 +271,73 @@ export default function EnhancedTransfersPage() {
       });
     },
   });
+  const returnDeliveryMutation = useMutation({
+    mutationFn: async ({id,...data}: any)=>{
+      const response = await fetch(`/api/transfers/${id}/return-delivery`,{
+        method:"Post",
+        headers: {"Content-Type":"application/json"},
+        body: JSON.stringify(data),
+      });
+      if(!response.ok){
+        throw new Error(`Failed to update transfer: ${response.statusText}`)
+      }
+      return response.json();
+    },
+    onSuccess: async () => {
+      // Force immediate cache invalidation and refetch
+      await queryClient.invalidateQueries({ queryKey: ["/api/transfers"] });
+      await queryClient.invalidateQueries({ queryKey: ["/api/items"] });
+      await queryClient.invalidateQueries({ queryKey: ["/api/warehouses"] });
+      await queryClient.refetchQueries({ queryKey: ["/api/transfers"], type: 'active' });
+      toast({
+        title: "Success",
+        description: "Transfer updated successfully",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update transfer",
+        variant: "destructive",
+      });
+    },
+
+  })
+  const returnShippmentMutation = useMutation({
+    mutationFn: async ({ id, ...data }: any) => {
+      const response = await fetch(`/api/transfers/${id}/return-shipment`, {
+        method: "Post",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to update transfer: ${response.statusText}`);
+      }
+
+      return response.json();
+    },
+    onSuccess: async () => {
+      // Force immediate cache invalidation and refetch
+      await queryClient.invalidateQueries({ queryKey: ["/api/transfers"] });
+      await queryClient.invalidateQueries({ queryKey: ["/api/items"] });
+      await queryClient.invalidateQueries({ queryKey: ["/api/warehouses"] });
+      await queryClient.refetchQueries({ queryKey: ["/api/transfers"], type: 'active' });
+      setReturnShippedDialogOpen(false)
+      toast({
+        title: "Success",
+        description: "Transfer updated successfully",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update transfer",
+        variant: "destructive",
+      });
+    },
+  });
+
 
   const rejectTransferMutation = useMutation({
     mutationFn: async ({ id, rejectionReason }: { id: number; rejectionReason: string }) => {
@@ -302,6 +386,12 @@ export default function EnhancedTransfersPage() {
       ...updateData,
     });
   };
+  const handleReturnDeliver = (transferId:number) => {
+    returnDeliveryMutation.mutate({
+      id:transferId,
+      status:'return-delivered'
+    })
+  }
 
   const handleReceiptSubmit = (data: ReceiptFormValues) => {
     if (!selectedTransfer) return;
@@ -318,6 +408,20 @@ export default function EnhancedTransfersPage() {
     
     setReceiptDialogOpen(false);
     receiptForm.reset();
+  };
+  const handleReturnShippedSubmit = (data: ReturnShippedFormValues) => {
+    if (!selectedTransfer) return;
+    
+    returnShippmentMutation.mutate({
+      id: selectedTransfer.id,
+      returnCourierName: data.returnCourierName,
+      returnShippedDate: new Date(data.returnShippedDate),
+      returnTrackingNumber: data.returnTrackingNumber,
+      status: 'returnShipment',
+    });
+    
+    setReceiptDialogOpen(false);
+    return_shippmentForm.reset();
   };
 
   const handleAcceptanceSubmit = (data: AcceptanceFormValues) => {
@@ -409,6 +513,10 @@ export default function EnhancedTransfersPage() {
         return true;
     }
   });
+  const sortedTransfers = (filteredTransfers && Array.isArray(filteredTransfers) ? [...filteredTransfers] : [])
+  .sort((a: any, b: any) => {
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+  });
 
   // Check if there are enough warehouses for transfers
   const activeWarehouses = warehouses?.filter((w: any) => w.isActive) || [];
@@ -486,7 +594,7 @@ export default function EnhancedTransfersPage() {
                 </div>
               </CardHeader>
               <CardContent>
-                <DataTablePagination data={filteredTransfers}>
+                <DataTablePagination data={sortedTransfers}>
                   {(paginatedTransfers) => (
                     <div className="overflow-x-auto">
                       <Table>
@@ -641,6 +749,34 @@ export default function EnhancedTransfersPage() {
                                     title="Accept or return transfer"
                                   >
                                     <Package className="h-4 w-4" />
+                                  </Button>
+                                )}
+                                {transfer.status === "return_approved" && transfer.destinationWarehouse?.managerId === user?.id && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="text-blue-600"
+                                    onClick={() => {
+                                      setSelectedTransfer(transfer);
+                                      setReturnShippedDialogOpen(true);
+                                    }}
+                                    title="Add receipt and handover details"
+                                  >
+                                    <FileText className="h-4 w-4" />
+                                  </Button>
+                                )}
+                                {transfer.status === "return_shipped" && (transfer.sourceWarehouse?.managerId === user?.id || user.role==='admin' )&& (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="text-blue-600"
+                                    onClick={() => {
+
+                                      handleReturnDeliver(transfer.id)
+                                    }}
+                                    title="Accept the returned Goods"
+                                  >
+                                    <FileText className="h-4 w-4" />
                                   </Button>
                                 )}
                               </div>
@@ -1815,6 +1951,73 @@ export default function EnhancedTransfersPage() {
                 {rejectTransferMutation.isPending ? "Rejecting..." : "Reject Transfer"}
               </Button>
             </DialogFooter>
+          </DialogContent>
+        </Dialog>
+        {/*Rejecturn Shipped Dialog*/}
+              <Dialog open={returnShippedDialogOpen} onOpenChange={setReturnShippedDialogOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Add Shipping Details</DialogTitle>
+              <DialogDescription>
+                Enter return courier name, return tracking number, and return shipped date for this transfer.
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={return_shippmentForm.handleSubmit(handleReturnShippedSubmit)} className="space-y-4">
+              <div>
+                <Label htmlFor="returnCourierName">Return Courier Name</Label>
+                <Input
+                  id="returnCourierName"
+                  {...return_shippmentForm.register("returnCourierName")}
+                  placeholder="Enter return courier name"
+                />
+                {return_shippmentForm.formState.errors.returnCourierName && (
+                  <p className="text-sm text-red-600 mt-1">
+                    {return_shippmentForm.formState.errors.returnCourierName.message}
+                  </p>
+                )}
+              </div>
+              <div>
+                <Label htmlFor="returnShippedDate">Return Shipped Date</Label>
+                <Input
+                  id="returnShippedDate"
+                  type="datetime-local"
+                  {...return_shippmentForm.register("returnShippedDate")}
+                />
+                {return_shippmentForm.formState.errors.returnShippedDate && (
+                  <p className="text-sm text-red-600 mt-1">
+                    {return_shippmentForm.formState.errors.returnShippedDate.message}
+                  </p>
+                )}
+              </div>
+              <div>
+                <Label htmlFor="returnTrackingNumber">Return Tracking Number</Label>
+                <Input
+                  id="returnTrackingNumber"
+                  {...return_shippmentForm.register("returnTrackingNumber")}
+                  placeholder="Enter tracking number"
+                />
+                {return_shippmentForm.formState.errors.returnTrackingNumber && (
+                  <p className="text-sm text-red-600 mt-1">
+                    {return_shippmentForm.formState.errors.returnTrackingNumber.message}
+                  </p>
+                )}
+              </div>
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setReturnShippedDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={returnShippmentMutation.isPending}>
+                  {updateTransferMutation.isPending ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Updating...
+                    </>
+                  ) : (
+                    "Submit Receipt"
+                  )}
+                </Button>
+              </DialogFooter>
+            </form>
           </DialogContent>
         </Dialog>
       </div>

@@ -433,6 +433,51 @@ export class DatabaseStorage implements IStorage {
       .returning();
     return updatedInventory;
   }
+  async addToInventoryQuantity(itemId: number, warehouseId: number, quantity: number): Promise<Inventory | undefined> {
+    const [currentInventory] = await db
+      .select()
+      .from(inventory)
+      .where(and(eq(inventory.itemId, itemId), eq(inventory.warehouseId, warehouseId)));
+
+    if (!currentInventory) return undefined;
+
+    const newQuantity = currentInventory.quantity + quantity;
+
+    const [updatedInventory] = await db
+      .update(inventory)
+      .set({
+        quantity: newQuantity,
+        lastUpdated: new Date(),
+      })
+      .where(and(eq(inventory.itemId, itemId), eq(inventory.warehouseId, warehouseId)))
+      .returning();
+
+    return updatedInventory;
+  }
+  async subtractFromInventoryQuantity(itemId: number, warehouseId: number, quantity: number): Promise<Inventory | undefined> {
+    const [currentInventory] = await db
+      .select()
+      .from(inventory)
+      .where(and(eq(inventory.itemId, itemId), eq(inventory.warehouseId, warehouseId)));
+
+    if (!currentInventory) return undefined;
+
+    // Prevent going below zero
+    const newQuantity = Math.max(currentInventory.quantity - quantity, 0);
+
+    const [updatedInventory] = await db
+      .update(inventory)
+      .set({
+        quantity: newQuantity,
+        lastUpdated: new Date(),
+      })
+      .where(and(eq(inventory.itemId, itemId), eq(inventory.warehouseId, warehouseId)))
+      .returning();
+
+    return updatedInventory;
+  }
+
+
 
   async deleteInventory(id: number): Promise<boolean> {
     const result = await db.delete(inventory).where(eq(inventory.id, id));
@@ -451,7 +496,13 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createTransaction(transaction: InsertTransaction): Promise<Transaction> {
-    const [newTransaction] = await db.insert(transactions).values([transaction]).returning();
+    const TransactionCode = `TRX-${(await storage.getAllTransactions() ).length + 873}`;
+    const dataToInsert = {
+    ...transaction, // All the original data (itemId, quantity, userId, etc.)
+    transactionCode: TransactionCode // Add the new code
+  };
+    
+    const [newTransaction] = await db.insert(transactions).values([dataToInsert]).returning();
     return newTransaction;
   }
 
@@ -477,7 +528,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteTransaction(id: number): Promise<boolean> {
-    const result = await db.delete(transactions).where(eq(transactions.id, id));
+    const result = await db.delete.where(eq(transactions.id, id));
     return result.rowCount ? result.rowCount > 0 : false;
   }
 
@@ -493,7 +544,9 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createRequest(request: InsertRequest): Promise<Request> {
+    console.log('entered createRequest', request);
     const [newRequest] = await db.insert(requests).values([request]).returning();
+    console.log('left create request',newRequest);
     return newRequest;
   }
 
@@ -651,6 +704,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateTransferNotification(id: number, data: Partial<InsertTransferNotification>): Promise<TransferNotification | undefined> {
+    console.log(data);
     const [updated] = await db.update(transferNotifications)
       .set(data)
       .where(eq(transferNotifications.id, id))
@@ -822,8 +876,8 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Simplified implementations for complex business logic methods
-  async approveReturn(transferId: number, userId: number): Promise<boolean> {
-    await this.updateTransfer(transferId, { status: 'return_approved', approvedBy: userId });
+  async approveReturn(transferId: number,returnReason:any, userId: number): Promise<boolean> {
+    await this.updateTransfer(transferId, { status: 'return_approved',returnReason, approvedBy: userId });
     return true;
   }
 
@@ -860,7 +914,7 @@ export class DatabaseStorage implements IStorage {
         description: issue.description,
         category: issue.category,
         priority: issue.priority,
-        reporterId: issue.reporterId,
+        reportedBy: issue.reporterId,
         warehouseId: issue.warehouseId || null,
         itemId: issue.itemId || null,
         status: 'open'

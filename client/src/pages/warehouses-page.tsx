@@ -80,8 +80,8 @@ const WarehouseCard = ({ warehouse, locations, isAdmin, onEdit, isArchived = fal
       <CardContent className="p-6">
         <div className="flex items-center justify-between mb-3">
           <h3 className="font-medium text-gray-800">{warehouse.name}</h3>
-          <span className={`${warehouse.status !== 'deleted' ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"} text-xs px-2 py-1 rounded-full`}>
-            {warehouse.status !== 'deleted' ? "Active" : "Archived"}
+          <span className={`${warehouse.status !== 'deleted' ? warehouse.isActive? "bg-green-100 text-green-800":"bg-red-100 text-red-800 ": "bg-gray-100 text-gray-800"} text-xs px-2 py-1 rounded-full`}>
+            {warehouse.status !== 'deleted' ? warehouse.isActive? "Active":"Inactive" : "Archived"}
           </span>
         </div>
         <div className="flex items-center text-sm text-gray-600 mb-2">
@@ -162,8 +162,9 @@ export default function WarehousesPage() {
   };
 
   // Filter warehouses based on archive status
-  const activeWarehouses = warehouses?.filter((warehouse: any) => warehouse.status !== 'deleted') || [];
+  const activeWarehouses = warehouses?.filter((warehouse: any) => warehouse.isActive === true) || [];
   const archivedWarehouses = warehouses?.filter((warehouse: any) => warehouse.status === 'deleted') || [];
+  const inactiveWarehouses = warehouses?.filter((warehouse:any) => warehouse.isActive=== false && warehouse.status !=='deleted')
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -230,8 +231,10 @@ export default function WarehousesPage() {
         },
       });
       if (!response.ok) {
-        throw new Error("Failed to archive warehouse");
-      }
+      // ✅ FIX: Properly parse the error response from server
+      const errorData = await response.json();
+      throw new Error(errorData.message || "Failed to archive warehouse");
+    }
       return response.json();
     },
     onSuccess: async () => {
@@ -374,13 +377,17 @@ export default function WarehousesPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="active">
             Active Warehouses ({activeWarehouses.length})
+          </TabsTrigger>
+          <TabsTrigger value="inactive">
+            Inactive Warehouses ({inactiveWarehouses.length})
           </TabsTrigger>
           <TabsTrigger value="archived">
             Archived Warehouses ({archivedWarehouses.length})
           </TabsTrigger>
+          
         </TabsList>
 
         <TabsContent value="active" className="mt-6">
@@ -448,6 +455,120 @@ export default function WarehousesPage() {
                           <TableCell>
                             <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">
                               Active
+                            </span>
+                          </TableCell>
+                          {isAdmin && (
+                            <TableCell>
+                              <div className="flex gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleEditWarehouse(warehouse)}
+                                >
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="text-red-600 hover:text-red-700"
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>Archive Warehouse</AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        Are you sure you want to archive "{warehouse.name}"? This will move it to the archived section.
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                      <AlertDialogAction onClick={() => handleArchiveWarehouse(warehouse.id)}>
+                                        Archive
+                                      </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
+                              </div>
+                            </TableCell>
+                          )}
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+        <TabsContent value="inactive" className="mt-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            {inactiveWarehouses.map((warehouse: any) => (
+              <WarehouseCard
+                key={warehouse.id}
+                warehouse={warehouse}
+                locations={locations}
+                isAdmin={isAdmin}
+                onEdit={handleEditWarehouse}
+              />
+            ))}
+            {activeWarehouses.length === 0 && (
+              <div className="col-span-full text-center py-8">
+                <p className="text-gray-500">No active warehouses found.</p>
+              </div>
+            )}
+          </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Inactive Warehouses</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Location</TableHead>
+                      <TableHead>Manager</TableHead>
+                      <TableHead>Capacity</TableHead>
+                      <TableHead>Total Items</TableHead>
+                      <TableHead>Status</TableHead>
+                      {isAdmin && <TableHead>Actions</TableHead>}
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {activeWarehouses.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={isAdmin ? 7 : 6} className="text-center py-8 text-gray-500">
+                          No active warehouses found
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      inactiveWarehouses.map((warehouse: any) => (
+                        <TableRow key={warehouse.id}>
+                          <TableCell className="font-medium">{warehouse.name}</TableCell>
+                          <TableCell>
+                            {(locations as any[])?.find((loc: any) => loc.id === warehouse.locationId)?.name || 'Location not found'}
+                          </TableCell>
+                          <TableCell>
+                            {warehouse.managerId ? 
+                              (users as any[])?.find((u: any) => u.id === warehouse.managerId)?.name || "Unknown Manager" 
+                              : "—"
+                            }
+                          </TableCell>
+                          <TableCell>{formatCapacity(warehouse.capacity)}</TableCell>
+                          <TableCell className="text-center">
+                            <span className="font-medium text-blue-600">
+                              {getTotalItemsInWarehouse(warehouse.id).toLocaleString()}
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            <span className="bg-red-100 text-red-800 text-xs px-2 py-1 rounded-full">
+                              Inactive
                             </span>
                           </TableCell>
                           {isAdmin && (

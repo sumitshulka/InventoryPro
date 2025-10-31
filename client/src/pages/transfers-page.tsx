@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -29,7 +29,7 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest } from "@/lib/queryClient";
 import { Loader2, CheckCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
@@ -52,6 +52,7 @@ export default function TransfersPage() {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState("all");
   const [refreshKey, setRefreshKey] = useState(0);
+  const queryClient=useQueryClient();
 
   const { data: transfers, isLoading: transfersLoading } = useQuery({
     queryKey: ["/api/transactions/type/transfer", refreshKey],

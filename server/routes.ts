@@ -46,6 +46,7 @@ import {
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, lte, exists, isNotNull, or } from "drizzle-orm";
+import { totalmem } from "os";
 
 // Utility function to check authentication
 const requireAuth = (req: Request, res: Response, next: Function) => {
@@ -679,6 +680,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Archive warehouse (admin only) - soft delete to preserve transaction history
   app.delete("/api/warehouses/:id", checkRole("admin"), async (req, res) => {
     const warehouseId = parseInt(req.params.id, 10);
+    const allInventoryByWarehouse=await storage.getInventoryByWarehouse(warehouseId)
+    const TotalAmount=allInventoryByWarehouse.reduce((sum,item)=>sum+item.quantity,0);
+    if (TotalAmount > 0) {
+      // ✅ FIX: Changed status code from 404 to 400 (Bad Request)
+      return res.status(400).json({ 
+        message: 'Cannot archive warehouse with existing inventory',
+        details: `Warehouse contains ${TotalAmount} units of inventory`
+      });
+    }
     const archivedWarehouse = await storage.archiveWarehouse(warehouseId);
     if (!archivedWarehouse) {
       return res.status(404).json({ message: "Warehouse not found" });
@@ -854,7 +864,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!warehouse) {
         return res.status(404).json({ message: "Warehouse not found" });
       }
-      
+
+      // Validate quantity
+      const incomingQuantity = inventoryData.quantity || 0;
+      if (incomingQuantity <= 0) {
+        return res.status(400).json({ message: 'Invalid quantity' });
+      }
+
+      // Get current inventory for the warehouse
+      const InventoryByWarehouse = await storage.getInventoryByWarehouse(inventoryData.warehouseId);
+      const FilledAmount = InventoryByWarehouse.reduce((total, inv) => total + (inv.quantity || 0), 0);
+      const leftAmount = warehouse.capacity - FilledAmount;
+
       // Check if inventory already exists for this item in this warehouse
       const existingInventory = await storage.getInventoryByItemAndWarehouse(
         inventoryData.itemId,
@@ -863,11 +884,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       let inventory;
       if (existingInventory) {
+        // For UPDATE: Calculate net change in quantity
+        const quantityChange = incomingQuantity - existingInventory.quantity;
+        
+        // Only check capacity if we're increasing quantity
+        if (quantityChange > 0 && quantityChange > leftAmount) {
+          return res.status(400).json({ 
+            message: `Not enough space in warehouse. Available: ${leftAmount}, Additional space needed: ${quantityChange}` 
+          });
+        }
+        
         // Update existing inventory
         inventory = await storage.updateInventory(existingInventory.id, {
-          quantity: inventoryData.quantity
+          quantity: incomingQuantity
         });
       } else {
+        // For CREATE: Check if there's enough space for new inventory
+        if (incomingQuantity > leftAmount) {
+          return res.status(400).json({ 
+            message: `Not enough space in warehouse. Available: ${leftAmount}, Requested: ${incomingQuantity}` 
+          });
+        }
+        
         // Create new inventory
         inventory = await storage.createInventory(inventoryData);
       }
@@ -925,57 +963,102 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Create transaction (check-in, issue, transfer) - check-in for all authenticated users, others require manager
-  app.post("/api/transactions", async (req, res) => {
-    if (!req.isAuthenticated()) {
-      return res.status(401).json({ message: "Unauthorized" });
+app.post("/api/transactions", async (req, res) => {
+  if (!req.isAuthenticated()) {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+
+  // Check if it's a check-in transaction or requires manager role
+  const transactionType = req.body.transactionType;
+  if (transactionType !== "check-in") {
+    const user = req.user;
+    if (user.role !== "admin" && user.role !== "manager") {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+  }
+
+  try {
+    console.log("Transaction request body:", JSON.stringify(req.body, null, 2));
+    
+    // Additional validation before schema parsing
+    if (req.body.quantity !== undefined && req.body.quantity <= 0) {
+      console.log("Rejecting negative/zero quantity:", req.body.quantity);
+      return res.status(400).json({ 
+        message: "Quantity must be greater than 0",
+        issues: [{ path: ["quantity"], message: "Quantity must be greater than 0" }]
+      });
     }
 
-    // Check if it's a check-in transaction or requires manager role
-    const transactionType = req.body.transactionType;
-    if (transactionType !== "check-in") {
-      const user = req.user;
-      if (user.role !== "admin" && user.role !== "manager") {
-        return res.status(403).json({ message: "Forbidden" });
+    // ✅ FIX 1: Better transaction code generation
+    const timestamp = Date.now();
+    const randomSuffix = Math.floor(Math.random() * 1000);
+    const transactionCode = `TRX-${timestamp}-${randomSuffix}`;
+    
+    const userId = req.user!.id;
+    const dataToValidate = {
+      ...req.body,
+      transactionCode,
+      userId,
+    };
+
+    // Use safeParse and handle any validation errors manually
+    const parseResult = insertTransactionSchema.safeParse(dataToValidate);
+    
+    if (!parseResult.success) {
+      console.log("Validation error:", JSON.stringify(parseResult.error.issues, null, 2));
+      return res.status(400).json({ 
+        message: parseResult.error.message,
+        issues: parseResult.error.issues
+      });
+    }
+    
+    const transactionPayload = parseResult.data;
+
+    // ✅ FIX 2: Validate item exists
+    const item = await storage.getItem(transactionPayload.itemId);
+    if (!item) {
+      return res.status(404).json({ message: "Item not found" });
+    }
+
+    // ✅ FIX 3: Add warehouse capacity checks
+    if ((transactionPayload.transactionType === "check-in" || 
+         transactionPayload.transactionType === "transfer") && 
+        transactionPayload.destinationWarehouseId) {
+      
+      const destinationWarehouse = await storage.getWarehouse(transactionPayload.destinationWarehouseId);
+      if (!destinationWarehouse) {
+        return res.status(404).json({ message: "Destination warehouse not found" });
+      }
+
+      // Check warehouse capacity
+      const inventoryInWarehouse = await storage.getInventoryByWarehouse(transactionPayload.destinationWarehouseId);
+      const currentCapacity = inventoryInWarehouse.reduce((total, inv) => total + (inv.quantity || 0), 0);
+      const availableSpace = destinationWarehouse.capacity - currentCapacity;
+      
+      // For transfer, only check capacity if status is completed
+      const needsCapacityCheck = transactionPayload.transactionType === "check-in" || 
+                               (transactionPayload.transactionType === "transfer" && transactionPayload.status === "completed");
+      
+      if (needsCapacityCheck && transactionPayload.quantity > availableSpace) {
+        return res.status(400).json({ 
+          message: `Not enough space in destination warehouse. Available: ${availableSpace}, Requested: ${transactionPayload.quantity}` 
+        });
       }
     }
+
+    // ✅ FIX 4: Validate source warehouse exists for issue/transfer
+    if ((transactionPayload.transactionType === "issue" || transactionPayload.transactionType === "transfer") && 
+        transactionPayload.sourceWarehouseId) {
+      const sourceWarehouse = await storage.getWarehouse(transactionPayload.sourceWarehouseId);
+      if (!sourceWarehouse) {
+        return res.status(404).json({ message: "Source warehouse not found" });
+      }
+    }
+
+    // Create the transaction
+    const transaction = await storage.createTransaction(transactionPayload);
+    
     try {
-      console.log("Transaction request body:", JSON.stringify(req.body, null, 2));
-      
-      // Additional validation before schema parsing
-      if (req.body.quantity !== undefined && req.body.quantity <= 0) {
-        console.log("Rejecting negative/zero quantity:", req.body.quantity);
-        return res.status(400).json({ 
-          message: "Quantity must be greater than 0",
-          issues: [{ path: ["quantity"], message: "Quantity must be greater than 0" }]
-        });
-      }
-      
-      // Use safeParse and handle any validation errors manually
-      const parseResult = insertTransactionSchema.safeParse(req.body);
-      
-      if (!parseResult.success) {
-        console.log("Validation error:", JSON.stringify(parseResult.error.issues, null, 2));
-        return res.status(400).json({ 
-          message: parseResult.error.message,
-          issues: parseResult.error.issues
-        });
-      }
-      
-      const transactionData = parseResult.data;
-      
-      // Generate transaction code
-      const transactionCode = `TRX-${(await storage.getAllTransactions()).length + 873}`; // Start from where sample data left off
-      
-      // Create transaction with the correct fields
-      let transactionPayload: any = {
-        ...transactionData,
-        transactionCode,
-        userId: req.user!.id, // Use the authenticated user's ID
-      };
-      
-      // Create the transaction
-      const transaction = await storage.createTransaction(transactionPayload);
-      
       // Update inventory based on transaction type
       if (transaction.transactionType === "check-in" && transaction.destinationWarehouseId) {
         // Check if inventory already exists
@@ -1005,10 +1088,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         );
         
         if (!existingInventory) {
+          // ✅ FIX 5: Rollback transaction
+          await storage.deleteTransaction(transaction.id);
           return res.status(400).json({ message: "Item not in inventory" });
         }
         
         if (existingInventory.quantity < transaction.quantity) {
+          await storage.deleteTransaction(transaction.id);
           return res.status(400).json({ message: "Not enough quantity in inventory" });
         }
         
@@ -1024,10 +1110,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         );
         
         if (!sourceInventory) {
+          await storage.deleteTransaction(transaction.id);
           return res.status(400).json({ message: "Item not in source warehouse inventory" });
         }
         
         if (sourceInventory.quantity < transaction.quantity) {
+          await storage.deleteTransaction(transaction.id);
           return res.status(400).json({ message: "Not enough quantity in source warehouse" });
         }
         
@@ -1060,11 +1148,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       res.status(201).json(transaction);
-    } catch (error: any) {
-      res.status(400).json({ message: error.message });
+    } catch (inventoryError) {
+      // ✅ FIX 6: Rollback transaction if inventory update fails
+      await storage.deleteTransaction(transaction.id);
+      throw inventoryError;
     }
-  });
-
+  } catch (error: any) {
+    console.error("Transaction creation error:", error);
+    res.status(400).json({ message: error.message });
+  }
+});
   // Update transaction status (manager+)
   app.put("/api/transactions/:id/status", checkRole("manager"), async (req, res) => {
     const transactionId = parseInt(req.params.id, 10);
@@ -1231,9 +1324,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
     
     try {
+      const requestCode = `RQX-${(await storage.getAllRequests() ).length + 873}`;
       const requestData = insertRequestSchema.parse({
         ...req.body,
-        userId: req.user!.id
+        userId: req.user!.id,
+        requestCode
       });
       
       // Create request
@@ -1458,10 +1553,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 });
                 
                 // Update source warehouse inventory by subtracting the transferred quantity
-                await storage.updateInventoryQuantity(
+                await storage.subtractFromInventoryQuantity(
                   requestItem.itemId,
                   warehouse.id,
-                  -requestItem.quantity
+                  requestItem.quantity
                 );
                 
                 foundInOtherWarehouse = true;
@@ -1490,10 +1585,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
             });
             
             // Update inventory by subtracting the issued quantity
-            await storage.updateInventoryQuantity(
+            await storage.subtractFromInventoryQuantity(
               requestItem.itemId,
               request.warehouseId,
-              -requestItem.quantity
+              requestItem.quantity
             );
           }
         }
@@ -1775,7 +1870,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const id = parseInt(req.params.id);
       const updateData = req.body;
-      
+      if (updateData.resolvedAt && typeof updateData.resolvedAt === "string") {
+        updateData.resolvedAt = new Date(updateData.resolvedAt);
+      }
+      console.log('updateData',updateData)
       const updatedNotification = await storage.updateTransferNotification(id, updateData);
       if (!updatedNotification) {
         return res.status(404).json({ message: "Transfer notification not found" });
@@ -2374,6 +2472,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const approvals = await storage.getRequestApprovalsByApprover(req.user.id);
       const pendingApprovals = approvals.filter(approval => approval.status === 'pending');
+      console.log('pendingApprovals',pendingApprovals)
       
       // Get all reference data
       const allItems = await storage.getAllItems();
@@ -2715,6 +2814,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Approve return for rejected goods (Admin only)
   app.post("/api/transfers/:transferId/approve-return", checkRole("admin"), async (req: Request, res: Response) => {
     try {
+      if (!req.user) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
       const transferId = parseInt(req.params.transferId);
       const { returnReason } = req.body;
       
@@ -2764,15 +2866,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/transfers/:transferId/return-shipment", async (req: Request, res: Response) => {
     try {
       const transferId = parseInt(req.params.transferId);
-      const { courierName, trackingNumber } = req.body;
+      const { returnCourierName, returnTrackingNumber,returnShippedDate } = req.body;
       
-      if (!courierName || courierName.trim() === '') {
+      if (!returnCourierName || returnCourierName.trim() === '') {
         return res.status(400).json({ message: "Courier name is required" });
       }
 
-      if (!trackingNumber || trackingNumber.trim() === '') {
+      if (!returnTrackingNumber || returnTrackingNumber.trim() === '') {
         return res.status(400).json({ message: "Tracking number is required" });
       }
+      if (!returnShippedDate ){
+        return res.status(400).json({message:'Return Shipped Date is required'})
+      }
+      const ReturnShippedDate=new Date(returnShippedDate)
+      
 
       const user = req.user;
       
@@ -2788,8 +2895,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           (user.role !== "manager" || user.warehouseId !== transfer.destinationWarehouseId)) {
         return res.status(403).json({ message: "Only destination warehouse manager can record return shipment" });
       }
+      const id=user?.id;
 
-      const updatedTransfer = await storage.recordReturnShipment(transferId, courierName, trackingNumber, user.id);
+      const updatedTransfer = await storage.recordReturnShipment(transferId,{ returnCourierName, returnTrackingNumber,ReturnShippedDate});
       
       if (!updatedTransfer) {
         return res.status(404).json({ message: "Transfer not found" });
@@ -2819,8 +2927,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           (user.role !== "manager" || user.warehouseId !== transfer.sourceWarehouseId)) {
         return res.status(403).json({ message: "Only source warehouse manager can confirm return delivery" });
       }
+      const date=new Date();
 
-      const updatedTransfer = await storage.recordReturnDelivery(transferId, user.id);
+      const updatedTransfer = await storage.recordReturnDelivery(transferId, {date});
       
       if (!updatedTransfer) {
         return res.status(404).json({ message: "Transfer not found" });
@@ -3184,9 +3293,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         }
       }
+      const timestamp = Date.now();
+      const randomSuffix = Math.floor(Math.random() * 1000);
+      const transferCode = `TRF-${timestamp}-${randomSuffix}`;
 
       const transferData = insertTransferSchema.parse({
         ...req.body,
+        transferCode,
         initiatedBy: req.user!.id,
         expectedShipmentDate: req.body.expectedShipmentDate ? new Date(req.body.expectedShipmentDate) : null,
         expectedArrivalDate: req.body.expectedArrivalDate ? new Date(req.body.expectedArrivalDate) : null
@@ -3309,6 +3422,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Status change permissions
       const canUpdateStatus = (newStatus: string) => {
+        console.log(`🔄 Status change check: ${transfer.status} -> ${newStatus}`);
+        
+        
         // Allow admins or warehouse managers to approve pending transfers
         if (newStatus === 'approved' && transfer.status === 'pending') {
           return user.role === 'admin' || managesSourceWarehouse || managesDestinationWarehouse;
@@ -3317,11 +3433,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return managesSourceWarehouse;
         }
         if ((newStatus === 'completed' || newStatus === 'rejected') && transfer.status === 'in-transit') {
+          console.log('managesDestination warehouse ',managesDestinationWarehouse)
           return managesDestinationWarehouse;
         }
         // Allow admins or relevant warehouse managers to reject pending transfers
         if (newStatus === 'rejected' && transfer.status === 'pending') {
           return user.role === 'admin' || managesSourceWarehouse || managesDestinationWarehouse;
+        }
+        if(newStatus==='returned' && transfer.status === 'in-transit'){
+          return managesDestinationWarehouse
         }
         return false;
       };
@@ -3368,6 +3488,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      console.log('✅ Final filtered data to update:', filteredData);
+
+      // Rest of your existing code for date conversions and updates...
       // Convert date strings to Date objects
       if (filteredData.expectedShipmentDate) {
         filteredData.expectedShipmentDate = new Date(filteredData.expectedShipmentDate);
@@ -3391,7 +3514,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updatedTransfer = await storage.updateTransfer(transferId, filteredData);
 
       // Handle inventory updates when transfer is completed (accepted) or rejected
-      if ((filteredData.status === 'completed' || filteredData.status === 'rejected') && updatedTransfer) {
+      if ((filteredData.status === 'completed' || filteredData.status === 'returned') && updatedTransfer) {
         const transferItems = await storage.getTransferItemsByTransfer(transferId);
         if (transferItems && transferItems.length > 0) {
           
@@ -3399,20 +3522,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
             // Handle accepted transfer - normal inventory flow
             for (const item of transferItems) {
               // Remove from source warehouse
-              await storage.updateInventoryQuantity(
+              await storage.subtractFromInventoryQuantity(
                 item.itemId, 
                 updatedTransfer.sourceWarehouseId, 
-                -item.requestedQuantity
+                item.requestedQuantity
               );
               
               // Add to destination warehouse
-              await storage.updateInventoryQuantity(
+              await storage.addToInventoryQuantity(
                 item.itemId, 
                 updatedTransfer.destinationWarehouseId, 
                 item.actualQuantity || item.requestedQuantity
               );
 
               // Create transaction records for transfer out
+              const requestCode = `RQX-${(await storage.getAllRequests() ).length + 873}`;
+
               await storage.createTransaction({
                 itemId: item.itemId,
                 sourceWarehouseId: updatedTransfer.sourceWarehouseId,
@@ -3432,14 +3557,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 quantity: item.actualQuantity || item.requestedQuantity,
               });
             }
-          } else if (filteredData.status === 'rejected') {
+          } else if (filteredData.status === 'returned') {
             // Handle rejected transfer - move items to rejected goods
+            console.log('// Handle rejected transfer - move items to rejected goods')
             for (const item of transferItems) {
               // Remove from source warehouse (already shipped)
-              await storage.updateInventoryQuantity(
+              await storage.subtractFromInventoryQuantity(
                 item.itemId, 
                 updatedTransfer.sourceWarehouseId, 
-                -item.requestedQuantity
+                item.requestedQuantity
               );
 
               // Create rejected goods record
@@ -3501,9 +3627,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         userAgent: req.get('User-Agent')
       });
 
+      console.log('🎉 Transfer update process completed successfully');
       res.json(updatedTransfer);
     } catch (error: any) {
-      console.error('Transfer update error:', error);
+      console.error('💥 Transfer update error:', error);
+      console.error('Error stack:', error.stack);
       res.status(400).json({ message: error.message });
     }
   });
@@ -4170,7 +4298,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const issueData = {
         ...req.body,
-        reportedBy: req.user.id,
+        reporterId: req.user.id,
         status: 'open'
       };
 
@@ -4343,7 +4471,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create or update email settings (admin only)
   app.post("/api/email-settings", checkRole("admin"), async (req, res) => {
     try {
-      const settingsData = insertEmailSettingsSchema.parse(req.body);
+      const settingsWithDefaults = {
+        isActive: true, // ✅ Default to active
+        ...req.body
+      };
+      const settingsData = insertEmailSettingsSchema.parse(settingsWithDefaults);
       const settings = await storage.createEmailSettings(settingsData);
       res.status(201).json(settings);
     } catch (error: any) {
@@ -4367,25 +4499,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Test email configuration (admin only)
-  app.post("/api/email-settings/test", checkRole("admin"), async (req, res) => {
-    try {
-      const { testEmail, verificationTestEmail, settingsId, ...tempSettings } = req.body;
-      
-      // Use either testEmail or verificationTestEmail
-      const emailToTest = testEmail || verificationTestEmail;
-      
-      if (!emailToTest) {
-        return res.status(400).json({ message: "Test email address is required" });
-      }
+app.post("/api/email-settings/test", checkRole("admin"), async (req, res) => {
+  try {
+    console.log("=== EMAIL SETTINGS TEST REQUEST ===");
+    console.log("📨 Request body:", JSON.stringify(req.body, null, 2));
+    
+    const { testEmail, verificationTestEmail, settingsId, ...tempSettings } = req.body;
+    
+    // Use either testEmail or verificationTestEmail
+    const emailToTest = testEmail || verificationTestEmail;
+    console.log("🎯 Test email address:", emailToTest);
+    
+    if (!emailToTest) {
+      console.log("❌ No test email address provided");
+      return res.status(400).json({ message: "Test email address is required" });
+    }
 
-      let settings;
-      let existingSettings = await storage.getEmailSettings();
+    let settings;
+    console.log("🔍 Looking for existing email settings...");
+    let existingSettings = await storage.getEmailSettings();
+    console.log("📋 Existing settings found:", existingSettings ? "Yes" : "No");
+    
+    if (settingsId || existingSettings) {
+      // Use existing settings if available
+      settings = existingSettings;
+      console.log("✅ Using existing email settings");
+      if (settings) {
+        console.log("   - ID:", settings.id);
+        console.log("   - Host:", settings.host);
+        console.log("   - Username:", settings.username);
+        console.log("   - Is Active:", settings.isActive);
+        console.log("   - Is Verified:", settings.isVerified);
+      }
+    } else {
+      // Test with provided settings without saving
+      console.log("🔄 Testing with temporary settings from request");
+      console.log("📝 Temporary settings:", tempSettings);
       
-      if (settingsId || existingSettings) {
-        // Use existing settings if available
-        settings = existingSettings;
-      } else {
-        // Test with provided settings without saving
+      try {
         const validatedSettings = insertEmailSettingsSchema.parse(tempSettings);
         settings = { 
           ...validatedSettings, 
@@ -4396,45 +4547,73 @@ export async function registerRoutes(app: Express): Promise<Server> {
           createdAt: new Date(), 
           updatedAt: new Date() 
         };
+        console.log("✅ Temporary settings validated successfully");
+      } catch (validationError) {
+        console.error("❌ Settings validation failed:", validationError);
+        throw validationError;
       }
-
-      if (!settings) {
-        return res.status(404).json({ message: "Email settings not found" });
-      }
-
-      // Import email service dynamically
-      const { EmailService } = await import('./email-service');
-      const emailService = new EmailService(settings);
-      
-      // Test connection first
-      const connectionTest = await emailService.testConnection();
-      if (!connectionTest) {
-        return res.status(400).json({ 
-          message: "Failed to connect to email server. Please check your configuration." 
-        });
-      }
-
-      // Send test email
-      const testResult = await emailService.sendTestEmail(emailToTest);
-      
-      if (testResult) {
-        // Mark as verified if this is an existing configuration
-        if (existingSettings && existingSettings.id) {
-          await storage.markEmailSettingsAsVerified(existingSettings.id);
-        }
-        res.json({ 
-          success: true, 
-          message: "Test email sent successfully. Configuration verified!" 
-        });
-      } else {
-        res.status(400).json({ 
-          message: "Failed to send test email. Please check your configuration." 
-        });
-      }
-    } catch (error: any) {
-      res.status(400).json({ message: error.message });
     }
-  });
+
+    if (!settings) {
+      console.log("❌ No email settings available for testing");
+      return res.status(404).json({ message: "Email settings not found" });
+    }
+
+    console.log("🚀 Initializing email service...");
+    // Import email service dynamically
+    const { EmailService } = await import('./email-service');
+    const emailService = new EmailService(settings);
+    console.log("✅ Email service initialized");
+
+    // Test connection first
+    console.log("🔌 Testing email server connection...");
+    const connectionTest = await emailService.testConnection();
+    console.log("📡 Connection test result:", connectionTest ? "SUCCESS" : "FAILED");
+    
+    if (!connectionTest) {
+      console.log("❌ Failed to connect to email server");
+      return res.status(400).json({ 
+        message: "Failed to connect to email server. Please check your configuration." 
+      });
+    }
+
+    console.log("✅ Connection successful, sending test email...");
+    // Send test email
+    const testResult = await emailService.sendTestEmail(emailToTest);
+    console.log("📨 Test email send result:", testResult ? "SUCCESS" : "FAILED");
+    
+    if (testResult) {
+      // Mark as verified if this is an existing configuration
+      if (existingSettings && existingSettings.id) {
+        console.log("🏷️ Marking email settings as verified...");
+        await storage.markEmailSettingsAsVerified(existingSettings.id);
+        console.log("✅ Email settings verified status updated");
+      }
+      
+      console.log("🎉 Email configuration test completed successfully!");
+      res.json({ 
+        success: true, 
+        message: "Test email sent successfully. Configuration verified!" 
+      });
+    } else {
+      console.log("❌ Failed to send test email");
+      res.status(400).json({ 
+        message: "Failed to send test email. Please check your configuration." 
+      });
+    }
+    
+  } catch (error: any) {
+    console.error("💥 EMAIL SETTINGS TEST ERROR:", error);
+    console.error("Error details:", {
+      message: error.message,
+      stack: error.stack,
+      name: error.name
+    });
+    res.status(400).json({ message: error.message });
+  } finally {
+    console.log("=== EMAIL SETTINGS TEST COMPLETED ===");
+  }
+});
 
   // Delete email settings (admin only)
   app.delete("/api/email-settings", checkRole("admin"), async (req, res) => {
