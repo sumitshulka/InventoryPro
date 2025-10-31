@@ -451,22 +451,29 @@ export default function EnhancedTransfersPage() {
     }
   };
 
-  const filteredTransfers = (transfers && Array.isArray(transfers) ? transfers : []).filter((transfer: any) => {
-    switch (activeTab) {
-      case "pending":
-        return transfer.status === "pending" || transfer.status === "approved";
-      case "in-transit":
-        return transfer.status === "in-transit";
-      case "completed":
-        return transfer.status === "completed";
-      case "returned":
-        return transfer.status === "returned";
-      case "rejected":
-        return transfer.status === "rejected";
-      default:
-        return true;
-    }
-  });
+  const filteredTransfers = (transfers && Array.isArray(transfers) ? transfers : [])
+    .filter((transfer: any) => {
+      switch (activeTab) {
+        case "pending":
+          return transfer.status === "pending" || transfer.status === "approved";
+        case "in-transit":
+          return transfer.status === "in-transit";
+        case "completed":
+          return transfer.status === "completed";
+        case "returned":
+          return transfer.status === "returned";
+        case "rejected":
+          return transfer.status === "rejected";
+        default:
+          return true;
+      }
+    })
+    .sort((a: any, b: any) => {
+      // Sort by creation date, latest first
+      const dateA = new Date(a.createdAt).getTime();
+      const dateB = new Date(b.createdAt).getTime();
+      return dateB - dateA;
+    });
 
   // Check if there are enough warehouses for transfers
   const activeWarehouses = warehouses?.filter((w: any) => w.isActive) || [];
@@ -556,6 +563,7 @@ export default function EnhancedTransfersPage() {
                             <TableHead>Mode</TableHead>
                             <TableHead>Items</TableHead>
                             <TableHead>Status</TableHead>
+                            <TableHead>Created</TableHead>
                             <TableHead>Expected Shipment</TableHead>
                             <TableHead>Actions</TableHead>
                           </TableRow>
@@ -563,13 +571,13 @@ export default function EnhancedTransfersPage() {
                         <TableBody>
                           {transfersLoading ? (
                             <TableRow>
-                              <TableCell colSpan={8} className="text-center py-8">
+                              <TableCell colSpan={9} className="text-center py-8">
                                 <Loader2 className="h-6 w-6 animate-spin mx-auto" />
                               </TableCell>
                             </TableRow>
                           ) : paginatedTransfers.length === 0 ? (
                             <TableRow>
-                              <TableCell colSpan={8} className="text-center py-8 text-gray-500">
+                              <TableCell colSpan={9} className="text-center py-8 text-gray-500">
                                 No transfers found
                               </TableCell>
                             </TableRow>
@@ -604,6 +612,12 @@ export default function EnhancedTransfersPage() {
                             </TableCell>
                             <TableCell>
                               {getStatusBadge(transfer.status)}
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-1 text-sm">
+                                <Calendar className="w-3 h-3" />
+                                {formatDateTime(transfer.createdAt)}
+                              </div>
                             </TableCell>
                             <TableCell>
                               {transfer.expectedShipmentDate ? (
