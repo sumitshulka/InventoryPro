@@ -1,9 +1,8 @@
 import { useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation,useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import AppLayout from "@/components/layout/app-layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -42,7 +41,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { apiRequest, queryClient, invalidateRelatedQueries } from "@/lib/queryClient";
+import { apiRequest,  invalidateRelatedQueries } from "@/lib/queryClient";
 import { Loader2, Plus, Edit, Users, Trash, RefreshCw, Power, PowerOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
@@ -76,11 +75,12 @@ export default function UsersManagementPage() {
   const isAdmin = user?.role === "admin";
   const isManager = user?.role === "manager";
   const canEdit = isAdmin; // Only admins can edit users
-
+  const queryClient=useQueryClient()
   const { data: users, isLoading, refetch: refetchUsers } = useQuery({
     queryKey: ["/api/users"],
     staleTime: 0, // Always consider data stale
     refetchOnWindowFocus: true,
+
   });
 
   const { data: warehouses } = useQuery({
@@ -149,6 +149,7 @@ export default function UsersManagementPage() {
     onSuccess: async () => {
       // Force immediate cache invalidation and refetch
       await invalidateRelatedQueries(queryClient,'user', isEditMode ? 'update' : 'create');
+      await queryClient.invalidateQueries({ queryKey: ['/api/users'] });
       toast({
         title: isEditMode ? "User updated" : "User created",
         description: isEditMode
@@ -259,11 +260,25 @@ export default function UsersManagementPage() {
     createUserMutation.mutate(values);
   };
 
-  const handleRefresh = () => {
-    queryClient.invalidateQueries({ queryKey: ["/api/users"] });
-    queryClient.invalidateQueries({ queryKey: ["/api/warehouses"] });
-    queryClient.invalidateQueries({ queryKey: ["/api/departments"] });
-    refetchUsers();
+  const handleRefresh = async () => {
+    try {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["/api/users"] }),
+        queryClient.invalidateQueries({ queryKey: ["/api/warehouses"] }),
+        queryClient.invalidateQueries({ queryKey: ["/api/departments"] }),
+        refetchUsers(),
+      ]);
+      toast({
+        title: "Refreshed",
+        description: "Users, warehouses and departments have been refreshed.",
+      });
+    } catch (err: any) {
+      toast({
+        title: "Refresh failed",
+        description: err?.message || "Failed to refresh data.",
+        variant: "destructive",
+      });
+    }
   };
 
   const toggleUserStatusMutation = useMutation({
@@ -299,16 +314,13 @@ export default function UsersManagementPage() {
 
   if (isLoading) {
     return (
-      <AppLayout>
         <div className="flex items-center justify-center h-64">
           <Loader2 className="h-8 w-8 animate-spin" />
         </div>
-      </AppLayout>
     );
   }
 
   return (
-    <AppLayout>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
@@ -339,7 +351,6 @@ export default function UsersManagementPage() {
               disabled={isLoading}
             >
               <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
-              Refresh
             </Button>
             {canEdit && (
               <Button 
@@ -791,6 +802,5 @@ export default function UsersManagementPage() {
           </AlertDialogContent>
         </AlertDialog>
       </div>
-    </AppLayout>
   );
 }

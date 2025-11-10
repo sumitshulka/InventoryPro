@@ -1,5 +1,4 @@
 import { useQuery } from "@tanstack/react-query";
-import AppLayout from "@/components/layout/app-layout";
 import MetricCard from "@/components/dashboard/metric-card";
 import RecentTransactions from "@/components/dashboard/recent-transactions";
 import WarehouseOverview from "@/components/dashboard/warehouse-overview";
@@ -47,16 +46,16 @@ export default function DashboardPage() {
   
   if (isLoading || warehouseStatsLoading) {
     return (
-      <AppLayout>
+      
         <div className="flex items-center justify-center h-[calc(100vh-200px)]">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
-      </AppLayout>
+     
     );
   }
 
   return (
-    <AppLayout>
+      <>
       {/* Page Title */}
       <div className="flex items-center justify-between mb-6">
         <div>
@@ -129,7 +128,7 @@ export default function DashboardPage() {
           changeText="vs last month"
         />
         <MetricCard
-          title="Low Stock Items"
+          title="Low Stock Items (Inventory)"
           value={dashboardData?.lowStockItemsCount || 0}
           icon="warning"
           iconBgColor="bg-warning bg-opacity-10"
@@ -178,6 +177,6 @@ export default function DashboardPage() {
           <RecentActivity />
         </div>
       </div>
-    </AppLayout>
+    </>
   );
 }

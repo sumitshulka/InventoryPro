@@ -80,14 +80,17 @@ import {
   issues,
   issueActivities,
   auditLogs,
-  emailSettings
+  emailSettings,
+  InsertDisposedItem,
+  disposedItems,
+  DisposedItem
 } from "@shared/schema";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
 import createMemoryStore from "memorystore";
 import { db, pool } from "./db";
 import { eq, and, desc, or, ne, sql } from "drizzle-orm";
-
+import {alias} from 'drizzle-orm/pg-core';
 const MemoryStore = createMemoryStore(session);
 const PostgresSessionStore = connectPg(session);
 
@@ -346,7 +349,7 @@ export class DatabaseStorage implements IStorage {
 
   async archiveWarehouse(id: number): Promise<Warehouse | undefined> {
     const [archivedWarehouse] = await db.update(warehouses)
-      .set({ status: 'deleted', deletedAt: new Date() })
+      .set({ status: 'deleted', deletedAt: new Date(),isActive:false })
       .where(eq(warehouses.id, id))
       .returning();
     return archivedWarehouse;
@@ -780,6 +783,63 @@ export class DatabaseStorage implements IStorage {
     return result.rowCount ? result.rowCount > 0 : false;
   }
 
+  async createDisposedItem(item: InsertDisposedItem): Promise<DisposedItem> {
+    const [newItem] = await db
+      .insert(disposedItems)
+      .values(item)
+      .returning();
+      
+    return newItem;
+  }
+  async getDisposedItem(id: number): Promise<DisposedItem | undefined> {
+    const [item] = await db
+      .select()
+      .from(disposedItems)
+      .where(eq(disposedItems.id, id));
+      
+    return item;
+  }
+  async getAllDisposedItem(): Promise<DisposedItem[] | undefined> {
+    return await db.select().from(disposedItems);
+    
+  }
+  async getAllDisposedItemsReport(): Promise<any[]> { 
+  // Alias the users table
+  const approvedByUser = alias(users, 'approvedByUser');
+
+  const results = await db
+    .select({
+      id: disposedItems.id,
+      quantity: disposedItems.quantity,
+      unitValue: disposedItems.unitValue,
+      totalValue: disposedItems.totalValue,
+      disposalDate: disposedItems.disposalDate,
+      disposalReason: disposedItems.disposalReason,
+      sourceType: disposedItems.sourceType,
+      sourceId: disposedItems.sourceId,
+      // We nest the joined data to match your original structure
+      item: {
+        id: items.id,
+        name: items.name,
+        sku: items.sku,
+      },
+      warehouse: {
+        id: warehouses.id,
+        name: warehouses.name,
+      },
+      approvedByUser: { 
+        id: approvedByUser.id,
+        name: approvedByUser.name,
+      },
+    })
+    .from(disposedItems)
+    .leftJoin(items, eq(disposedItems.itemId, items.id))
+    .leftJoin(warehouses, eq(disposedItems.warehouseId, warehouses.id))
+    .leftJoin(approvedByUser, eq(disposedItems.approvedBy, approvedByUser.id));
+
+  return results;
+}
+
   // Helper method for user hierarchy
   async getUserHierarchy(userId: number): Promise<User[]> {
     const hierarchy: User[] = [];
@@ -817,6 +877,9 @@ export class DatabaseStorage implements IStorage {
   async getAllRejectedGoods(): Promise<RejectedGoods[]> {
     return await db.select().from(rejectedGoods);
   }
+  async getRejectedGood(id:number): Promise<RejectedGoods[]> {
+    return await db.select().from(rejectedGoods).where(eq(rejectedGoods.id,id));
+  }
 
   async getRejectedGoodsByWarehouse(warehouseId: number): Promise<RejectedGoods[]> {
     return await db.select().from(rejectedGoods).where(eq(rejectedGoods.warehouseId, warehouseId));
@@ -845,7 +908,14 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createTransfer(transfer: InsertTransfer): Promise<Transfer> {
-    const [newTransfer] = await db.insert(transfers).values([transfer]).returning();
+  const now = new Date();
+
+  // Adjust to remove local timezone offset (normalize to UTC)
+  const utcNormalized = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
+
+  // Merge with transfer object
+  const transferWithTime = { ...transfer, createdAt: utcNormalized };
+    const [newTransfer] = await db.insert(transfers).values([transferWithTime]).returning();
     return newTransfer;
   }
 
@@ -860,6 +930,10 @@ export class DatabaseStorage implements IStorage {
   async getTransferItemsByTransfer(transferId: number): Promise<TransferItem[]> {
     return await db.select().from(transferItems).where(eq(transferItems.transferId, transferId));
   }
+    async getTransferItemsByTransferAndItem(transferId: number,itemId:number): Promise<TransferItem[]> {
+    return await db.select().from(transferItems).where(and(eq(transferItems.transferId, transferId), eq(transferItems.itemId, itemId)));
+  }
+
 
   async createTransferItem(item: InsertTransferItem): Promise<TransferItem> {
     const [newItem] = await db.insert(transferItems).values([item]).returning();

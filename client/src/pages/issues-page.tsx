@@ -18,7 +18,6 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { format, formatDistanceToNow } from "date-fns";
 import { AlertTriangle, Plus, Search, Filter, CheckCircle, Clock, X, Flag, Bell, MessageSquare, Archive, Reply, Mail, MailOpen, RefreshCw, Trash2 } from "lucide-react";
-import AppLayout from "@/components/layout/app-layout";
 import { DataTablePagination } from "@/components/ui/data-table-pagination";
 
 interface Issue {
@@ -571,16 +570,13 @@ export default function IssuesPage() {
 
   if (isLoading) {
     return (
-      <AppLayout>
         <div className="flex items-center justify-center h-64">
           <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full"></div>
         </div>
-      </AppLayout>
     );
   }
 
   return (
-    <AppLayout>
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <div>
@@ -1747,6 +1743,5 @@ export default function IssuesPage() {
           </DialogContent>
         </Dialog>
       </div>
-    </AppLayout>
   );
 }

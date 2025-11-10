@@ -5,7 +5,6 @@ import { getTransactionTypeColor, formatDateTime } from "@/lib/utils";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import AppLayout from "@/components/layout/app-layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -212,16 +211,14 @@ export default function InventoryPage() {
 
   if (inventoryLoading || itemsLoading || warehousesLoading) {
     return (
-      <AppLayout>
         <div className="flex items-center justify-center h-[calc(100vh-200px)]">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
-      </AppLayout>
     );
   }
 
   return (
-    <AppLayout>
+    <>
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-medium text-gray-800">Inventory</h1>
@@ -637,6 +634,6 @@ export default function InventoryPage() {
           </form>
         </DialogContent>
       </Dialog>
-    </AppLayout>
+    </>
   );
 }

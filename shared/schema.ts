@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, unique, numeric, index } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, unique, numeric, index,varchar,json } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -299,8 +299,8 @@ export const insertTransactionSchema = createInsertSchema(transactions)
       if (typeof arg === 'number') return arg.toString();
       return arg;
     }, z.string().optional()),
-    supplierName: z.string().optional(),
-    poNumber: z.string().optional(),
+    supplierName: z.string().nullable().optional(),
+    poNumber: z.string().nullable().optional(),
     checkInDate: z.preprocess((arg) => {
       if (typeof arg === 'string' || arg instanceof Date) return new Date(arg);
       return arg;
@@ -473,6 +473,71 @@ export const transfers = pgTable("transfers", {
   updatedAt: timestamp("updated_at"),
 });
 
+export const disposedItems = pgTable('disposed_items', {
+  id: serial('id').primaryKey(),
+
+  itemId: integer('item_id')
+    .notNull()
+    .references(() => items.id),
+
+  warehouseId: integer('warehouse_id')
+    .notNull()
+    .references(() => warehouses.id),
+
+  quantity: integer('quantity').notNull(),
+
+  // Store the value at the moment of disposal
+  unitValue: numeric('unit_value', { precision: 10, scale: 2 }).notNull(),
+  totalValue: numeric('total_value', { precision: 10, scale: 2 }).notNull(),
+
+  disposalDate: timestamp('disposal_date').notNull().defaultNow(),
+  disposalReason: text('disposal_reason'),
+
+  approvedBy: integer('approved_by')
+    .notNull()
+    .references(() => users.id),
+
+  // This tells you where it came from
+  sourceType: varchar('source_type', { length: 50 }), // 'rejected_transfer', 'inventory'
+  sourceId: integer('source_id'), // the rejectedGoodsId or transferId
+
+  createdAt: timestamp('created_at').defaultNow(),
+});
+export const insertDisposedItemSchema = createInsertSchema(disposedItems, {
+  // Pre-process numeric fields to convert numbers to strings for Drizzle
+  unitValue: z.preprocess((arg) => {
+    if (typeof arg === 'number') return arg.toString();
+    return arg;
+  }, z.string()),
+  
+  totalValue: z.preprocess((arg) => {
+    if (typeof arg === 'number') return arg.toString();
+    return arg;
+  }, z.string()),
+
+}).omit({
+  id: true,
+  disposalDate: true,
+  createdAt: true,
+});
+
+export const session = pgTable("session", {
+  // sid: [PK] character varying
+  sid: varchar("sid", ).primaryKey(),
+  
+  // sess: json
+  sess: json("sess").notNull(),
+  
+  // expire: timestamp without time zone (6)
+  expire: timestamp("expire", { 
+    precision: 6, 
+    withTimezone: false 
+  }).notNull(),
+  
+}, (table) => ({
+  // This adds the "IDX_session_expire" index
+  expireIdx: index("IDX_session_expire").on(table.expire),
+}));
 export const insertTransferSchema = createInsertSchema(transfers).omit({
   id: true,
   createdAt: true,
@@ -498,6 +563,7 @@ export const transferItems = pgTable("transfer_items", {
   actualQuantity: integer("actual_quantity"), // quantity actually received
   condition: text("condition").default("good"), // good, damaged, missing
   notes: text("notes"),
+  itemStatus: text("item_status")
 });
 
 export const insertTransferItemSchema = createInsertSchema(transferItems).omit({
@@ -566,6 +632,9 @@ export type InsertTransferItem = z.infer<typeof insertTransferItemSchema>;
 
 export type TransferUpdate = typeof transferUpdates.$inferSelect;
 export type InsertTransferUpdate = z.infer<typeof insertTransferUpdateSchema>;
+
+export type DisposedItem = typeof disposedItems.$inferSelect;
+export type InsertDisposedItem = z.infer<typeof insertDisposedItemSchema>;
 
 // Rejected Goods table for tracking rejected transfer items
 export const rejectedGoods = pgTable("rejected_goods", {

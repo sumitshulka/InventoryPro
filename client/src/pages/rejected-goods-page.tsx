@@ -128,15 +128,24 @@ export default function RejectedGoodsPage() {
     if (!selectedItem || !actionNotes.trim()) return;
 
     if (actionType === 'return') {
-      approveReturnMutation.mutate({
-        transferId: selectedItem.transferId,
-        returnReason: actionNotes.trim()
+      updateStatusMutation.mutate({
+        id: selectedItem.id,
+        status:'restocked',
+        notes: actionNotes.trim()
       });
-    } else if (actionType === 'dispose') {
-      approveDisposalMutation.mutate({
-        transferId: selectedItem.transferId,
-        disposalReason: actionNotes.trim()
-      });
+    } 
+    // else if (actionType === 'dispose') {
+    //   approveDisposalMutation.mutate({
+    //     transferId: selectedItem.transferId,
+    //     disposalReason: actionNotes.trim()
+    //   });
+    // }
+    else if(actionType==='dispose'){
+      updateStatusMutation.mutate({
+        id:selectedItem.id,
+        status:'dispose',
+        notes:actionNotes.trim()
+      })
     }
   };
 
@@ -223,7 +232,6 @@ export default function RejectedGoodsPage() {
   };
 
   return (
-    <AppLayout>
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <h1 className="text-3xl font-bold">Rejected Goods Management</h1>
@@ -468,6 +476,5 @@ export default function RejectedGoodsPage() {
           </DialogContent>
         </Dialog>
       </div>
-    </AppLayout>
   );
 }

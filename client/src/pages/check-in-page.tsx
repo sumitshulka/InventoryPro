@@ -1,10 +1,9 @@
-import { useState } from "react";
+import { useState,useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { z } from "zod";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { format } from "date-fns";
-import AppLayout from "@/components/layout/app-layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -48,16 +47,16 @@ const itemSchema = z.object({
   quantity: z.string().min(1, { message: "Quantity is required" }).refine(val => !isNaN(Number(val)) && Number(val) > 0, {
     message: "Quantity must be a positive number"
   }),
-  cost: z.string().optional().refine(val => !val || (!isNaN(Number(val)) && Number(val) >= 0), {
+  cost: z.string().min(1,{message:"Cost is required"}).refine(val => !val || (!isNaN(Number(val)) && Number(val) >= 0), {
     message: "Cost must be a valid number"
   }),
 });
 
 const multiCheckInSchema = z.object({
   destinationWarehouseId: z.string().min(1, { message: "Destination warehouse is required" }),
-  purchaseOrderNumber: z.string().optional(),
+  purchaseOrderNumber: z.string().min(1,{message:'Purchase Order Number is required'}),
   deliveryChallanNumber: z.string().optional(),
-  supplierName: z.string().optional(),
+  supplierName: z.string().min(1,{message:'Supplier name is required'}),
   notes: z.string().optional(),
   checkInDate: z.date(),
   items: z.array(itemSchema).min(1, { message: "At least one item is required" }),
@@ -87,7 +86,7 @@ export default function CheckInPage() {
     location: string;
     managerId?: number;
   }>>({
-    queryKey: ["/api/warehouses"],
+    queryKey: ["/api/warehouses/active"],
   });
 
   const { data: userOperatedWarehouses = [], isLoading: operatedWarehousesLoading } = useQuery<number[]>({
@@ -118,6 +117,13 @@ export default function CheckInPage() {
     refetchInterval: 5000,
     refetchIntervalInBackground: true,
   });
+    const sortedCheckInTransactions = useMemo(() => {
+    return [...(checkInTransactions || [])].sort((a, b) => {
+      const da = new Date(a.checkInDate || a.createdAt).getTime();
+      const db = new Date(b.checkInDate || b.createdAt).getTime();
+      return db - da;
+    });
+  }, [checkInTransactions]);
 
   const { data: users = [], isLoading: usersLoading } = useQuery<Array<{
     id: number;
@@ -235,17 +241,14 @@ export default function CheckInPage() {
 
   if (itemsLoading || warehousesLoading || transactionsLoading || usersLoading || operatedWarehousesLoading) {
     return (
-      <AppLayout>
         <div className="flex justify-center items-center h-64">
           <Loader2 className="h-8 w-8 animate-spin" />
         </div>
-      </AppLayout>
     );
   }
 
   if (!hasCheckInPermission) {
     return (
-      <AppLayout>
         <div className="flex justify-center items-center h-64">
           <Card className="w-full max-w-md">
             <CardHeader>
@@ -259,12 +262,10 @@ export default function CheckInPage() {
             </CardContent>
           </Card>
         </div>
-      </AppLayout>
     );
   }
 
   return (
-    <AppLayout>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <h1 className="text-3xl font-bold">Check In Items</h1>
@@ -471,7 +472,7 @@ export default function CheckInPage() {
                               name={`items.${index}.cost`}
                               render={({ field }) => (
                                 <FormItem>
-                                  <FormLabel>Cost ({currencySymbol})</FormLabel>
+                                  <FormLabel>Unit Cost ({currencySymbol})</FormLabel>
                                   <FormControl>
                                     <Input type="number" step="0.01" placeholder="Enter cost" {...field} />
                                   </FormControl>
@@ -558,7 +559,7 @@ export default function CheckInPage() {
                         <TableHead>Transaction Code</TableHead>
                         <TableHead>Item</TableHead>
                         <TableHead>Quantity</TableHead>
-                        <TableHead>Price ({currencySymbol})</TableHead>
+                        <TableHead>Unit Price ({currencySymbol})</TableHead>
                         <TableHead>Warehouse</TableHead>
                         <TableHead>Date</TableHead>
                         <TableHead>Status</TableHead>
@@ -568,8 +569,8 @@ export default function CheckInPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {checkInTransactions && checkInTransactions.length > 0 ? (
-                        checkInTransactions.map((transaction) => {
+                      {sortedCheckInTransactions && sortedCheckInTransactions.length > 0 ? (
+                        sortedCheckInTransactions.map((transaction) => {
                           const item = items?.find(i => i.id === transaction.itemId);
                           const warehouse = warehouses?.find(w => w.id === transaction.destinationWarehouseId);
                           const requester = users?.find(u => u.id === transaction.requesterId);
@@ -629,6 +630,5 @@ export default function CheckInPage() {
           </TabsContent>
         </Tabs>
       </div>
-    </AppLayout>
   );
 }

@@ -295,16 +295,14 @@ export default function RequestsPage() {
 
   if (requestsLoading || itemsLoading || warehousesLoading || usersLoading) {
     return (
-      <AppLayout>
         <div className="flex items-center justify-center h-[calc(100vh-200px)]">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
-      </AppLayout>
     );
   }
 
   return (
-    <AppLayout>
+    <>
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Inventory Check Out Requests</h1>
@@ -324,11 +322,25 @@ export default function RequestsPage() {
               variant="outline"
               size="sm"
               onClick={async () => {
-                await refetchRequests();
-                await refetchInventory();
-                await refetchUsers();
-                await refetchWarehouses();
-                await refetchItems();
+                try {
+                  await Promise.all([
+                    refetchRequests(),
+                    refetchInventory(),
+                    refetchUsers(),
+                    refetchWarehouses(),
+                    refetchItems(),
+                  ]);
+                  toast({
+                    title: "Refreshed",
+                    description: "Requests data have been refreshed.",
+                  });
+                } catch (err: any) {
+                  toast({
+                    title: "Refresh failed",
+                    description: err?.message || "Failed to refresh data.",
+                    variant: "destructive",
+                  });
+                }
               }}
               className="ml-2"
             >
@@ -659,7 +671,7 @@ export default function RequestsPage() {
                     <TableBody>
                       {selectedRequest.items?.map((item: any) => (
                         <TableRow key={item.id}>
-                          <TableCell>{getItemName(item.itemId)}</TableCell>
+                          <TableCell>{getItemName(item.itemId)} {` (${item.sku})`}</TableCell>
                           <TableCell className="text-right">{item.quantity}</TableCell>
                         </TableRow>
                       ))}
@@ -729,6 +741,6 @@ export default function RequestsPage() {
           </DialogContent>
         </Dialog>
       )}
-    </AppLayout>
+    </>
   );
 }

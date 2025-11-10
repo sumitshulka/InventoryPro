@@ -43,7 +43,7 @@ export default function LowStockItems({ items }: LowStockItemsProps) {
   return (
     <Card>
       <CardHeader className="p-6 border-b flex flex-row items-center justify-between">
-        <h3 className="text-lg font-medium text-gray-800">Low Stock Items</h3>
+        <h3 className="text-lg font-medium text-gray-800">Low Stock Items (Inventory)</h3>
         <Button 
           variant="ghost" 
           className="text-primary text-sm hover:bg-primary/5"

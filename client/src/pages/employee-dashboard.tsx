@@ -1,5 +1,4 @@
 import { useQuery } from "@tanstack/react-query";
-import AppLayout from "@/components/layout/app-layout";
 import MetricCard from "@/components/dashboard/metric-card";
 import { Loader2, FileText, Clock, CheckCircle } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
@@ -17,16 +16,14 @@ export default function EmployeeDashboard() {
 
   if (isLoading) {
     return (
-      <AppLayout>
         <div className="flex items-center justify-center h-[calc(100vh-200px)]">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
-      </AppLayout>
     );
   }
 
   return (
-    <AppLayout>
+    <>
       {/* Page Title */}
       <div className="mb-6">
         <h1 className="text-2xl font-medium text-gray-800">My Workspace</h1>
@@ -153,6 +150,6 @@ export default function EmployeeDashboard() {
           </div>
         </div>
       </div>
-    </AppLayout>
+    </>
   );
 }

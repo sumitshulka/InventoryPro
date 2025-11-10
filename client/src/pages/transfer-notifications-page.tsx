@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import AppLayout from "@/components/layout/app-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -149,7 +148,6 @@ export default function TransferNotificationsPage() {
 
   if (notificationsLoading) {
     return (
-      <AppLayout>
         <div className="container mx-auto p-6">
           <div className="space-y-4">
             <div className="h-8 bg-gray-200 rounded animate-pulse"></div>
@@ -157,14 +155,12 @@ export default function TransferNotificationsPage() {
             <div className="h-32 bg-gray-200 rounded animate-pulse"></div>
           </div>
         </div>
-      </AppLayout>
     );
   }
 
   const pendingNotifications = notifications.filter((n: TransferNotification) => n.status === 'pending');
 
   return (
-    <AppLayout>
       <div className="container mx-auto p-6">
         <div className="mb-6">
           <h1 className="text-3xl font-bold text-gray-900">Transfer Notifications</h1>
@@ -328,6 +324,5 @@ export default function TransferNotificationsPage() {
         </div>
       )}
       </div>
-    </AppLayout>
   );
 }

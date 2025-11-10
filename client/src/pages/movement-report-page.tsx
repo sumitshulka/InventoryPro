@@ -1,6 +1,5 @@
 import { useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import AppLayout from "@/components/layout/app-layout";
+import { useQuery, useMutation,useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -34,8 +33,8 @@ export default function MovementReportPage() {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [dateRange, setDateRange] = useState("all");
-
-  const { data: transactions, isLoading: transactionsLoading, refetch } = useQuery({
+  const queryClient=useQueryClient();
+  const { data: unsortedtransactions, isLoading: transactionsLoading, refetch } = useQuery({
     queryKey: ["/api/reports/inventory-movement"],
   });
 
@@ -116,7 +115,10 @@ export default function MovementReportPage() {
     setStartDate(startDateVal);
     setEndDate(range === "all" ? "" : endDateVal);
   };
-
+  const transactions = (unsortedtransactions && Array.isArray(unsortedtransactions) ? [...unsortedtransactions] : [])
+    .sort((a: any, b: any) => {
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
   // Apply filters to transaction data
   const filteredTransactions = transactions && Array.isArray(transactions)
     ? transactions.filter((transaction: any) => {
@@ -190,25 +192,39 @@ export default function MovementReportPage() {
 
   if (transactionsLoading || warehousesLoading || itemsLoading) {
     return (
-      <AppLayout>
         <div className="flex items-center justify-center h-[calc(100vh-200px)]">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
-      </AppLayout>
     );
   }
 
   return (
-    <AppLayout>
+    <>
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-medium text-gray-800">Inventory Movement Report</h1>
           <p className="text-gray-600">Track and analyze inventory movements over time</p>
         </div>
         <div className="flex space-x-2">
-          <Button variant="outline" onClick={() => refetch()}>
-            <RefreshCw className="mr-2 h-4 w-4" />
-            Refresh
+          <Button variant="outline" onClick={async () => {
+                      try {
+                        // Clear all relevant query caches
+                        await queryClient.invalidateQueries({ queryKey: ["/api/reports/inventory-movement"] });
+                        
+                        toast({
+                          title: "Refreshed",
+                          description: "Inventory Movement Report has been refreshed with latest data",
+                        });
+                      } catch (error) {
+                        console.error('Refresh error:', error);
+                        toast({
+                          title: "Refresh Failed",
+                          description: "Unable to refresh data. Please try again.",
+                          variant: "destructive",
+                        });
+                      }
+                    }}>
+            <RefreshCw className=" h-4 w-4 " />
           </Button>
           <Button 
             onClick={() => exportMutation.mutate()}
@@ -493,6 +509,6 @@ export default function MovementReportPage() {
           </div>
         </CardContent>
       </Card>
-    </AppLayout>
+    </>
   );
 }

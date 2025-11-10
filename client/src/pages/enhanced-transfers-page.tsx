@@ -3,7 +3,6 @@ import { useQuery, useMutation,useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import AppLayout from "@/components/layout/app-layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -59,7 +58,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
-import { formatDateTime, getStatusColor } from "@/lib/utils";
+import { formatDateTime, formatDateTimeWithoutTimeZone, getStatusColor } from "@/lib/utils";
 import { DataTablePagination } from "@/components/ui/data-table-pagination";
 
 const transferItemSchema = z.object({
@@ -77,7 +76,28 @@ const formSchema = z.object({
   handoverPersonName: z.string().optional(),
   handoverPersonContact: z.string().optional(),
   notes: z.string().optional(),
-  items: z.array(transferItemSchema).min(1, { message: "At least one item is required" }),
+  items: z.array(transferItemSchema).min(1, { message: "At least one item is required" })
+  .superRefine((items, ctx) => {
+      const ids = items.map(i => i.itemId);
+      const dupes = ids.filter((v, i, a) => a.indexOf(v) !== i);
+      if (dupes.length > 0) {
+        // add an error on the items array
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Each item can only be selected once",
+        });
+        // also add an error on individual duplicate indices if possible
+        ids.forEach((id, idx) => {
+          if (dupes.includes(id)) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: "Duplicate item",
+              path: ["items", idx, "itemId"],
+            });
+          }
+        });
+        }
+    }),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -95,13 +115,15 @@ const returnShippedSchema = z.object({
 
 const acceptanceSchema = z.object({
   receivedDate: z.string().min(1, "Received date is required"),
-  overallCondition: z.string().min(1, "Overall condition is required"),
+  overallCondition: z.string().optional(),
   receiverNotes: z.string().optional(),
   items: z.array(z.object({
     itemId: z.number(),
+    transferItemId:z.number(),
     actualQuantity: z.number().min(0, "Quantity cannot be negative"),
     condition: z.string().min(1, "Condition is required"),
     notes: z.string().optional(),
+    itemStatus: z.string().min(1,"Status is required")
   })),
 });
 
@@ -124,6 +146,7 @@ export default function EnhancedTransfersPage() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [rejectionReason, setRejectionReason] = useState("");
   const queryClient=useQueryClient();
+  
 
   const { data: transfers, isLoading: transfersLoading } = useQuery({
     queryKey: ["/api/transfers", refreshKey],
@@ -190,6 +213,15 @@ export default function EnhancedTransfersPage() {
       items: [],
     },
   });
+  const acceptanceItems = acceptanceForm.watch("items") || [];
+  const acceptanceButtonLabel = (() => {
+    if (!Array.isArray(acceptanceItems) || acceptanceItems.length === 0) return "Submit";
+    const statuses = acceptanceItems.map((it: any) => it?.itemStatus);
+    if (statuses.every(s => s === "Accept")) return "Accept Transfer";
+    if (statuses.every(s => s === "Return")) return "Return Transfer";
+    if (statuses.some(s => s === "Return")) return "Partial Return";
+    return "Accept Transfer";
+  })();
 
   const createTransferMutation = useMutation({
     mutationFn: async (data: FormValues) => {
@@ -273,8 +305,8 @@ export default function EnhancedTransfersPage() {
   });
   const returnDeliveryMutation = useMutation({
     mutationFn: async ({id,...data}: any)=>{
-      const response = await fetch(`/api/transfers/${id}/return-delivery`,{
-        method:"Post",
+      const response = await fetch(`/api/transfers/${id}`,{
+        method:"PATCH",
         headers: {"Content-Type":"application/json"},
         body: JSON.stringify(data),
       });
@@ -389,7 +421,7 @@ export default function EnhancedTransfersPage() {
   const handleReturnDeliver = (transferId:number) => {
     returnDeliveryMutation.mutate({
       id:transferId,
-      status:'return-delivered'
+      status:'returned'
     })
   }
 
@@ -425,19 +457,29 @@ export default function EnhancedTransfersPage() {
   };
 
   const handleAcceptanceSubmit = (data: AcceptanceFormValues) => {
+    console.log("✅ Form submitted with data:", data);
+
     if (!selectedTransfer) return;
+    let overallCondition;
+    if (data.items.every(item => item.itemStatus === "Accept")) {
+      overallCondition = "completed";
+    } else if (data.items.every(item => item.itemStatus === "Return")) {
+      overallCondition = "return-requested";
+    } else if (data.items.some(item => item.itemStatus === "Return")) {
+      overallCondition = "partial-return-requested";
+    } 
     
-    const isAccepted = data.overallCondition !== 'rejected';
     
     updateTransferMutation.mutate({
       id: selectedTransfer.id,
       receivedBy: user?.id,
       receivedDate: new Date(data.receivedDate),
-      overallCondition: data.overallCondition,
+      overallCondition,
       receiverNotes: data.receiverNotes,
-      status: isAccepted ? 'completed' : 'returned',
+      status: overallCondition,
       updateType: 'receipt_confirmation',
-      updateDescription: isAccepted ? 'Transfer completed and accepted' : 'Transfer returned due to issues',
+      updateDescription: `Transfer is ${overallCondition}`,
+      items: data.items
     });
     
     setAcceptanceDialogOpen(false);
@@ -521,9 +563,12 @@ export default function EnhancedTransfersPage() {
   // Check if there are enough warehouses for transfers
   const activeWarehouses = warehouses?.filter((w: any) => w.isActive) || [];
   const hasEnoughWarehouses = activeWarehouses.length >= 2;
+  const selectedItemIds = (form.watch("items") || []).map((it: any) => it?.itemId).filter(Boolean);
+  const acceptanceIsReturn = Array.isArray(acceptanceItems) && acceptanceItems.some((it: any) => it?.itemStatus === "Return");
+  const acceptanceButtonVariant = acceptanceIsReturn ? "destructive" : undefined;
+
 
   return (
-    <AppLayout>
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <h1 className="text-3xl font-bold">Transfer Management</h1>
@@ -717,7 +762,8 @@ export default function EnhancedTransfersPage() {
                                     )}
                                   </>
                                 )}
-                                {transfer.status === "approved" && transfer.sourceWarehouse?.managerId === user?.id && (
+                                {transfer.status === "approved" && (transfer.sourceWarehouse?.managerId === user?.id|| user?.role === "admin") && (
+              
                                   <Button
                                     variant="ghost"
                                     size="sm"
@@ -731,7 +777,7 @@ export default function EnhancedTransfersPage() {
                                     <FileText className="h-4 w-4" />
                                   </Button>
                                 )}
-                                {transfer.status === "in-transit" && transfer.destinationWarehouse?.managerId === user?.id && (
+                                {transfer.status === "in-transit" && (transfer.destinationWarehouse?.managerId === user?.id || user?.role==='admin')&& (
                                   <Button
                                     variant="ghost"
                                     size="sm"
@@ -740,9 +786,11 @@ export default function EnhancedTransfersPage() {
                                       setSelectedTransfer(transfer);
                                       acceptanceForm.setValue('items', transfer.items?.map((item: any) => ({
                                         itemId: item.itemId,
+                                        transferItemId: item.id,
                                         actualQuantity: item.requestedQuantity,
                                         condition: 'good',
-                                        notes: ''
+                                        notes: '',
+                                        itemStatus:'Accept'
                                       })) || []);
                                       setAcceptanceDialogOpen(true);
                                     }}
@@ -751,7 +799,34 @@ export default function EnhancedTransfersPage() {
                                     <Package className="h-4 w-4" />
                                   </Button>
                                 )}
-                                {transfer.status === "return_approved" && transfer.destinationWarehouse?.managerId === user?.id && (
+                                {(transfer.status === "return-requested" || transfer.status ==='partial-return-requested'  )&& (transfer.sourceWarehouse?.managerId === user?.id || user?.role==='admin' ) && (
+                                  <>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="text-green-600"
+                                      onClick={() => handleUpdateStatus(transfer.id, "return-approved")}
+                                      title="Approve return transfer request"
+                                    >
+                                      <CheckCircle className="h-4 w-4" />
+                                    </Button>
+                                    {(user?.role === 'admin' || transfer.initiatedBy === user?.id) && (
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="text-red-600"
+                                        onClick={() => {
+                                          setSelectedTransfer(transfer);
+                                          setRejectionDialogOpen(true);
+                                        }}
+                                        title="Reject or cancel transfer"
+                                      >
+                                        <X className="h-4 w-4" />
+                                      </Button>
+                                    )}
+                                  </>
+                                )}
+                                {transfer.status === "return-approved" && transfer.destinationWarehouse?.managerId === user?.id && (
                                   <Button
                                     variant="ghost"
                                     size="sm"
@@ -1065,8 +1140,10 @@ export default function EnhancedTransfersPage() {
                                 (items && Array.isArray(items) ? items : []).map((item: any) => {
                                   const sourceWarehouseId = parseInt(form.watch("sourceWarehouseId") || "0");
                                   const availableQty = getItemQuantity(item.id, sourceWarehouseId);
+                                  const valueStr = item.id.toString();
+                                  const isSelectedElsewhere = selectedItemIds.includes(valueStr) && form.getValues(`items.${index}.itemId`) !== valueStr;
                                   return (
-                                    <SelectItem key={item.id} value={item.id.toString()}>
+                                    <SelectItem key={item.id}  value={valueStr} disabled={isSelectedElsewhere}>
                                       <div className="flex justify-between items-center w-full">
                                         <span>{item.name} ({item.sku})</span>
                                         <span className={`ml-2 text-sm ${availableQty > 0 ? 'text-green-600' : 'text-red-500'}`}>
@@ -1418,7 +1495,7 @@ export default function EnhancedTransfersPage() {
                     </p>
                   )}
                 </div>
-                <div>
+                {/* <div>
                   <Label htmlFor="overallCondition">Overall Condition</Label>
                   <Select
                     value={acceptanceForm.watch("overallCondition")}
@@ -1439,7 +1516,7 @@ export default function EnhancedTransfersPage() {
                       {acceptanceForm.formState.errors.overallCondition.message}
                     </p>
                   )}
-                </div>
+                </div> */}
               </div>
 
               {/* Item Details */}
@@ -1447,7 +1524,8 @@ export default function EnhancedTransfersPage() {
                 <Label>Item Details</Label>
                 <div className="mt-2 space-y-3 max-h-60 overflow-y-auto border rounded-md p-3">
                   {selectedTransfer?.items?.map((item: any, index: number) => (
-                    <div key={item.itemId} className="grid grid-cols-4 gap-3 items-center p-2 bg-gray-50 rounded">
+                    
+                    <div key={item.itemId} className="grid grid-cols-5 gap-3 items-center p-2 bg-gray-50 rounded">
                       <div>
                         <p className="font-medium text-sm">{getItemName(item.itemId)}</p>
                         <p className="text-xs text-gray-500">Qty: {item.requestedQuantity}</p>
@@ -1479,6 +1557,21 @@ export default function EnhancedTransfersPage() {
                         </Select>
                       </div>
                       <div>
+                        <Label className="text-xs">Status</Label>
+                        <Select
+                          defaultValue="Accept"
+                          onValueChange={(value) => acceptanceForm.setValue(`items.${index}.itemStatus`, value)}
+                        >
+                          <SelectTrigger className="h-8">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Accept">Accept</SelectItem>
+                            <SelectItem value="Return">Return</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
                         <Label className="text-xs">Notes</Label>
                         <Input
                           {...acceptanceForm.register(`items.${index}.notes`)}
@@ -1505,7 +1598,7 @@ export default function EnhancedTransfersPage() {
                 <Button type="button" variant="outline" onClick={() => setAcceptanceDialogOpen(false)}>
                   Cancel
                 </Button>
-                <Button 
+                {/* <Button 
                   type="submit" 
                   disabled={updateTransferMutation.isPending}
                   className={acceptanceForm.watch("overallCondition") === "rejected" ? "bg-red-600 hover:bg-red-700" : ""}
@@ -1520,6 +1613,20 @@ export default function EnhancedTransfersPage() {
                   ) : (
                     "Accept Transfer"
                   )}
+                </Button> */}
+                <Button 
+                  type="submit" 
+                  disabled={updateTransferMutation.isPending}
+                  variant={acceptanceButtonVariant}
+                >
+                  {updateTransferMutation.isPending ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Processing...
+                    </>
+                  ) :
+                    acceptanceButtonLabel
+                 }
                 </Button>
               </DialogFooter>
             </form>
@@ -1578,7 +1685,7 @@ export default function EnhancedTransfersPage() {
                     </div>
                     <div>
                       <span className="font-medium">Created:</span>
-                      <span className="ml-2">{formatDateTime(selectedTransfer.createdAt)}</span>
+                      <span className="ml-2">{formatDateTimeWithoutTimeZone(selectedTransfer.createdAt)}</span>
                     </div>
                   </div>
                 </div>
@@ -1596,6 +1703,7 @@ export default function EnhancedTransfersPage() {
                           <TableHead>Actual Qty</TableHead>
                           <TableHead>Condition</TableHead>
                           <TableHead>Notes</TableHead>
+                          <TableHead>ItemStatus</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -1617,6 +1725,7 @@ export default function EnhancedTransfersPage() {
                               )}
                             </TableCell>
                             <TableCell className="text-sm">{item.notes || '-'}</TableCell>
+                            <TableCell>{item.itemStatus}</TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
@@ -1732,7 +1841,7 @@ export default function EnhancedTransfersPage() {
                       <div className="w-2 h-2 bg-blue-500 rounded-full mt-2"></div>
                       <div className="flex-1">
                         <div className="font-medium text-sm">Transfer Created</div>
-                        <div className="text-xs text-gray-600">{formatDateTime(selectedTransfer.createdAt)}</div>
+                        <div className="text-xs text-gray-600">{formatDateTimeWithoutTimeZone(selectedTransfer.createdAt)}</div>
                         <div className="text-xs text-gray-700">Transfer request initiated</div>
                       </div>
                     </div>
@@ -1742,7 +1851,7 @@ export default function EnhancedTransfersPage() {
                         <div className="w-2 h-2 bg-green-500 rounded-full mt-2"></div>
                         <div className="flex-1">
                           <div className="font-medium text-sm">Transfer Approved</div>
-                          <div className="text-xs text-gray-600">{formatDateTime(selectedTransfer.updatedAt)}</div>
+                          <div className="text-xs text-gray-600">{formatDateTimeWithoutTimeZone(selectedTransfer.approvedAt)}</div>
                           <div className="text-xs text-gray-700">
                             {selectedTransfer.approvedByUser ? (
                               <>Transfer approved by: {selectedTransfer.approvedByUser.name}</>
@@ -1817,7 +1926,7 @@ export default function EnhancedTransfersPage() {
                         <div className="w-2 h-2 bg-red-500 rounded-full mt-2"></div>
                         <div className="flex-1">
                           <div className="font-medium text-sm">Transfer Rejected</div>
-                          <div className="text-xs text-gray-600">Jun 12, 2025 14:55:56</div>
+                          <div className="text-xs text-gray-600">{formatDateTime(selectedTransfer.rejectedAt)}</div>
                           <div className="text-xs text-gray-700">Quality issues detected at destination warehouse</div>
                         </div>
                       </div>
@@ -1828,8 +1937,8 @@ export default function EnhancedTransfersPage() {
                         <div className="w-2 h-2 bg-orange-500 rounded-full mt-2"></div>
                         <div className="flex-1">
                           <div className="font-medium text-sm">Return Approved</div>
-                          <div className="text-xs text-gray-600">Jun 12, 2025 15:00:00</div>
-                          <div className="text-xs text-gray-700">Return request approved by admin</div>
+                          <div className="text-xs text-gray-600">{formatDateTimeWithoutTimeZone(selectedTransfer.returnApproved.createdAt)}</div>
+                          <div className="text-xs text-gray-700">{selectedTransfer.returnApproved.description}</div>
                           {selectedTransfer.returnReason && (
                             <div className="text-xs text-gray-600 mt-1">
                               Return Reason: {selectedTransfer.returnReason}
@@ -1844,8 +1953,8 @@ export default function EnhancedTransfersPage() {
                         <div className="w-2 h-2 bg-blue-500 rounded-full mt-2"></div>
                         <div className="flex-1">
                           <div className="font-medium text-sm">Return Shipment Initiated</div>
-                          <div className="text-xs text-gray-600">Jun 13, 2025 10:30:00</div>
-                          <div className="text-xs text-gray-700">Return shipment initiated via courier</div>
+                          <div className="text-xs text-gray-600">{formatDateTimeWithoutTimeZone(selectedTransfer.returnShipped.createdAt)}</div>
+                          <div className="text-xs text-gray-700">{selectedTransfer.returnShipped.description}</div>
                           {selectedTransfer.returnCourierName && (
                             <div className="text-xs text-blue-600 mt-1">
                               Courier: {selectedTransfer.returnCourierName}
@@ -1865,8 +1974,8 @@ export default function EnhancedTransfersPage() {
                         <div className="w-2 h-2 bg-green-500 rounded-full mt-2"></div>
                         <div className="flex-1">
                           <div className="font-medium text-sm">Return Completed</div>
-                          <div className="text-xs text-gray-600">Jun 13, 2025 16:45:00</div>
-                          <div className="text-xs text-gray-700">Items returned to source warehouse and inventory updated</div>
+                          <div className="text-xs text-gray-600">{formatDateTimeWithoutTimeZone(selectedTransfer.returned.createdAt)}</div>
+                          <div className="text-xs text-gray-700">{selectedTransfer.returned.description}</div>
                           {selectedTransfer.returnDeliveredDate && (
                             <div className="text-xs text-gray-600 mt-1">
                               Delivered: {formatDateTime(selectedTransfer.returnDeliveredDate)}
@@ -1881,7 +1990,7 @@ export default function EnhancedTransfersPage() {
                         <div className="w-2 h-2 bg-gray-500 rounded-full mt-2"></div>
                         <div className="flex-1">
                           <div className="font-medium text-sm">Items Disposed</div>
-                          <div className="text-xs text-gray-600">{selectedTransfer.disposalDate && formatDateTime(selectedTransfer.disposalDate)}</div>
+                          <div className="text-xs text-gray-600">{selectedTransfer.disposalDate && formatDateTimeWithoutTimeZone(selectedTransfer.disposalDate)}</div>
                           <div className="text-xs text-gray-700">Items marked as disposed</div>
                           {selectedTransfer.disposalReason && (
                             <div className="text-xs text-gray-600 mt-1">
@@ -2021,6 +2130,5 @@ export default function EnhancedTransfersPage() {
           </DialogContent>
         </Dialog>
       </div>
-    </AppLayout>
   );
 }

@@ -4,7 +4,7 @@ import { storage } from "./storage";
 import { setupAuth, hashPassword } from "./auth";
 import { licenseManager } from "./license-manager.js";
 import { requireValidLicense, checkUserLimit, checkProductLimit } from "./license-middleware.js";
-import { z } from "zod";
+import { any, z } from "zod";
 import { 
   insertItemSchema, 
   insertWarehouseSchema, 
@@ -367,8 +367,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/users", checkRole("admin"), checkUserLimit, async (req, res) => {
     try {
       const existingUser = await storage.getUserByUsername(req.body.username);
+      const existingUserEmail = await storage.getUserByEmail(req.body?.email)
       if (existingUser) {
         return res.status(400).json({ message: "Username already exists" });
+      }
+      if(existingUserEmail){
+        return res.status(400).json({message:'User with this email already exists'})
       }
 
       const user = await storage.createUser(req.body);
@@ -381,97 +385,80 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Update user (admin only)
   app.put("/api/users/:id", checkRole("admin"), async (req, res) => {
     const userId = parseInt(req.params.id, 10);
+
     try {
       console.log("User update request body:", JSON.stringify(req.body, null, 2));
-      
-      // Validate the user data
+
+      // 1️⃣ Validate incoming data (partial schema)
       const userData = insertUserSchema.partial().parse(req.body);
-      console.log("Parsed user data:", JSON.stringify(userData, null, 2));
-      
-      // Check if the user exists
+
+      // 2️⃣ Fetch existing user
       const existingUser = await storage.getUser(userId);
-      if (!existingUser) {
-        return res.status(404).json({ message: "User not found" });
-      }
-      console.log("Existing user:", JSON.stringify(existingUser, null, 2));
-      
-      // Check for unique constraint violations only if username or email is being changed
-      if (userData.username && userData.username !== existingUser.username) {
-        console.log("Checking username uniqueness:", userData.username);
-        const userWithSameUsername = await storage.getUserByUsername(userData.username);
-        if (userWithSameUsername) {
-          console.log("Username conflict found:", userWithSameUsername.username);
-          return res.status(400).json({ message: "Username already exists" });
-        }
-      }
-      
-      if (userData.email && userData.email !== existingUser.email) {
-        console.log("Checking email uniqueness:", userData.email);
-        const allUsers = await storage.getAllUsers();
-        const userWithSameEmail = allUsers.find(u => u.email === userData.email && u.id !== userId);
-        if (userWithSameEmail) {
-          console.log("Email conflict found:", userWithSameEmail.email);
-          return res.status(400).json({ message: "Email already exists" });
-        }
-      }
-      
-      // Filter out undefined values to prevent constraint issues
+      if (!existingUser) return res.status(404).json({ message: "User not found" });
+
+      // 3️⃣ Clean undefined/empty fields
       const cleanUserData = Object.entries(userData).reduce((acc, [key, value]) => {
-        if (value !== undefined && value !== "") {
-          acc[key] = value;
-        }
+        if (value !== undefined && value !== "") acc[key] = value;
         return acc;
       }, {} as any);
-      
-      console.log("Clean user data for update:", JSON.stringify(cleanUserData, null, 2));
-      
-      // Validate warehouse manager assignments - check if any warehouses are being managed by this user
-      if (cleanUserData.warehouseId !== undefined) {
+
+      // 4️⃣ Handle uniqueness only if field actually changed
+      if (cleanUserData.username && cleanUserData.username !== existingUser.username) {
+        const existingByUsername = await storage.getUserByUsername(cleanUserData.username);
+        if (existingByUsername) return res.status(400).json({ message: "Username already exists" });
+      }
+
+      if (cleanUserData.email && cleanUserData.email !== existingUser.email) {
+        const allUsers = await storage.getAllUsers();
+        const existingByEmail = allUsers.find(u => u.email === cleanUserData.email && u.id !== userId);
+        if (existingByEmail) return res.status(400).json({ message: "Email already exists" });
+      }
+
+      // 5️⃣ Handle warehouse validation only if warehouseId is actually changing
+      if (
+        cleanUserData.warehouseId !== undefined &&
+        cleanUserData.warehouseId !== existingUser.warehouseId
+      ) {
         const allWarehouses = await storage.getAllWarehouses();
         const managedWarehouses = allWarehouses.filter(w => w.managerId === userId);
-        
-        // Check if any managed warehouses would become invalid with the new assignment
+
         for (const warehouse of managedWarehouses) {
+          // If the user manages any warehouse that isn't the new one, auto-unassign
           if (warehouse.id !== cleanUserData.warehouseId) {
-            return res.status(400).json({ 
-              message: `Cannot change warehouse assignment. User manages ${warehouse.name} but would no longer be assigned to it. A user can only manage warehouses they are assigned to.` 
-            });
+            console.log(`Auto-unassigning ${warehouse.name} from user ${userId}`);
+            await storage.updateWarehouse(warehouse.id, { managerId: null });
           }
         }
       }
-      
+
+      // 6️⃣ Update the user (only changed fields)
       const updatedUser = await storage.updateUser(userId, cleanUserData);
-      if (!updatedUser) {
-        return res.status(404).json({ message: "User not found" });
+      if (!updatedUser) return res.status(404).json({ message: "User not found" });
+
+      // 7️⃣ Create audit log for meaningful changes only
+      const changedFields = Object.keys(cleanUserData);
+      if (changedFields.length > 0) {
+        await storage.createAuditLog({
+          userId: req.user!.id,
+          action: 'UPDATE',
+          entityType: 'user',
+          entityId: userId,
+          details: `User ${existingUser.username} updated (${changedFields.join(", ")})`,
+          oldValues: JSON.stringify(existingUser),
+          newValues: JSON.stringify(cleanUserData),
+          ipAddress: req.ip || req.connection.remoteAddress,
+          userAgent: req.get('User-Agent')
+        });
       }
 
-      // Create audit log for user update
-      await storage.createAuditLog({
-        userId: req.user!.id,
-        action: 'UPDATE',
-        entityType: 'user',
-        entityId: userId,
-        details: `User ${existingUser.username} updated`,
-        oldValues: JSON.stringify({
-          username: existingUser.username,
-          email: existingUser.email,
-          name: existingUser.name,
-          role: existingUser.role,
-          warehouseId: existingUser.warehouseId,
-          managerId: existingUser.managerId,
-          isActive: existingUser.isActive
-        }),
-        newValues: JSON.stringify(cleanUserData),
-        ipAddress: req.ip || req.connection.remoteAddress,
-        userAgent: req.get('User-Agent')
-      });
-
       res.json(updatedUser);
+
     } catch (error: any) {
       console.error("User update error:", error);
       res.status(400).json({ message: error.message });
     }
   });
+
 
   // Delete user (admin only)
   app.delete("/api/users/:id", checkRole("admin"), async (req, res) => {
@@ -600,7 +587,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/warehouses", async (req, res) => {
     try {
       const warehouses = await storage.getAllWarehouses();
-      
+
       // Enrich warehouses with manager information
       const enrichedWarehouses = await Promise.all(warehouses.map(async (warehouse) => {
         let manager = null;
@@ -963,201 +950,201 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Create transaction (check-in, issue, transfer) - check-in for all authenticated users, others require manager
-app.post("/api/transactions", async (req, res) => {
-  if (!req.isAuthenticated()) {
-    return res.status(401).json({ message: "Unauthorized" });
-  }
-
-  // Check if it's a check-in transaction or requires manager role
-  const transactionType = req.body.transactionType;
-  if (transactionType !== "check-in") {
-    const user = req.user;
-    if (user.role !== "admin" && user.role !== "manager") {
-      return res.status(403).json({ message: "Forbidden" });
-    }
-  }
-
-  try {
-    console.log("Transaction request body:", JSON.stringify(req.body, null, 2));
-    
-    // Additional validation before schema parsing
-    if (req.body.quantity !== undefined && req.body.quantity <= 0) {
-      console.log("Rejecting negative/zero quantity:", req.body.quantity);
-      return res.status(400).json({ 
-        message: "Quantity must be greater than 0",
-        issues: [{ path: ["quantity"], message: "Quantity must be greater than 0" }]
-      });
+  app.post("/api/transactions", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Unauthorized" });
     }
 
-    // ✅ FIX 1: Better transaction code generation
-    const timestamp = Date.now();
-    const randomSuffix = Math.floor(Math.random() * 1000);
-    const transactionCode = `TRX-${timestamp}-${randomSuffix}`;
-    
-    const userId = req.user!.id;
-    const dataToValidate = {
-      ...req.body,
-      transactionCode,
-      userId,
-    };
-
-    // Use safeParse and handle any validation errors manually
-    const parseResult = insertTransactionSchema.safeParse(dataToValidate);
-    
-    if (!parseResult.success) {
-      console.log("Validation error:", JSON.stringify(parseResult.error.issues, null, 2));
-      return res.status(400).json({ 
-        message: parseResult.error.message,
-        issues: parseResult.error.issues
-      });
-    }
-    
-    const transactionPayload = parseResult.data;
-
-    // ✅ FIX 2: Validate item exists
-    const item = await storage.getItem(transactionPayload.itemId);
-    if (!item) {
-      return res.status(404).json({ message: "Item not found" });
-    }
-
-    // ✅ FIX 3: Add warehouse capacity checks
-    if ((transactionPayload.transactionType === "check-in" || 
-         transactionPayload.transactionType === "transfer") && 
-        transactionPayload.destinationWarehouseId) {
-      
-      const destinationWarehouse = await storage.getWarehouse(transactionPayload.destinationWarehouseId);
-      if (!destinationWarehouse) {
-        return res.status(404).json({ message: "Destination warehouse not found" });
-      }
-
-      // Check warehouse capacity
-      const inventoryInWarehouse = await storage.getInventoryByWarehouse(transactionPayload.destinationWarehouseId);
-      const currentCapacity = inventoryInWarehouse.reduce((total, inv) => total + (inv.quantity || 0), 0);
-      const availableSpace = destinationWarehouse.capacity - currentCapacity;
-      
-      // For transfer, only check capacity if status is completed
-      const needsCapacityCheck = transactionPayload.transactionType === "check-in" || 
-                               (transactionPayload.transactionType === "transfer" && transactionPayload.status === "completed");
-      
-      if (needsCapacityCheck && transactionPayload.quantity > availableSpace) {
-        return res.status(400).json({ 
-          message: `Not enough space in destination warehouse. Available: ${availableSpace}, Requested: ${transactionPayload.quantity}` 
-        });
+    // Check if it's a check-in transaction or requires manager role
+    const transactionType = req.body.transactionType;
+    if (transactionType !== "check-in") {
+      const user = req.user;
+      if (user.role !== "admin" && user.role !== "manager") {
+        return res.status(403).json({ message: "Forbidden" });
       }
     }
 
-    // ✅ FIX 4: Validate source warehouse exists for issue/transfer
-    if ((transactionPayload.transactionType === "issue" || transactionPayload.transactionType === "transfer") && 
-        transactionPayload.sourceWarehouseId) {
-      const sourceWarehouse = await storage.getWarehouse(transactionPayload.sourceWarehouseId);
-      if (!sourceWarehouse) {
-        return res.status(404).json({ message: "Source warehouse not found" });
-      }
-    }
-
-    // Create the transaction
-    const transaction = await storage.createTransaction(transactionPayload);
-    
     try {
-      // Update inventory based on transaction type
-      if (transaction.transactionType === "check-in" && transaction.destinationWarehouseId) {
-        // Check if inventory already exists
-        const existingInventory = await storage.getInventoryByItemAndWarehouse(
-          transaction.itemId,
-          transaction.destinationWarehouseId
-        );
-        
-        if (existingInventory) {
-          // Update existing inventory
-          await storage.updateInventory(existingInventory.id, {
-            quantity: existingInventory.quantity + transaction.quantity
-          });
-        } else {
-          // Create new inventory
-          await storage.createInventory({
-            itemId: transaction.itemId,
-            warehouseId: transaction.destinationWarehouseId,
-            quantity: transaction.quantity
-          });
-        }
-      } else if (transaction.transactionType === "issue" && transaction.sourceWarehouseId) {
-        // Check if inventory exists and has enough quantity
-        const existingInventory = await storage.getInventoryByItemAndWarehouse(
-          transaction.itemId,
-          transaction.sourceWarehouseId
-        );
-        
-        if (!existingInventory) {
-          // ✅ FIX 5: Rollback transaction
-          await storage.deleteTransaction(transaction.id);
-          return res.status(400).json({ message: "Item not in inventory" });
-        }
-        
-        if (existingInventory.quantity < transaction.quantity) {
-          await storage.deleteTransaction(transaction.id);
-          return res.status(400).json({ message: "Not enough quantity in inventory" });
-        }
-        
-        // Update inventory
-        await storage.updateInventory(existingInventory.id, {
-          quantity: existingInventory.quantity - transaction.quantity
+      console.log("Transaction request body:", JSON.stringify(req.body, null, 2));
+      
+      // Additional validation before schema parsing
+      if (req.body.quantity !== undefined && req.body.quantity <= 0) {
+        console.log("Rejecting negative/zero quantity:", req.body.quantity);
+        return res.status(400).json({ 
+          message: "Quantity must be greater than 0",
+          issues: [{ path: ["quantity"], message: "Quantity must be greater than 0" }]
         });
-      } else if (transaction.transactionType === "transfer" && transaction.sourceWarehouseId && transaction.destinationWarehouseId) {
-        // Check if source inventory exists and has enough quantity
-        const sourceInventory = await storage.getInventoryByItemAndWarehouse(
-          transaction.itemId,
-          transaction.sourceWarehouseId
-        );
-        
-        if (!sourceInventory) {
-          await storage.deleteTransaction(transaction.id);
-          return res.status(400).json({ message: "Item not in source warehouse inventory" });
-        }
-        
-        if (sourceInventory.quantity < transaction.quantity) {
-          await storage.deleteTransaction(transaction.id);
-          return res.status(400).json({ message: "Not enough quantity in source warehouse" });
-        }
-        
-        // Update source inventory
-        await storage.updateInventory(sourceInventory.id, {
-          quantity: sourceInventory.quantity - transaction.quantity
+      }
+
+      // ✅ FIX 1: Better transaction code generation
+      const timestamp = Date.now();
+      const randomSuffix = Math.floor(Math.random() * 1000);
+      const transactionCode = `TRX-${timestamp}-${randomSuffix}`;
+      
+      const userId = req.user!.id;
+      const dataToValidate = {
+        ...req.body,
+        transactionCode,
+        userId,
+      };
+
+      // Use safeParse and handle any validation errors manually
+      const parseResult = insertTransactionSchema.safeParse(dataToValidate);
+      
+      if (!parseResult.success) {
+        console.log("Validation error:", JSON.stringify(parseResult.error.issues, null, 2));
+        return res.status(400).json({ 
+          message: parseResult.error.message,
+          issues: parseResult.error.issues
         });
+      }
+      
+      const transactionPayload = parseResult.data;
+
+      // ✅ FIX 2: Validate item exists
+      const item = await storage.getItem(transactionPayload.itemId);
+      if (!item) {
+        return res.status(404).json({ message: "Item not found" });
+      }
+
+      // ✅ FIX 3: Add warehouse capacity checks
+      if ((transactionPayload.transactionType === "check-in" || 
+          transactionPayload.transactionType === "transfer") && 
+          transactionPayload.destinationWarehouseId) {
         
-        // If transaction is completed, update destination inventory
-        if (transaction.status === "completed") {
-          const destinationInventory = await storage.getInventoryByItemAndWarehouse(
+        const destinationWarehouse = await storage.getWarehouse(transactionPayload.destinationWarehouseId);
+        if (!destinationWarehouse) {
+          return res.status(404).json({ message: "Destination warehouse not found" });
+        }
+
+        // Check warehouse capacity
+        const inventoryInWarehouse = await storage.getInventoryByWarehouse(transactionPayload.destinationWarehouseId);
+        const currentCapacity = inventoryInWarehouse.reduce((total, inv) => total + (inv.quantity || 0), 0);
+        const availableSpace = destinationWarehouse.capacity - currentCapacity;
+        
+        // For transfer, only check capacity if status is completed
+        const needsCapacityCheck = transactionPayload.transactionType === "check-in" || 
+                                (transactionPayload.transactionType === "transfer" && transactionPayload.status === "completed");
+        
+        if (needsCapacityCheck && transactionPayload.quantity > availableSpace) {
+          return res.status(400).json({ 
+            message: `Not enough space in destination warehouse. Available: ${availableSpace}, Requested: ${transactionPayload.quantity}` 
+          });
+        }
+      }
+
+      // ✅ FIX 4: Validate source warehouse exists for issue/transfer
+      if ((transactionPayload.transactionType === "issue" || transactionPayload.transactionType === "transfer") && 
+          transactionPayload.sourceWarehouseId) {
+        const sourceWarehouse = await storage.getWarehouse(transactionPayload.sourceWarehouseId);
+        if (!sourceWarehouse) {
+          return res.status(404).json({ message: "Source warehouse not found" });
+        }
+      }
+
+      // Create the transaction
+      const transaction = await storage.createTransaction(transactionPayload);
+      
+      try {
+        // Update inventory based on transaction type
+        if (transaction.transactionType === "check-in" && transaction.destinationWarehouseId) {
+          // Check if inventory already exists
+          const existingInventory = await storage.getInventoryByItemAndWarehouse(
             transaction.itemId,
             transaction.destinationWarehouseId
           );
           
-          if (destinationInventory) {
-            // Update existing destination inventory
-            await storage.updateInventory(destinationInventory.id, {
-              quantity: destinationInventory.quantity + transaction.quantity
+          if (existingInventory) {
+            // Update existing inventory
+            await storage.updateInventory(existingInventory.id, {
+              quantity: existingInventory.quantity + transaction.quantity
             });
           } else {
-            // Create new destination inventory
+            // Create new inventory
             await storage.createInventory({
               itemId: transaction.itemId,
               warehouseId: transaction.destinationWarehouseId,
               quantity: transaction.quantity
             });
           }
+        } else if (transaction.transactionType === "issue" && transaction.sourceWarehouseId) {
+          // Check if inventory exists and has enough quantity
+          const existingInventory = await storage.getInventoryByItemAndWarehouse(
+            transaction.itemId,
+            transaction.sourceWarehouseId
+          );
+          
+          if (!existingInventory) {
+            // ✅ FIX 5: Rollback transaction
+            await storage.deleteTransaction(transaction.id);
+            return res.status(400).json({ message: "Item not in inventory" });
+          }
+          
+          if (existingInventory.quantity < transaction.quantity) {
+            await storage.deleteTransaction(transaction.id);
+            return res.status(400).json({ message: "Not enough quantity in inventory" });
+          }
+          
+          // Update inventory
+          await storage.updateInventory(existingInventory.id, {
+            quantity: existingInventory.quantity - transaction.quantity
+          });
+        } else if (transaction.transactionType === "transfer" && transaction.sourceWarehouseId && transaction.destinationWarehouseId) {
+          // Check if source inventory exists and has enough quantity
+          const sourceInventory = await storage.getInventoryByItemAndWarehouse(
+            transaction.itemId,
+            transaction.sourceWarehouseId
+          );
+          
+          if (!sourceInventory) {
+            await storage.deleteTransaction(transaction.id);
+            return res.status(400).json({ message: "Item not in source warehouse inventory" });
+          }
+          
+          if (sourceInventory.quantity < transaction.quantity) {
+            await storage.deleteTransaction(transaction.id);
+            return res.status(400).json({ message: "Not enough quantity in source warehouse" });
+          }
+          
+          // Update source inventory
+          await storage.updateInventory(sourceInventory.id, {
+            quantity: sourceInventory.quantity - transaction.quantity
+          });
+          
+          // If transaction is completed, update destination inventory
+          if (transaction.status === "completed") {
+            const destinationInventory = await storage.getInventoryByItemAndWarehouse(
+              transaction.itemId,
+              transaction.destinationWarehouseId
+            );
+            
+            if (destinationInventory) {
+              // Update existing destination inventory
+              await storage.updateInventory(destinationInventory.id, {
+                quantity: destinationInventory.quantity + transaction.quantity
+              });
+            } else {
+              // Create new destination inventory
+              await storage.createInventory({
+                itemId: transaction.itemId,
+                warehouseId: transaction.destinationWarehouseId,
+                quantity: transaction.quantity
+              });
+            }
+          }
         }
+        
+        res.status(201).json(transaction);
+      } catch (inventoryError) {
+        // ✅ FIX 6: Rollback transaction if inventory update fails
+        await storage.deleteTransaction(transaction.id);
+        throw inventoryError;
       }
-      
-      res.status(201).json(transaction);
-    } catch (inventoryError) {
-      // ✅ FIX 6: Rollback transaction if inventory update fails
-      await storage.deleteTransaction(transaction.id);
-      throw inventoryError;
+    } catch (error: any) {
+      console.error("Transaction creation error:", error);
+      res.status(400).json({ message: error.message });
     }
-  } catch (error: any) {
-    console.error("Transaction creation error:", error);
-    res.status(400).json({ message: error.message });
-  }
-});
+  });
   // Update transaction status (manager+)
   app.put("/api/transactions/:id/status", checkRole("manager"), async (req, res) => {
     const transactionId = parseInt(req.params.id, 10);
@@ -1280,12 +1267,23 @@ app.post("/api/transactions", async (req, res) => {
     
     // Get items in request
     const requestItems = await storage.getRequestItemsByRequest(requestId);
-    
+    const allItems= await storage.getAllItems();
+    const itemMap = new Map<number, any>(allItems.map(i => [i.id, i]));
+
+    const requestItemsWithSku = requestItems.map((ri: any) => {
+        const item = itemMap.get(ri.itemId);
+        return {
+          ...ri,
+          sku: item?.sku || null,
+          itemName: item?.name || null
+        };
+      });    
     res.json({
       ...request,
       userName: user?.name || 'Unknown User',
       userRole: user?.role || 'unknown',
-      items: requestItems
+      items: requestItemsWithSku,
+
     });
   });
 
@@ -1672,7 +1670,7 @@ app.post("/api/transactions", async (req, res) => {
       }
       
       // Filter by transaction type if provided
-      if (type && ['check-in', 'issue', 'transfer'].includes(type as string)) {
+      if (type && ['check-in', 'issue', ].includes(type as string)) {
         transactions = transactions.filter(t => t.transactionType === type);
       }
       
@@ -2290,7 +2288,7 @@ app.post("/api/transactions", async (req, res) => {
   app.get("/api/departments", async (req, res) => {
     try {
       const allDepartments = await db.select().from(departments);
-      res.json(allDepartments);
+      res.json([...allDepartments].reverse());
     } catch (error: any) {
       res.status(400).json({ message: error.message });
     }
@@ -2795,19 +2793,88 @@ app.post("/api/transactions", async (req, res) => {
     }
   });
 
-  app.patch("/api/rejected-goods/:id", async (req: Request, res: Response) => {
-    try {
-      const id = parseInt(req.params.id);
-      const updatedGoods = await storage.updateRejectedGoods(id, req.body);
-      if (!updatedGoods) {
-        return res.status(404).json({ message: "Rejected goods not found" });
-      }
-      res.json(updatedGoods);
-    } catch (error) {
-      console.error("Error updating rejected goods:", error);
-      res.status(500).json({ message: "Failed to update rejected goods" });
+app.patch("/api/rejected-goods/:id", async (req: Request, res: Response) => {
+  try {
+    const id = parseInt(req.params.id);
+    const user = req.user;
+    const { notes, status } = req.body;
+    const rejectedGood = await storage.getRejectedGood(id);
+
+    if (!rejectedGood || rejectedGood.length === 0) {
+      return res.status(404).json({ message: "Rejected goods not found" });
     }
-  });
+
+    const transferId = rejectedGood[0].transferId;
+    const itemId = rejectedGood[0].itemId;
+    const transfer = await storage.getTransfer(transferId);
+    if (!transfer) {
+      return res.status(404).json({ message: "Transfer not found" });
+    }
+
+    const sourceWarehouse = await storage.getWarehouse(transfer.sourceWarehouseId);
+    const [transferItem] = await storage.getTransferItemsByTransferAndItem(transfer.id, itemId);
+
+    if (user.role !== "admin" && sourceWarehouse?.managerId !== user.id) {
+      return res
+        .status(400)
+        .json({ message: "You don't have permission to change rejected goods status" });
+    }
+
+    // 5️⃣ Handle restock logic
+    if (status === "restocked") {
+      const updatedInventory = await storage.addToInventoryQuantity(
+        itemId,
+        sourceWarehouse?.id,
+        rejectedGood[0]?.quantity
+      );
+      await storage.createTransaction({
+      transactionCode: `TXN-${transfer}`,
+        transactionType: "check-in",
+        itemId,
+        quantity: rejectedGood[0]?.quantity,
+        sourceWarehouseId: transfer.sourceWarehouseId,
+        destinationWarehouseId: transfer.destinationWarehouseId, // Use same warehouse for disposal
+        userId: user.id,
+        status: "completed",
+        checkInDate: new Date()
+    })
+    }
+    if(status==='dispose')
+    await storage.createTransaction({
+      transactionCode: `TXN-${transfer}`,
+        transactionType: "disposal",
+        itemId,
+        quantity: rejectedGood[0]?.quantity,
+        sourceWarehouseId: transfer.sourceWarehouseId,
+        destinationWarehouseId: transfer.destinationWarehouseId, // Use same warehouse for disposal
+        userId: user.id,
+        status: "completed",
+        checkInDate: new Date()
+    })
+    
+
+    const updatedGoods = await storage.updateRejectedGoods(id, { status, notes });
+    const updatedItem = await storage.updateTransferItem(transferItem?.id, { itemStatus:status });
+    console.log("✅ Updated Transfer Item:", updatedItem);
+    if (!updatedGoods) {
+      return res.status(404).json({ message: "Rejected goods not found" });
+    }
+
+    if (!updatedItem) {
+      return res.status(404).json({ message: "Transfer Item not found" });
+    }
+
+    res.json({
+      message: "Rejected goods and transfer item updated successfully",
+      updatedGoods,
+      updatedItem,
+    });
+  } catch (error) {
+    console.error("💥 Error updating rejected goods:", error);
+    res.status(500).json({ message: "Failed to update rejected goods" });
+  }
+});
+
 
   // NEW TRANSFER RETURN/DISPOSAL WORKFLOW ENDPOINTS
 
@@ -2862,53 +2929,137 @@ app.post("/api/transactions", async (req, res) => {
     }
   });
 
-  // Record return shipment details (Destination warehouse manager)
-  app.post("/api/transfers/:transferId/return-shipment", async (req: Request, res: Response) => {
+// Record return shipment details (Destination warehouse manager)
+app.post(
+  "/api/transfers/:transferId/return-shipment",
+  async (req: Request, res: Response) => {
+    console.log(
+      `🚚 POST /api/transfers/${req.params.transferId}/return-shipment hit`
+    );
+    console.log("Request body:", req.body);
+
     try {
       const transferId = parseInt(req.params.transferId);
-      const { returnCourierName, returnTrackingNumber,returnShippedDate } = req.body;
-      
-      if (!returnCourierName || returnCourierName.trim() === '') {
+      const { returnCourierName, returnTrackingNumber, returnShippedDate } =
+        req.body;
+
+      if (!returnCourierName || returnCourierName.trim() === "") {
+        console.warn("Validation failed: Courier name is required");
         return res.status(400).json({ message: "Courier name is required" });
       }
 
-      if (!returnTrackingNumber || returnTrackingNumber.trim() === '') {
+      if (!returnTrackingNumber || returnTrackingNumber.trim() === "") {
+        console.warn("Validation failed: Tracking number is required");
         return res.status(400).json({ message: "Tracking number is required" });
       }
-      if (!returnShippedDate ){
-        return res.status(400).json({message:'Return Shipped Date is required'})
+      if (!returnShippedDate) {
+        console.warn("Validation failed: Return Shipped Date is required");
+        return res
+          .status(400)
+          .json({ message: "Return Shipped Date is required" });
       }
-      const ReturnShippedDate=new Date(returnShippedDate)
-      
+      const ReturnShippedDate = new Date(returnShippedDate);
+      console.log(`Parsed ReturnShippedDate: ${ReturnShippedDate}`);
 
       const user = req.user;
-      
+      console.log(
+        `User performing action: ID=${user?.id}, Role=${user?.role}, WarehouseID=${user?.warehouseId}`
+      );
+
       // Verify user has permission to update this transfer
+      console.log(`Fetching transfer ${transferId} for permission check...`);
       const transfer = await storage.getTransfer(transferId);
       if (!transfer) {
+        console.warn(`Transfer ${transferId} not found`);
         return res.status(404).json({ message: "Transfer not found" });
       }
+      console.log(
+        `Transfer found. Destination Warehouse ID: ${transfer.destinationWarehouseId}`
+      );
 
       // Check if user is destination warehouse manager or admin
-      const destinationWarehouse = await storage.getWarehouse(transfer.destinationWarehouseId);
-      if (user.role !== "admin" && 
-          (user.role !== "manager" || user.warehouseId !== transfer.destinationWarehouseId)) {
-        return res.status(403).json({ message: "Only destination warehouse manager can record return shipment" });
+      const destinationWarehouse = await storage.getWarehouse(
+        transfer.destinationWarehouseId
+      );
+      if (
+        user.role !== "admin" &&
+        (user.role !== "manager" ||
+          user.warehouseId !== transfer.destinationWarehouseId)
+      ) {
+        console.error(
+          `Permission denied for user ${user.id}. Not admin or destination manager.`
+        );
+        return res.status(403).json({
+          message: "Only destination warehouse manager can record return shipment",
+        });
       }
-      const id=user?.id;
+      console.log(`User ${user.id} permission granted.`);
+      const id = user?.id;
 
-      const updatedTransfer = await storage.recordReturnShipment(transferId,{ returnCourierName, returnTrackingNumber,ReturnShippedDate});
-      
+      console.log(`Calling storage.recordReturnShipment for transfer ${transferId}...`);
+      const updatedTransfer = await storage.updateTransfer(transferId, {
+        returnCourierName,
+        returnTrackingNumber,
+        returnShippedDate:ReturnShippedDate,
+        status:'return_shipped'
+      });
+
       if (!updatedTransfer) {
+        console.warn(`Failed to update transfer ${transferId} after storage call.`);
         return res.status(404).json({ message: "Transfer not found" });
       }
+      console.log(
+        `Transfer ${transferId} updated successfully. New status: ${updatedTransfer.status}`
+      );
 
+      if (updatedTransfer) {
+        console.log(`Creating transfer update log...`);
+        await storage.createTransferUpdate({
+          transferId,
+          updatedBy: req.user!.id,
+          status: updatedTransfer.status,
+          updateType: req.body.updateType || "return_shipment_recorded",
+          description:
+            req.body.updateDescription ||
+            `Return shipment recorded: ${returnCourierName} (${returnTrackingNumber})`,
+          metadata: req.body.metadata
+            ? JSON.stringify(req.body.metadata)
+            : undefined,
+        });
+        console.log(`Transfer update log created.`);
+
+        // Create audit log for transfer update
+        console.log(`Creating audit log...`);
+        await storage.createAuditLog({
+          userId: req.user!.id,
+          action: "UPDATE",
+          entityType: "transfer",
+          entityId: transferId,
+          details: `Transfer ${transfer.transferCode} return shipment recorded`,
+          oldValues: JSON.stringify({
+            status: transfer.status,
+            returnCourierName: transfer.returnCourierName,
+            returnTrackingNumber: transfer.returnTrackingNumber,
+            returnShippedDate: transfer.returnShippedDate,
+          }),
+          newValues: JSON.stringify(updatedTransfer),
+          ipAddress: req.ip || req.connection.remoteAddress,
+          userAgent: req.get("User-Agent"),
+        });
+        console.log(`Audit log created.`);
+      }
+
+      console.log(`🎉 Successfully recorded return shipment for transfer ${transferId}.`);
       res.json(updatedTransfer);
     } catch (error) {
-      console.error("Error recording return shipment:", error);
+      console.error(
+        `💥 Error in POST /api/transfers/${req.params.transferId}/return-shipment:`,
+        error
+      );
       res.status(500).json({ message: "Failed to record return shipment" });
     }
-  });
+  }
+);
 
   // Record return delivery (Source warehouse manager or admin)
   app.post("/api/transfers/:transferId/return-delivery", async (req: Request, res: Response) => {
@@ -3053,7 +3204,8 @@ app.post("/api/transactions", async (req, res) => {
         itemId: inventory.itemId,
         requestedQuantity: quantity,
         approvedQuantity: quantity,
-        actualQuantity: quantity
+        actualQuantity: quantity,
+        itemStatus:'dispose'
       });
 
       // Create disposal transaction for movement history
@@ -3183,6 +3335,81 @@ app.post("/api/transactions", async (req, res) => {
     }
   });
 
+
+  // GET /api/disposed-inventory
+// app.get("/api/disposed-inventory", async (req: Request, res: Response) => {
+//   try {
+//     if (!req.isAuthenticated()) {
+//       return res.status(401).json({ message: "Unauthorized" });
+//     }
+
+//     const { warehouseId, itemId, dateFrom, dateTo, approvedBy } = req.query;
+
+//     // 1. Get all disposed items WITH the joined data
+//     let disposedItems = await storage.getAllDisposedItemsReport();
+    
+//     // Note: We don't need to calculate value, it's already in the table.
+//     // We also don't need N+1 loops. This is much faster.
+
+//     // 2. Apply filters (This logic is now identical to your original)
+//     if (warehouseId) {
+//       disposedItems = disposedItems.filter(item => 
+//         item.warehouse.id === parseInt(warehouseId as string)
+//       );
+//     }
+
+//     if (itemId) {
+//       disposedItems = disposedItems.filter(item => 
+//         item.item.id === parseInt(itemId as string)
+//       );
+//     }
+
+//     if (dateFrom) {
+//       const fromDate = new Date(dateFrom as string);
+//       disposedItems = disposedItems.filter(item => 
+//         item.disposalDate && new Date(item.disposalDate) >= fromDate
+//       );
+//     }
+
+//     if (dateTo) {
+//       const toDate = new Date(dateTo as string);
+//       toDate.setHours(23, 59, 59, 999); // End of day
+//       disposedItems = disposedItems.filter(item => 
+//         item.disposalDate && new Date(item.disposalDate) <= toDate
+//       );
+//     }
+
+//     if (approvedBy && approvedBy !== "all") {
+//       disposedItems = disposedItems.filter(item => 
+//         item.approvedByUser.id === parseInt(approvedBy as string)
+//       );
+//     }
+
+//     // 3. We rename the 'approvedByUser' field to match your original 'approvedBy' name
+//     const finalResults = disposedItems.map(item => ({
+//       id: item.id,
+//       itemId: item.item.id,
+//       item: item.item,
+//       warehouseId: item.warehouse.id,
+//       warehouse: item.warehouse,
+//       quantity: item.quantity,
+//       unitValue: item.unitValue,
+//       totalValue: item.totalValue,
+//       disposalDate: item.disposalDate,
+//       disposalReason: item.disposalReason,
+//       approvedBy: item.approvedByUser?.name || 'System', // Get the name
+//       approvedById: item.approvedByUser?.id, // Get the ID
+//       // Add any other fields you need
+//     }));
+
+//     res.json(finalResults);
+
+//   } catch (error) {
+//     console.error("Error fetching disposed inventory:", error);
+//     res.status(500).json({ message: "Failed to fetch disposed inventory" });
+//   }
+// });
+
   // Enhanced Transfer Management Routes
   
   // Get all transfers with enriched data
@@ -3201,6 +3428,17 @@ app.post("/api/transactions", async (req, res) => {
         const initiatedByUser = await storage.getUser(transfer.initiatedBy);
         const approvedByUser = transfer.approvedBy ? await storage.getUser(transfer.approvedBy) : null;
         const transferItems = await storage.getTransferItemsByTransfer(transfer.id);
+        const transferUpdates = await storage.getTransferUpdatesByTransfer(transfer.id);
+        const approvedUpdate = transferUpdates.find((item) => item.status === "approved");
+        const returnApproved = transferUpdates.find((item)=>item.status === "return-approved");
+        const returnShipped = transferUpdates.find((item)=>item.status==='return_shipped');
+        const returned = transferUpdates.find((item)=>item.status === 'returned');
+        const rejected = transferUpdates.find((item)=>item.status==='rejected');
+        const approvedAt = approvedUpdate ? new Date(approvedUpdate.createdAt) : null;
+        const returnApprovedAt = returnApproved ? new Date(returnApproved?.createdAt):null;
+        const returnShippedAt = returnShipped ? new Date(returnShipped?.createdAt):null;
+        const returnedAt = returned ? new Date(returned?.createdAt):null;
+        const rejectedAt = rejected ? new Date(rejected.createdAt):null;
         
         // Enrich transfer items with item details
         const enrichedItems = await Promise.all(transferItems.map(async (item) => {
@@ -3214,7 +3452,12 @@ app.post("/api/transactions", async (req, res) => {
           destinationWarehouse,
           initiatedByUser,
           approvedByUser,
-          items: enrichedItems
+          items: enrichedItems,
+          approvedAt,
+          returnApproved,
+          returnShipped,
+          returned,
+          rejected,
         };
       }));
 
@@ -3430,7 +3673,7 @@ app.post("/api/transactions", async (req, res) => {
           return user.role === 'admin' || managesSourceWarehouse || managesDestinationWarehouse;
         }
         if (newStatus === 'in-transit' && transfer.status === 'approved') {
-          return managesSourceWarehouse;
+          return managesSourceWarehouse || user.role === 'admin';
         }
         if ((newStatus === 'completed' || newStatus === 'rejected') && transfer.status === 'in-transit') {
           console.log('managesDestination warehouse ',managesDestinationWarehouse)
@@ -3440,13 +3683,21 @@ app.post("/api/transactions", async (req, res) => {
         if (newStatus === 'rejected' && transfer.status === 'pending') {
           return user.role === 'admin' || managesSourceWarehouse || managesDestinationWarehouse;
         }
-        if(newStatus==='returned' && transfer.status === 'in-transit'){
-          return managesDestinationWarehouse
+        if ((newStatus === 'return-requested' || newStatus ==='partial-return-requested') && transfer.status==='in-transit'){
+          return user.role==='admin' || managesDestinationWarehouse;
         }
+        if(newStatus==='returned' && transfer.status === 'return_shipped'){
+          return managesDestinationWarehouse || user?.role==='admin'
+        }
+        if(newStatus==='return-approved'){
+          return managesSourceWarehouse || user.role==='admin'
+        }
+
         return false;
       };
       
       const filteredData: any = {};
+      console.table({'managesSourceWarehouse':managesSourceWarehouse,'managesDestinationWarehouse':managesDestinationWarehouse,'isAdmin':user.role==='admin','canUpdateStatus':canUpdateStatus})
       
       // Check permissions for each field
       for (const [field, value] of Object.entries(req.body)) {
@@ -3454,6 +3705,9 @@ app.post("/api/transactions", async (req, res) => {
         
         if (field === 'status') {
           if (canUpdateStatus(value as string)) {
+            if(value==='approved'){
+              filteredData["approvedBy"]=req.user.id;
+            }
             filteredData[field] = value;
           } else {
             return res.status(403).json({ 
@@ -3513,6 +3767,29 @@ app.post("/api/transactions", async (req, res) => {
 
       const updatedTransfer = await storage.updateTransfer(transferId, filteredData);
 
+      // Handle inventory updates when transfer is in-transit
+      if((filteredData.status === 'in-transit') && updatedTransfer){
+        const transferItems = await storage.getTransferItemsByTransfer(transferId);
+        for (const item of transferItems) {
+          console.log('ribhuitem',item);
+          // Remove from source warehouse
+          await storage.subtractFromInventoryQuantity(
+            item.itemId, 
+            updatedTransfer.sourceWarehouseId, 
+            item.requestedQuantity
+          );
+          await storage.createTransaction({
+            itemId: item.itemId,
+            sourceWarehouseId: updatedTransfer.sourceWarehouseId,
+            userId: req.user!.id,
+            requesterId: req.user!.id,
+            transactionType: 'transfer',
+            quantity: item.requestedQuantity,
+            status:'in-transit'
+          });
+        }
+      }
+
       // Handle inventory updates when transfer is completed (accepted) or rejected
       if ((filteredData.status === 'completed' || filteredData.status === 'returned') && updatedTransfer) {
         const transferItems = await storage.getTransferItemsByTransfer(transferId);
@@ -3521,32 +3798,13 @@ app.post("/api/transactions", async (req, res) => {
           if (filteredData.status === 'completed') {
             // Handle accepted transfer - normal inventory flow
             for (const item of transferItems) {
-              // Remove from source warehouse
-              await storage.subtractFromInventoryQuantity(
-                item.itemId, 
-                updatedTransfer.sourceWarehouseId, 
-                item.requestedQuantity
-              );
-              
-              // Add to destination warehouse
-              await storage.addToInventoryQuantity(
+              console.log(' Add to destination warehouse');
+              const updatedInventory= await storage.addToInventoryQuantity(
                 item.itemId, 
                 updatedTransfer.destinationWarehouseId, 
                 item.actualQuantity || item.requestedQuantity
               );
-
-              // Create transaction records for transfer out
-              const requestCode = `RQX-${(await storage.getAllRequests() ).length + 873}`;
-
-              await storage.createTransaction({
-                itemId: item.itemId,
-                sourceWarehouseId: updatedTransfer.sourceWarehouseId,
-                userId: req.user!.id,
-                requesterId: req.user!.id,
-                transactionType: 'check-out',
-                quantity: item.requestedQuantity,
-              });
-
+              console.log('updatedInventory',updatedInventory)
               // Create transaction records for transfer in
               await storage.createTransaction({
                 itemId: item.itemId,
@@ -3557,16 +3815,27 @@ app.post("/api/transactions", async (req, res) => {
                 quantity: item.actualQuantity || item.requestedQuantity,
               });
             }
-          } else if (filteredData.status === 'returned') {
+            const items=req.body.items;
+            if (Array.isArray(items) && items.length > 0) {
+                // run updates in parallel
+                await Promise.all(items.map(async (item: any) => {
+                  const id = item.transferItemId ;
+                  const updatePayload = {
+                    actualQuantity: item.actualQuantity,
+                    condition: item.condition,
+                    notes: item.notes,
+                    itemStatus:item.itemStatus
+                  };
+                  await storage.updateTransferItem(id, updatePayload);
+                }));
+              }
+          }
+          else if (filteredData.status === 'returned') {
             // Handle rejected transfer - move items to rejected goods
-            console.log('// Handle rejected transfer - move items to rejected goods')
-            for (const item of transferItems) {
-              // Remove from source warehouse (already shipped)
-              await storage.subtractFromInventoryQuantity(
-                item.itemId, 
-                updatedTransfer.sourceWarehouseId, 
-                item.requestedQuantity
-              );
+            
+            const filteredTransferItems=transferItems.filter((item)=>item.itemStatus==='Return')
+            for (const item of filteredTransferItems) {
+             
 
               // Create rejected goods record
               await storage.createRejectedGoods({
@@ -3575,7 +3844,7 @@ app.post("/api/transactions", async (req, res) => {
                 quantity: item.requestedQuantity,
                 rejectionReason: filteredData.receiverNotes || 'Transfer rejected by destination warehouse',
                 rejectedBy: req.user!.id,
-                warehouseId: updatedTransfer.destinationWarehouseId,
+                warehouseId: updatedTransfer.sourceWarehouseId,
                 status: 'rejected',
                 notes: filteredData.receiverNotes
               });
@@ -3591,8 +3860,78 @@ app.post("/api/transactions", async (req, res) => {
               });
             }
           }
-        }
+        
       }
+      }
+if (
+  (filteredData.status === 'partial-return-requested' ||
+    filteredData.status === 'return-requested') &&
+  updatedTransfer
+) {
+  console.log('🔄 Entered partial/return request block');
+  console.log('➡️ Updated Transfer ID:', updatedTransfer.id);
+  console.log('📦 Incoming request items:', req.body?.items);
+
+  const transferItems = await storage.getTransferItemsByTransfer(updatedTransfer.id);
+  console.log('🧾 All transfer items from DB:', transferItems);
+
+  const items = req.body?.items;
+
+  if (Array.isArray(items) && items.length > 0) {
+    console.log('✏️ Updating transfer items...');
+    await Promise.all(
+      items.map(async (item: any) => {
+        const updatePayload = {
+          actualQuantity: item.actualQuantity,
+          condition: item.condition,
+          notes: item.notes,
+          itemStatus: item.itemStatus,
+        };
+        console.log(`➡️ Updating item ID ${item.transferItemId} with:`, updatePayload);
+        await storage.updateTransferItem(item.transferItemId, updatePayload);
+      })
+    );
+  } else {
+    console.log('⚠️ No items provided in request body.');
+  }
+
+  // Refetch updated items to ensure status reflects DB
+  const updatedTransferItems = await storage.getTransferItemsByTransfer(updatedTransfer.id);
+  console.log('✅ Refetched updated transfer items:', updatedTransferItems);
+
+  const filteredTransferAcceptItems = updatedTransferItems.filter(
+    (item) => item.itemStatus === 'Accept'
+  );
+  console.log('🟢 Accepted items:', filteredTransferAcceptItems);
+
+  for (const item of filteredTransferAcceptItems) {
+    console.log(`📦 Processing accepted itemId=${item.itemId}`);
+
+    const quantityToAdd = item.actualQuantity || item.requestedQuantity;
+    console.log(
+      `➕ Adding to destination warehouse=${updatedTransfer.destinationWarehouseId}, quantity=${quantityToAdd}`
+    );
+
+    const updatedInventory = await storage.addToInventoryQuantity(
+      item.itemId,
+      updatedTransfer.destinationWarehouseId,
+      quantityToAdd
+    );
+    console.log('✅ Updated Inventory:', updatedInventory);
+
+    await storage.createTransaction({
+      itemId: item.itemId,
+      destinationWarehouseId: updatedTransfer.destinationWarehouseId,
+      userId: req.user!.id,
+      requesterId: filteredData.receivedBy || req.user!.id,
+      transactionType: 'check-in',
+      quantity: quantityToAdd,
+    });
+    console.log('🧾 Transaction created for itemId:', item.itemId);
+  }
+
+  console.log('🎯 Partial/Return flow complete for transfer ID:', updatedTransfer.id);
+}
 
       if (!updatedTransfer) {
         return res.status(404).json({ message: "Transfer not found" });
@@ -3629,7 +3968,8 @@ app.post("/api/transactions", async (req, res) => {
 
       console.log('🎉 Transfer update process completed successfully');
       res.json(updatedTransfer);
-    } catch (error: any) {
+    }
+    catch (error: any) {
       console.error('💥 Transfer update error:', error);
       console.error('Error stack:', error.stack);
       res.status(400).json({ message: error.message });

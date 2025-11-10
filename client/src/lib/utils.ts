@@ -15,6 +15,18 @@ export function formatDate(date: Date | string | number) {
 
 export function formatDateTime(date: Date | string | number) {
   return new Date(date).toLocaleString("en-US", {
+    // timeZone:"utc",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+export function formatDateTimeWithoutTimeZone(date: Date | string | number) {
+  return new Date(date).toLocaleString("en-US", {
+    timeZone:"utc",
     day: "numeric",
     month: "short",
     year: "numeric",

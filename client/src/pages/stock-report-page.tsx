@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation,useQueryClient } from "@tanstack/react-query";
 import AppLayout from "@/components/layout/app-layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -28,6 +28,8 @@ export default function StockReportPage() {
   const [warehouseFilter, setWarehouseFilter] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [stockFilter, setStockFilter] = useState("all");
+    const queryClient=useQueryClient();
+  
 
   const { data: inventoryReport, isLoading: inventoryLoading, refetch } = useQuery({
     queryKey: ["/api/reports/inventory-stock"],
@@ -132,28 +134,52 @@ export default function StockReportPage() {
   };
   
   const itemTotals = calculateTotals();
+  console.log('itemTotalsribhu',itemTotals)
 
   if (inventoryLoading || warehousesLoading || categoriesLoading) {
     return (
-      <AppLayout>
         <div className="flex items-center justify-center h-[calc(100vh-200px)]">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
-      </AppLayout>
     );
   }
 
   return (
-    <AppLayout>
+    <>
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-medium text-gray-800">Inventory Stock Report</h1>
           <p className="text-gray-600">View and analyze current inventory levels</p>
         </div>
         <div className="flex space-x-2">
-          <Button variant="outline" onClick={() => refetch()}>
-            <RefreshCw className="mr-2 h-4 w-4" />
-            Refresh
+          <Button variant="outline" onClick={async () => {
+                      try {
+                        // Clear all relevant query caches
+                        await queryClient.invalidateQueries({ queryKey: ["/api/reports/inventory-stock"] });
+                        await queryClient.invalidateQueries({ queryKey: ["/api/warehouses"] });
+                        await queryClient.invalidateQueries({ queryKey: ["/api/categories"] });
+                        
+                        // Force fresh data fetch
+                        // await Promise.all([
+                        //   queryClient.refetchQueries({ queryKey: ["/api/reports/inventory-stock"], type: 'active' }),
+                        //   queryClient.refetchQueries({ queryKey: ["/api/warehouses"], type: 'active' }),
+                        //   queryClient.refetchQueries({ queryKey: ["/api/categories"], type: 'active' }),
+                        // ]);
+                        
+                        toast({
+                          title: "Refreshed",
+                          description: "Stock Report has been refreshed with latest data",
+                        });
+                      } catch (error) {
+                        console.error('Refresh error:', error);
+                        toast({
+                          title: "Refresh Failed",
+                          description: "Unable to refresh data. Please try again.",
+                          variant: "destructive",
+                        });
+                      }
+                    }}>
+            <RefreshCw className={`h-4 w-4 `} />
           </Button>
           <Button 
             onClick={() => exportMutation.mutate()}
@@ -340,6 +366,6 @@ export default function StockReportPage() {
           </div>
         </CardContent>
       </Card>
-    </AppLayout>
+    </>
   );
 }

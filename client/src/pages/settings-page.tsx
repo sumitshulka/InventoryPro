@@ -3,7 +3,6 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import AppLayout from "@/components/layout/app-layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -597,7 +596,6 @@ export default function SettingsPage() {
   // Show access denied message for non-admin users
   if (!isAdmin) {
     return (
-      <AppLayout>
         <div className="space-y-6">
           <div className="flex items-center justify-between">
             <div>
@@ -618,12 +616,11 @@ export default function SettingsPage() {
             </CardContent>
           </Card>
         </div>
-      </AppLayout>
     );
   }
 
   return (
-    <AppLayout>
+    <>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
@@ -640,7 +637,7 @@ export default function SettingsPage() {
             <TabsTrigger value="organization">Organization</TabsTrigger>
             <TabsTrigger value="email-config">Email Configuration</TabsTrigger>
             <TabsTrigger value="license-management">License Management</TabsTrigger>
-            <TabsTrigger value="system-config">System Configuration</TabsTrigger>
+            {/* <TabsTrigger value="system-config">System Configuration</TabsTrigger> */}
           </TabsList>
 
           <TabsContent value="approval-hierarchy" className="space-y-4">
@@ -701,7 +698,7 @@ export default function SettingsPage() {
                               {setting.minApprovalLevel}
                             </TableCell>
                             <TableCell>
-                              {setting.maxAmount ? `$${setting.maxAmount}` : "No limit"}
+                              {setting.maxAmount ? `${setting.maxAmount}` : "No limit"}
                             </TableCell>
                             <TableCell>
                               {setting.requiresSecondApproval ? "Yes" : "No"}
@@ -2034,6 +2031,6 @@ export default function SettingsPage() {
           </form>
         </DialogContent>
       </Dialog>
-    </AppLayout>
+    </>
   );
 }

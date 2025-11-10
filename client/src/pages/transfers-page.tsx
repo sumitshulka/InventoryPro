@@ -3,7 +3,6 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import AppLayout from "@/components/layout/app-layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -196,17 +195,14 @@ export default function TransfersPage() {
 
   if (transfersLoading || itemsLoading || warehousesLoading || inventoryLoading || operatedWarehousesLoading) {
     return (
-      <AppLayout>
         <div className="flex justify-center items-center h-64">
           <Loader2 className="h-8 w-8 animate-spin" />
         </div>
-      </AppLayout>
     );
   }
 
   if (!hasTransferPermission) {
     return (
-      <AppLayout>
         <div className="flex justify-center items-center h-64">
           <Card className="w-full max-w-md">
             <CardHeader>
@@ -220,12 +216,10 @@ export default function TransfersPage() {
             </CardContent>
           </Card>
         </div>
-      </AppLayout>
     );
   }
 
   return (
-    <AppLayout>
       <div className="space-y-6">
         <div>
           <h1 className="text-3xl font-bold">Inventory Transfers</h1>
@@ -428,6 +422,5 @@ export default function TransfersPage() {
           </div>
         </Tabs>
       </div>
-    </AppLayout>
   );
 }

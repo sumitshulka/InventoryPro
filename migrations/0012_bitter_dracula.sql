@@ -1,0 +1,1 @@
+ALTER TABLE "transfer_items" ADD COLUMN "item_status" text;

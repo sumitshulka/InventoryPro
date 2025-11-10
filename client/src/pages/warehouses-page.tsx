@@ -3,7 +3,6 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import AppLayout from "@/components/layout/app-layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -111,7 +110,7 @@ const WarehouseCard = ({ warehouse, locations, isAdmin, onEdit, isArchived = fal
             <p className="text-xs text-gray-500">Capacity</p>
             <p className="font-medium">{formatCapacity(warehouse.capacity)}</p>
           </div>
-          {isAdmin && (
+          {isAdmin && !isArchived && (
             <Button
               variant="outline"
               className="bg-gray-50 text-gray-600 hover:text-primary hover:bg-gray-100"
@@ -162,7 +161,7 @@ export default function WarehousesPage() {
   };
 
   // Filter warehouses based on archive status
-  const activeWarehouses = warehouses?.filter((warehouse: any) => warehouse.isActive === true) || [];
+  const activeWarehouses = warehouses?.filter((warehouse: any) => warehouse.isActive === true && warehouse.status !=='deleted') || [];
   const archivedWarehouses = warehouses?.filter((warehouse: any) => warehouse.status === 'deleted') || [];
   const inactiveWarehouses = warehouses?.filter((warehouse:any) => warehouse.isActive=== false && warehouse.status !=='deleted')
 
@@ -342,16 +341,14 @@ export default function WarehousesPage() {
 
   if (isLoading) {
     return (
-      <AppLayout>
         <div className="flex items-center justify-center h-[calc(100vh-200px)]">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
-      </AppLayout>
     );
   }
 
   return (
-    <AppLayout>
+    <>
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-medium text-gray-800">Warehouses</h1>
@@ -365,7 +362,6 @@ export default function WarehousesPage() {
             className="flex items-center gap-2"
           >
             <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-            {isRefreshing ? 'Refreshing...' : 'Refresh'}
           </Button>
           {isAdmin && (
             <Button onClick={() => setIsDialogOpen(true)}>
@@ -850,6 +846,6 @@ export default function WarehousesPage() {
           </form>
         </DialogContent>
       </Dialog>
-    </AppLayout>
+    </>
   );
 }

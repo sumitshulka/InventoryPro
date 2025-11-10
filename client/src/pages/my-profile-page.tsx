@@ -4,7 +4,6 @@ import { Separator } from "@/components/ui/separator";
 import { User, Building, Mail, UserCheck, MapPin, Building2 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery } from "@tanstack/react-query";
-import AppLayout from "@/components/layout/app-layout";
 
 export default function MyProfilePage() {
   const { user } = useAuth();
@@ -58,16 +57,13 @@ export default function MyProfilePage() {
 
   if (!user) {
     return (
-      <AppLayout>
         <div className="flex items-center justify-center h-64">
           <p className="text-gray-500">Loading profile...</p>
         </div>
-      </AppLayout>
     );
   }
 
   return (
-    <AppLayout>
       <div className="space-y-6">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">My Profile</h1>
@@ -228,6 +224,5 @@ export default function MyProfilePage() {
           </CardContent>
         </Card>
       </div>
-    </AppLayout>
   );
 }

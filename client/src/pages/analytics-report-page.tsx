@@ -1,6 +1,5 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import AppLayout from "@/components/layout/app-layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -106,16 +105,13 @@ export default function AnalyticsReportPage() {
 
   if (isLoading) {
     return (
-      <AppLayout>
         <div className="flex items-center justify-center h-64">
           <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full"></div>
         </div>
-      </AppLayout>
     );
   }
 
   return (
-    <AppLayout>
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <div>
@@ -563,6 +559,5 @@ export default function AnalyticsReportPage() {
           </TabsContent>
         </Tabs>
       </div>
-    </AppLayout>
   );
 }

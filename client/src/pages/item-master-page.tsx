@@ -3,7 +3,6 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import AppLayout from "@/components/layout/app-layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -296,16 +295,14 @@ export default function ItemMasterPage() {
 
   if (itemsLoading || categoriesLoading || inventoryLoading) {
     return (
-      <AppLayout>
         <div className="flex items-center justify-center h-[calc(100vh-200px)]">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
-      </AppLayout>
     );
   }
 
   return (
-    <AppLayout>
+    <>
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-medium text-gray-800">
@@ -674,9 +671,9 @@ export default function ItemMasterPage() {
                   <Label className="text-sm font-medium text-gray-500">Unit</Label>
                   <p className="text-sm">{selectedItem.unit}</p>
                 </div>
-                <div>
+                <div className="flex flex-col gap-1.5">
                   <Label className="text-sm font-medium text-gray-500">Status</Label>
-                  <Badge variant={selectedItem.status === "active" ? "default" : "secondary"}>
+                  <Badge className="w-fit" variant={selectedItem.status === "active" ? "default" : "secondary"}>
                     {selectedItem.status === "active" ? "Active" : "Inactive"}
                   </Badge>
                 </div>
@@ -696,7 +693,7 @@ export default function ItemMasterPage() {
 
       {/* Check-in History Sheet */}
       <Sheet open={isCheckInHistoryOpen} onOpenChange={setIsCheckInHistoryOpen}>
-        <SheetContent className="w-[600px] sm:w-[800px]">
+        <SheetContent className="w-[600px] sm:w-[800px] max-h-[100vh] overflow-y-auto">
           <SheetHeader>
             <SheetTitle>Check-in History</SheetTitle>
             <p className="text-sm text-gray-600">
@@ -752,6 +749,6 @@ export default function ItemMasterPage() {
           </div>
         </SheetContent>
       </Sheet>
-    </AppLayout>
+    </>
   );
 }
