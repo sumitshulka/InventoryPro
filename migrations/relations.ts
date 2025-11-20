@@ -1,5 +1,5 @@
 import { relations } from "drizzle-orm/relations";
-import { users, issues, warehouses, items, auditLogs, notifications, warehouseOperators, issueActivities, locations } from "./schema";
+import { users, issues, warehouses, items, auditLogs, notifications, warehouseOperators, locations, issueActivities } from "./schema";
 
 export const issuesRelations = relations(issues, ({one, many}) => ({
 	user_reportedBy: one(users, {
@@ -54,8 +54,8 @@ export const usersRelations = relations(users, ({many}) => ({
 		relationName: "notifications_recipientId_users_id"
 	}),
 	warehouseOperators: many(warehouseOperators),
-	issueActivities: many(issueActivities),
 	warehouses: many(warehouses),
+	issueActivities: many(issueActivities),
 }));
 
 export const warehousesRelations = relations(warehouses, ({one, many}) => ({
@@ -106,6 +106,10 @@ export const warehouseOperatorsRelations = relations(warehouseOperators, ({one})
 	}),
 }));
 
+export const locationsRelations = relations(locations, ({many}) => ({
+	warehouses: many(warehouses),
+}));
+
 export const issueActivitiesRelations = relations(issueActivities, ({one}) => ({
 	issue: one(issues, {
 		fields: [issueActivities.issueId],
@@ -115,8 +119,4 @@ export const issueActivitiesRelations = relations(issueActivities, ({one}) => ({
 		fields: [issueActivities.userId],
 		references: [users.id]
 	}),
-}));
-
-export const locationsRelations = relations(locations, ({many}) => ({
-	warehouses: many(warehouses),
 }));

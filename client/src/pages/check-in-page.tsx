@@ -85,8 +85,11 @@ export default function CheckInPage() {
     name: string;
     location: string;
     managerId?: number;
+    isActive:boolean;
+    capacity:number;
+    totalItems:number
   }>>({
-    queryKey: ["/api/warehouses/active"],
+    queryKey: ["/api/warehouses/stats"],
   });
 
   const { data: userOperatedWarehouses = [], isLoading: operatedWarehousesLoading } = useQuery<number[]>({
@@ -124,6 +127,7 @@ export default function CheckInPage() {
       return db - da;
     });
   }, [checkInTransactions]);
+   warehouses.filter(id=>id.isActive===true);
 
   const { data: users = [], isLoading: usersLoading } = useQuery<Array<{
     id: number;
@@ -303,7 +307,7 @@ export default function CheckInPage() {
                                 {availableWarehouses.length > 0 ? (
                                   availableWarehouses.map((warehouse) => (
                                     <SelectItem key={warehouse.id} value={warehouse.id.toString()}>
-                                      {warehouse.name}
+                                      {warehouse.name}  <span  className={warehouse.capacity-warehouse.totalItems>0?"text-green-600":"text-red-600"}>  Available space: {warehouse.capacity-warehouse.totalItems}</span>
                                     </SelectItem>
                                   ))
                                 ) : (

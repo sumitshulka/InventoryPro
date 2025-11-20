@@ -14,7 +14,7 @@ import { Separator } from "@/components/ui/separator";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { format, formatDistanceToNow } from "date-fns";
 import { AlertTriangle, Plus, Search, Filter, CheckCircle, Clock, X, Flag, Bell, MessageSquare, Archive, Reply, Mail, MailOpen, RefreshCw, Trash2 } from "lucide-react";
@@ -260,6 +260,34 @@ export default function IssuesPage() {
       priority: "medium",
     },
   });
+  const getUserName = (userId: number) => {
+    if (!users) return "";
+    const user = users.find((u: any) => u.id === userId);
+    return user ? user.name : "";
+  };
+
+  // Watch warehouseId to filter items
+  const selectedWarehouseId = form.watch("warehouseId");
+  // Get inventory to filter items by warehouse
+  const { data: inventory = [],isLoading: inventoryLoading = false  } = useQuery({
+    queryKey: ['/api/inventory'],
+    queryFn: async () => {
+      try {
+        const res = await fetch('/api/inventory');
+        if (!res.ok) return [];
+        const data = await res.json();
+        return Array.isArray(data) ? data : [];
+      } catch (error) {
+        return [];
+      }
+    }
+  });
+  // Filter items based on selected warehouse
+  const availableItems = selectedWarehouseId
+    ? items.filter((item: any) => 
+        inventory.some((inv: any) => inv.itemId === item.id && inv.warehouseId === selectedWarehouseId)
+      )
+    : items;
 
   const notificationForm = useForm<z.infer<typeof notificationSchema>>({
     resolver: zodResolver(notificationSchema),
@@ -590,19 +618,19 @@ export default function IssuesPage() {
                 {unreadCount} unread
               </Badge>
             )}
-            <Dialog open={showNewNotificationDialog} onOpenChange={setShowNewNotificationDialog}>
-              <DialogTrigger asChild>
-                <Button>
-                  <Mail className="h-4 w-4 mr-2" />
-                  Send Message
-                </Button>
-              </DialogTrigger>
-            </Dialog>
             <Dialog open={showNewIssueDialog} onOpenChange={setShowNewIssueDialog}>
               <DialogTrigger asChild>
                 <Button variant="outline">
                   <Plus className="h-4 w-4 mr-2" />
                   Report Issue
+                </Button>
+              </DialogTrigger>
+            </Dialog>
+            <Dialog open={showNewNotificationDialog} onOpenChange={setShowNewNotificationDialog}>
+              <DialogTrigger asChild>
+                <Button>
+                  <Mail className="h-4 w-4 mr-2" />
+                  Send Notification
                 </Button>
               </DialogTrigger>
             </Dialog>
@@ -723,6 +751,8 @@ export default function IssuesPage() {
                                 <span>By: {issue.reporter.name}</span>
                               </>
                             )}
+                            {issue?.warehouse && <span>  •  Warehouse: {issue?.warehouse?.name} </span>}
+                            {issue?.item && <span>  •  Item: {issue.item?.name}</span> }
                           </div>
                         </div>
                         <div className="flex flex-col gap-2">
@@ -968,7 +998,7 @@ export default function IssuesPage() {
         </Tabs>
 
         {/* Issue Creation Dialog */}
-        <Dialog open={showNewIssueDialog} onOpenChange={setShowNewIssueDialog}>
+        {/* <Dialog open={showNewIssueDialog} onOpenChange={setShowNewIssueDialog}>
           <DialogContent className="sm:max-w-md" aria-describedby="issue-dialog-description">
             <DialogHeader>
               <DialogTitle>Report New Issue</DialogTitle>
@@ -1119,7 +1149,7 @@ export default function IssuesPage() {
                 </form>
               </Form>
             </DialogContent>
-          </Dialog>
+          </Dialog> */}
 
         {/* Notification Detail Dialog */}
         <Dialog open={!!selectedNotification} onOpenChange={() => setSelectedNotification(null)}>
@@ -1457,7 +1487,14 @@ export default function IssuesPage() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Related Warehouse (Optional)</FormLabel>
-                        <Select onValueChange={(value) => field.onChange(value === "none" ? undefined : parseInt(value))}>
+                        <Select
+                          value={field.value ? String(field.value) : "none"}
+                          onValueChange={(value) => {
+                            field.onChange(value === "none" ? undefined : parseInt(value));
+                            // Reset itemId when warehouse changes
+                            form.setValue("itemId", undefined);
+                          }}
+                        >
                           <FormControl>
                             <SelectTrigger>
                               <SelectValue placeholder="Select warehouse" />
@@ -1483,25 +1520,49 @@ export default function IssuesPage() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Related Item (Optional)</FormLabel>
-                        <Select onValueChange={(value) => field.onChange(value === "none" ? undefined : parseInt(value))}>
+                        <Select
+                          value={field.value ? String(field.value) : "none"}
+                          onValueChange={(value) =>
+                            field.onChange(value === "none" ? undefined : parseInt(value))
+                          }
+                          disabled={!!selectedWarehouseId && inventoryLoading}
+                        >
                           <FormControl>
                             <SelectTrigger>
-                              <SelectValue placeholder="Select item" />
+                              <SelectValue
+                                placeholder={
+                                  selectedWarehouseId
+                                    ? "Select item from warehouse"
+                                    : "Select any item (no warehouse selected)"
+                                }
+                              />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            <SelectItem value="none">None</SelectItem>
-                            {Array.isArray(items) && items.map((item: any) => (
-                              <SelectItem key={item.id} value={item.id.toString()}>
-                                {item.name} ({item.sku})
+                            {availableItems.length > 0 ? (
+                              <>
+                                <SelectItem value="none">None</SelectItem>
+                                {availableItems.map((item: any) => (
+                                  <SelectItem key={item.id} value={item.id.toString()}>
+                                    {item.name} ({item.sku})
+                                  </SelectItem>
+                                ))}
+                              </>
+                            ) : (
+                              <SelectItem value="no-items" disabled>
+                                {selectedWarehouseId
+                                  ? "No items in selected warehouse"
+                                  : "No items available"}
                               </SelectItem>
-                            ))}
+                            )}
                           </SelectContent>
                         </Select>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
+
+
                 </div>
 
                 <div className="flex justify-end gap-3 pt-4">

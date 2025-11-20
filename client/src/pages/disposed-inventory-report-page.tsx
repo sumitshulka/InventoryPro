@@ -134,8 +134,8 @@ export default function DisposedInventoryReportPage() {
         item.item?.sku || "",
         `"${item.warehouse?.name || ''}"`,
         item.quantity,
-        item.item?.rate || 0,
-        (item.quantity * (item.item?.rate || 0)),
+        item.unitValue || 0,
+        (item.quantity * (item.unitValue || 0)),
         item.disposalDate ? new Date(item.disposalDate).toLocaleDateString() : "",
         `"${item.disposalReason || ''}"`
       ].join(","))

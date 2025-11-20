@@ -169,6 +169,11 @@ export interface IStorage {
   reopenIssue(id: number, userId: number): Promise<any>;
   getIssueActivityWithUser(issueId: number): Promise<any[]>;
 
+  // create issue activity/activities
+  createIssueActivity(activity: InsertIssueActivity): Promise<IssueActivity>;
+  createIssueActivities(activities: InsertIssueActivity[]): Promise<IssueActivity[]>;
+  deleteIssueActivities(issueId: number): Promise<boolean>;
+
   // Email settings operations
   getEmailSettings(): Promise<any>;
   createEmailSettings(settings: any): Promise<any>;
@@ -290,12 +295,12 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getAllLocations(): Promise<Location[]> {
-    return await db.select().from(locations);
+    return await db.select().from(locations).orderBy(desc(locations.updatedAt));
   }
 
   async updateLocation(id: number, locationData: Partial<InsertLocation>): Promise<Location | undefined> {
     const [updatedLocation] = await db.update(locations)
-      .set(locationData)
+      .set({...locationData,updatedAt:new Date()})
       .where(eq(locations.id, id))
       .returning();
     return updatedLocation;
@@ -311,6 +316,13 @@ export class DatabaseStorage implements IStorage {
     const [warehouse] = await db.select().from(warehouses).where(eq(warehouses.id, id));
     return warehouse;
   }
+  async getWarehouseTx(tx: any, id: number): Promise<Warehouse | undefined> {
+    return await tx
+      .select()
+      .from(warehouses)
+      .where(eq(warehouses.id, id));
+  }
+
 
   async getWarehouseByName(name: string): Promise<Warehouse | undefined> {
     const [warehouse] = await db.select().from(warehouses).where(eq(warehouses.name, name));
@@ -436,48 +448,188 @@ export class DatabaseStorage implements IStorage {
       .returning();
     return updatedInventory;
   }
-  async addToInventoryQuantity(itemId: number, warehouseId: number, quantity: number): Promise<Inventory | undefined> {
-    const [currentInventory] = await db
-      .select()
-      .from(inventory)
-      .where(and(eq(inventory.itemId, itemId), eq(inventory.warehouseId, warehouseId)));
+  async safeAddInventory(
+    itemId: number,
+    warehouseId: number,
+    quantity: number
+  ) {
+    return db.transaction(async (tx) => {
+      const result = await tx.execute(sql`
+        SELECT * FROM inventory
+        WHERE item_id = ${itemId}
+        AND warehouse_id = ${warehouseId}
+        FOR UPDATE
+      `);
 
-    if (!currentInventory) return undefined;
+      const current = result.rows[0];
 
-    const newQuantity = currentInventory.quantity + quantity;
+      if (!current) {
+        return { success: false, reason: "inventory_missing" };
+      }
 
-    const [updatedInventory] = await db
-      .update(inventory)
-      .set({
-        quantity: newQuantity,
-        lastUpdated: new Date(),
-      })
-      .where(and(eq(inventory.itemId, itemId), eq(inventory.warehouseId, warehouseId)))
-      .returning();
+      const newQty = current.quantity + quantity;
 
-    return updatedInventory;
+      if (current.max_capacity && newQty > current.max_capacity) {
+        return { success: false, reason: "exceeds_capacity" };
+      }
+
+      const updateResult = await tx.execute(sql`
+        UPDATE inventory
+        SET quantity = ${newQty}, last_updated = NOW()
+        WHERE item_id = ${itemId}
+        AND warehouse_id = ${warehouseId}
+        RETURNING *
+      `);
+
+      return { success: true, inventory: updateResult.rows[0] };
+    });
   }
-  async subtractFromInventoryQuantity(itemId: number, warehouseId: number, quantity: number): Promise<Inventory | undefined> {
-    const [currentInventory] = await db
-      .select()
-      .from(inventory)
-      .where(and(eq(inventory.itemId, itemId), eq(inventory.warehouseId, warehouseId)));
 
-    if (!currentInventory) return undefined;
+  async safeSubtractInventory(
+    itemId: number,
+    warehouseId: number,
+    quantity: number
+  ) {
+    return db.transaction(async (tx) => {
+      // Lock row
+      const result = await tx.execute(sql`
+        SELECT * FROM inventory
+        WHERE item_id = ${itemId}
+        AND warehouse_id = ${warehouseId}
+        FOR UPDATE
+      `);
 
-    // Prevent going below zero
-    const newQuantity = Math.max(currentInventory.quantity - quantity, 0);
+      const current = result.rows[0];
 
-    const [updatedInventory] = await db
-      .update(inventory)
-      .set({
-        quantity: newQuantity,
-        lastUpdated: new Date(),
-      })
-      .where(and(eq(inventory.itemId, itemId), eq(inventory.warehouseId, warehouseId)))
-      .returning();
+      if (!current) {
+        return { success: false, reason: "inventory_missing" };
+      }
 
-    return updatedInventory;
+      if (current.quantity < quantity) {
+        return { success: false, reason: "insufficient_stock" };
+      }
+
+      const newQty = current.quantity - quantity;
+
+      const updateResult = await tx.execute(sql`
+        UPDATE inventory
+        SET quantity = ${newQty}, last_updated = NOW()
+        WHERE item_id = ${itemId}
+        AND warehouse_id = ${warehouseId}
+        RETURNING *
+      `);
+
+      return { success: true, inventory: updateResult.rows[0] };
+    });
+  }
+// Transactional helpers — add inside DatabaseStorage class
+
+  // Get transfer inside tx
+  async getTransferTx(tx: any, id: number) {
+    const [transfer] = await tx.select().from(transfers).where(eq(transfers.id, id));
+    return transfer;
+  }
+
+  // Get transfer items inside tx
+  async getTransferItemsByTransferTx(tx: any, transferId: number) {
+    return await tx.select().from(transferItems).where(eq(transferItems.transferId, transferId));
+  }
+
+  // Update transfer inside tx
+  async updateTransferTx(tx: any, id: number, data: Partial<InsertTransfer>) {
+    const [updated] = await tx.update(transfers).set(data).where(eq(transfers.id, id)).returning();
+    return updated;
+  }
+
+  // Update transfer item inside tx
+  async updateTransferItemTx(tx: any, id: number, data: any) {
+    const [updated] = await tx.update(transferItems).set(data).where(eq(transferItems.id, id)).returning();
+    return updated;
+  }
+
+  // Create transaction record inside tx
+  async createTransactionTx(tx: any, payload: InsertTransaction) {
+    const TransactionCode = `TRX-${(await storage.getAllTransactions() ).length + 873}-${ Date.now()}`;
+    const dataToInsert = {
+    ...payload, // All the original data (itemId, quantity, userId, etc.)
+    transactionCode: TransactionCode // Add the new code
+  };
+    const [created] = await tx.insert(transactions).values(dataToInsert).returning();
+    return created;
+  }
+
+  // Create transfer update (log) inside tx
+  async createTransferUpdateTx(tx: any, payload: InsertTransferUpdate) {
+    const [created] = await tx.insert(transferUpdates).values(payload).returning();
+    return created;
+  }
+
+  // Create audit log inside tx
+  async createAuditLogTx(tx: any, payload: InsertAuditLog) {
+    const [created] = await tx.insert(auditLogs).values(payload).returning();
+    return created;
+  }
+
+  // Create rejected goods inside tx
+  async createRejectedGoodsTx(tx: any, payload: InsertRejectedGoods) {
+    const [created] = await tx.insert(rejectedGoods).values(payload).returning();
+    return created;
+  }
+
+  // safeSubtractInventoryTx: locks row FOR UPDATE and subtracts
+  async safeSubtractInventoryTx(tx: any, itemId: number, warehouseId: number, quantity: number) {
+    // lock the inventory row
+    const result = await tx.execute(sql`
+      SELECT * FROM inventory
+      WHERE item_id = ${itemId}
+        AND warehouse_id = ${warehouseId}
+      FOR UPDATE
+    `);
+
+    const current = result.rows[0];
+    if (!current) return { success: false, reason: "inventory_missing" };
+
+    if (current.quantity < quantity) return { success: false, reason: "insufficient_stock" };
+
+    const newQty = current.quantity - quantity;
+
+    const updateResult = await tx.execute(sql`
+      UPDATE inventory
+      SET quantity = ${newQty}, last_updated = NOW()
+      WHERE item_id = ${itemId}
+        AND warehouse_id = ${warehouseId}
+      RETURNING *
+    `);
+
+    return { success: true, inventory: updateResult.rows[0] };
+  }
+
+  // safeAddInventoryTx: locks row FOR UPDATE and adds with capacity check
+  async safeAddInventoryTx(tx: any, itemId: number, warehouseId: number, quantity: number) {
+    const result = await tx.execute(sql`
+      SELECT * FROM inventory
+      WHERE item_id = ${itemId}
+        AND warehouse_id = ${warehouseId}
+      FOR UPDATE
+    `);
+
+    const current = result.rows[0];
+    if (!current) return { success: false, reason: "inventory_missing" };
+
+    const newQty = current.quantity + quantity;
+    if (current.max_capacity && newQty > current.max_capacity) {
+      return { success: false, reason: "exceeds_capacity" };
+    }
+
+    const updateResult = await tx.execute(sql`
+      UPDATE inventory
+      SET quantity = ${newQty}, last_updated = NOW()
+      WHERE item_id = ${itemId}
+        AND warehouse_id = ${warehouseId}
+      RETURNING *
+    `);
+
+    return { success: true, inventory: updateResult.rows[0] };
   }
 
 
@@ -880,6 +1032,13 @@ export class DatabaseStorage implements IStorage {
   async getRejectedGood(id:number): Promise<RejectedGoods[]> {
     return await db.select().from(rejectedGoods).where(eq(rejectedGoods.id,id));
   }
+  async getRejectedGoodTx(tx: Tx, id: number): Promise<RejectedGoods[]> {
+    return await tx
+      .select()
+      .from(rejectedGoods)
+      .where(eq(rejectedGoods.id, id));
+  }
+
 
   async getRejectedGoodsByWarehouse(warehouseId: number): Promise<RejectedGoods[]> {
     return await db.select().from(rejectedGoods).where(eq(rejectedGoods.warehouseId, warehouseId));
@@ -887,6 +1046,13 @@ export class DatabaseStorage implements IStorage {
 
   async updateRejectedGoods(id: number, data: Partial<InsertRejectedGoods>): Promise<RejectedGoods | undefined> {
     const [updated] = await db.update(rejectedGoods)
+      .set(data)
+      .where(eq(rejectedGoods.id, id))
+      .returning();
+    return updated;
+  }
+  async updateRejectedGoodsTx(tx:any,id: number, data: Partial<InsertRejectedGoods>): Promise<RejectedGoods | undefined> {
+    const [updated] = await tx.update(rejectedGoods)
       .set(data)
       .where(eq(rejectedGoods.id, id))
       .returning();
@@ -908,14 +1074,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createTransfer(transfer: InsertTransfer): Promise<Transfer> {
-  const now = new Date();
-
-  // Adjust to remove local timezone offset (normalize to UTC)
-  const utcNormalized = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
-
-  // Merge with transfer object
-  const transferWithTime = { ...transfer, createdAt: utcNormalized };
-    const [newTransfer] = await db.insert(transfers).values([transferWithTime]).returning();
+    const [newTransfer] = await db.insert(transfers).values([transfer]).returning();
     return newTransfer;
   }
 
@@ -932,6 +1091,9 @@ export class DatabaseStorage implements IStorage {
   }
     async getTransferItemsByTransferAndItem(transferId: number,itemId:number): Promise<TransferItem[]> {
     return await db.select().from(transferItems).where(and(eq(transferItems.transferId, transferId), eq(transferItems.itemId, itemId)));
+  }
+  async getTransferItemsByTransferAndItemTx(tx:any,transferId: number,itemId:number): Promise<TransferItem[]> {
+    return await tx.select().from(transferItems).where(and(eq(transferItems.transferId, transferId), eq(transferItems.itemId, itemId)));
   }
 
 
@@ -1232,6 +1394,7 @@ export class DatabaseStorage implements IStorage {
         newValue: issueActivities.newValue,
         comment: issueActivities.comment,
         createdAt: issueActivities.createdAt,
+        description:issueActivities.description,
         user: {
           id: users.id,
           name: users.name,
@@ -1246,6 +1409,29 @@ export class DatabaseStorage implements IStorage {
     } catch (error) {
       console.error('Error fetching issue activities:', error);
       return [];
+    }
+  }
+
+  // create a single issue activity
+  async createIssueActivity(activity: InsertIssueActivity): Promise<IssueActivity> {
+    try {
+      const [newActivity] = await db.insert(issueActivities).values(activity).returning();
+      return newActivity;
+    } catch (error) {
+      console.error('Error creating issue activity:', error);
+      throw error;
+    }
+  }
+
+  // create multiple issue activities in a single call
+  async createIssueActivities(activities: InsertIssueActivity[]): Promise<IssueActivity[]> {
+    try {
+      if (!Array.isArray(activities) || activities.length === 0) return [];
+      const result = await db.insert(issueActivities).values(activities).returning();
+      return result;
+    } catch (error) {
+      console.error('Error creating issue activities:', error);
+      throw error;
     }
   }
 
@@ -1344,6 +1530,18 @@ export class DatabaseStorage implements IStorage {
       return result[0];
     } catch (error) {
       console.error('Error creating rejected goods:', error);
+      throw error;
+    }
+  }
+
+  // delete all issue activities for a given issue
+  async deleteIssueActivities(issueId: number): Promise<boolean> {
+    try {
+      const result = await db.delete(issueActivities)
+        .where(eq(issueActivities.issueId, issueId));
+      return result.rowCount ? result.rowCount > 0 : false;
+    } catch (error) {
+      console.error('Error deleting issue activities:', error);
       throw error;
     }
   }

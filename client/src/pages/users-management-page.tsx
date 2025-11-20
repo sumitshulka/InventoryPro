@@ -57,7 +57,18 @@ const formSchema = z.object({
   warehouseId: z.string().optional(),
   departmentId: z.string().optional(),
   isWarehouseOperator: z.boolean().default(false),
+})
+.refine((data) => {
+  // Employee MUST have a warehouse
+  if (data.role === "employee" && (!data.warehouseId || data.warehouseId === "none")) {
+    return false;
+  }
+  return true;
+}, {
+  message: "Warehouse is required for employees",
+  path: ["warehouseId"],
 });
+
 
 type FormValues = z.infer<typeof formSchema>;
 
@@ -93,18 +104,21 @@ export default function UsersManagementPage() {
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
+    mode: "onChange",
+    reValidateMode: "onChange",
     defaultValues: {
       username: "",
       password: "",
       name: "",
       email: "",
-      role: "employee" as const,
+      role: "employee",
       managerId: "none",
-      warehouseId: "none", 
+      warehouseId: "none",
       departmentId: "none",
       isWarehouseOperator: false,
     },
   });
+
 
   const createUserMutation = useMutation({
     mutationFn: async (data: FormValues) => {
@@ -167,7 +181,7 @@ export default function UsersManagementPage() {
       } else if (error.message.includes("Cannot assign user as warehouse manager")) {
         userMessage = "This user cannot be assigned as a warehouse manager because they are not assigned to that warehouse.";
       } else if (error.message.includes("Username already exists")) {
-        userMessage = "This username is already taken. Please choose a different username.";
+        userMessage = "This username is already exist. Please choose a different username.";
       } else if (error.message.includes("Email already exists")) {
         userMessage = "This email address is already registered. Please use a different email.";
       }
@@ -350,7 +364,7 @@ export default function UsersManagementPage() {
               onClick={handleRefresh}
               disabled={isLoading}
             >
-              <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`h-4 w-4  ${isLoading ? 'animate-spin' : ''}`} />
             </Button>
             {canEdit && (
               <Button 
@@ -603,7 +617,10 @@ export default function UsersManagementPage() {
                   <Label htmlFor="role">Role</Label>
                   <Select
                     value={form.watch("role")}
-                    onValueChange={(value) => form.setValue("role", value as "admin" | "manager" | "employee")}
+                      onValueChange={(value) => {
+                        form.setValue("role", value as "admin" | "manager" | "employee");
+                        form.trigger("warehouseId"); // revalidate warehouse
+                      }}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select role" />
@@ -653,7 +670,10 @@ export default function UsersManagementPage() {
                   <Label htmlFor="warehouseId">Default Warehouse</Label>
                   <Select
                     value={form.watch("warehouseId")?.toString() || "none"}
-                    onValueChange={(value) => form.setValue("warehouseId", value)}
+                    onValueChange={(value) => {
+                      form.setValue("warehouseId", value);
+                      form.trigger("warehouseId"); // revalidate immediately
+                    }}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select warehouse" />
@@ -673,6 +693,11 @@ export default function UsersManagementPage() {
                       )}
                     </SelectContent>
                   </Select>
+                  {form.formState.errors.warehouseId && (
+                    <p className="text-sm text-red-500">
+                      {form.formState.errors.warehouseId.message}
+                    </p>
+                  )}
                 </div>
 
                 <div className="space-y-2">

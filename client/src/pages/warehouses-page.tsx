@@ -438,7 +438,8 @@ export default function WarehousesPage() {
                           </TableCell>
                           <TableCell>
                             {warehouse.managerId ? 
-                              (users as any[])?.find((u: any) => u.id === warehouse.managerId)?.name || "Unknown Manager" 
+                              // (users as any[])?.find((u: any) => u.id === warehouse.managerId)?.name || "Unknown Manager" 
+                              warehouse?.manager?.name || 'Unknown Manager'
                               : "—"
                             }
                           </TableCell>
@@ -552,7 +553,8 @@ export default function WarehousesPage() {
                           </TableCell>
                           <TableCell>
                             {warehouse.managerId ? 
-                              (users as any[])?.find((u: any) => u.id === warehouse.managerId)?.name || "Unknown Manager" 
+                              // (users as any[])?.find((u: any) => u.id === warehouse.managerId)?.name || "Unknown Manager" 
+                              warehouse?.manager?.name || "Unknown Manager"
                               : "—"
                             }
                           </TableCell>
@@ -671,7 +673,8 @@ export default function WarehousesPage() {
                           </TableCell>
                           <TableCell>
                             {warehouse.managerId ? 
-                              (users as any[])?.find((u: any) => u.id === warehouse.managerId)?.name || "Unknown Manager" 
+                              // (users as any[])?.find((u: any) => u.id === warehouse.managerId)?.name || "Unknown Manager" 
+                              warehouse?.manager?.name || 'Unknown Manager'
                               : "—"
                             }
                           </TableCell>

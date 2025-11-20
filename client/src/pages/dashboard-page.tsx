@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import MetricCard from "@/components/dashboard/metric-card";
 import RecentTransactions from "@/components/dashboard/recent-transactions";
 import WarehouseOverview from "@/components/dashboard/warehouse-overview";
@@ -10,10 +10,29 @@ import { useAuth } from "@/hooks/use-auth";
 import EmployeeDashboard from "./employee-dashboard";
 import { Button } from "@/components/ui/button";
 import { useLocation } from "wouter";
+import { toast } from "@/hooks/use-toast";
 
 export default function DashboardPage() {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
+  const queryClient=useQueryClient()
+  const handleRefresh = async ()=>{
+    try{
+      await queryClient.invalidateQueries();
+      toast({
+        title:'Refreshed',
+        description: "Dashboard data refreshed successfully."
+      })
+    }
+    catch(err:any){
+      console.log('Failed to refresh Data',err)
+      toast({
+        title:"Refresh failed",
+        description: err?.message || "Failed to refresh data.",
+        variant: "destructive",
+      })
+    }
+  }
   
   const { data: userOperatedWarehouses = [] } = useQuery<number[]>({
     queryKey: ["/api/users", user?.id, "operated-warehouses"],
@@ -75,9 +94,10 @@ export default function DashboardPage() {
               <span className="material-icons mr-1 text-sm">date_range</span>
               Last 30 days
             </button>
-            <button className="bg-primary text-white rounded-md px-4 py-2 text-sm font-medium flex items-center hover:bg-primary/90">
+            <button className="bg-primary text-white rounded-md px-4 py-2 text-sm font-medium flex items-center hover:bg-primary/90"
+            onClick={()=>handleRefresh()}
+            >
               <span className="material-icons mr-1 text-sm">refresh</span>
-              Refresh
             </button>
           </div>
         )}
@@ -119,8 +139,8 @@ export default function DashboardPage() {
         <MetricCard
           title="Total Items"
           value={dashboardData?.totalItems || 0}
-          icon="inventory_2"
-          iconBgColor="bg-primary bg-opacity-10"
+          icon="category"
+          iconBgColor="bg-warning bg-opacity-10"
           iconColor="text-primary"
           changeValue={dashboardData?.statistics?.totalItemsChange || 0}
           changeDirection={dashboardData?.statistics?.totalItemsChange >= 0 ? "up" : "down"}
@@ -152,9 +172,9 @@ export default function DashboardPage() {
         <MetricCard
           title="Active Transfers"
           value={dashboardData?.activeTransfersCount || 0}
-          icon="swap_horiz"
-          iconBgColor="bg-secondary bg-opacity-10"
-          iconColor="text-secondary"
+          icon="compare_arrows"
+          iconBgColor="bg-white bg-opacity-10"
+          iconColor="black"
           changeValue={Math.abs(dashboardData?.statistics?.activeTransfersChange || 0)}
           changeDirection={dashboardData?.statistics?.activeTransfersChange >= 0 ? "up" : "down"}
           changeColor={dashboardData?.statistics?.activeTransfersChange >= 0 ? "text-info" : "text-success"}

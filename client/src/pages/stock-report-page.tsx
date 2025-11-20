@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useQuery, useMutation,useQueryClient } from "@tanstack/react-query";
+import { useState, useEffect } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import AppLayout from "@/components/layout/app-layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/select";
 import { Loader2, Search, Download, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useLocation } from "wouter";
 
 export default function StockReportPage() {
   const { toast } = useToast();
@@ -28,7 +29,17 @@ export default function StockReportPage() {
   const [warehouseFilter, setWarehouseFilter] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [stockFilter, setStockFilter] = useState("all");
-    const queryClient=useQueryClient();
+  const [location] = useLocation();
+  const queryClient=useQueryClient();
+  // Check for filter query parameter on mount
+  useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    const filterParam = searchParams.get('filter');
+    console.log('Filter param:',filterParam);
+    if (filterParam === 'low') {
+      setStockFilter('low');
+    }
+  }, []);
   
 
   const { data: inventoryReport, isLoading: inventoryLoading, refetch } = useQuery({
@@ -99,6 +110,7 @@ export default function StockReportPage() {
         return matchesSearch && matchesWarehouse && matchesCategory && matchesStock;
       })
     : [];
+  const LowStockInventories = inventoryReport ? inventoryReport.filter((item:any)=>item.isLowStock===true):[];
 
   // Calculate totals for each item across all warehouses
   const calculateTotals = () => {
@@ -204,8 +216,8 @@ export default function StockReportPage() {
                 <p className="text-sm font-medium text-gray-500">Total Items</p>
                 <h2 className="text-3xl font-bold">{itemTotals.length}</h2>
               </div>
-              <div className="bg-primary bg-opacity-10 p-3 rounded-full">
-                <span className="material-icons text-primary">inventory_2</span>
+              <div className="bg-white bg-opacity-10 p-3 rounded-full">
+                <span className="material-icons text-primary">category</span>
               </div>
             </div>
           </CardContent>
@@ -215,8 +227,8 @@ export default function StockReportPage() {
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-500">Low Stock Items</p>
-                <h2 className="text-3xl font-bold">{itemTotals.filter(item => item.isLowStock).length}</h2>
+                <p className="text-sm font-medium text-gray-500">Low Stock Items (Inventory)</p>
+                <h2 className="text-3xl font-bold">{LowStockInventories?.length || 0}</h2>
               </div>
               <div className="bg-warning bg-opacity-10 p-3 rounded-full">
                 <span className="material-icons text-warning">warning</span>

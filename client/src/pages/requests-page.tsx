@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState,useEffect,useMemo } from "react";
 import { useQuery, useMutation,useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
 import { useForm, useFieldArray } from "react-hook-form";
@@ -69,6 +69,15 @@ export default function RequestsPage() {
   const [activeTab, setActiveTab] = useState("all");
   const queryClient=useQueryClient();
 
+  useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    const filterParam = searchParams.get('filter');
+    console.log('Filter param:',filterParam);
+    if (filterParam === 'pending') {
+      setActiveTab('pending');
+    }
+  }, []);
+
   const { data: requests, isLoading: requestsLoading, refetch: refetchRequests } = useQuery({
     queryKey: ["/api/requests"],
   });
@@ -93,6 +102,9 @@ export default function RequestsPage() {
   const { data: inventory, isLoading: inventoryLoading, refetch: refetchInventory } = useQuery({
     queryKey: ["/api/reports/inventory-stock"],
   });
+  const {data:Inventories} = useQuery({
+    queryKey: ["/api/inventory"],
+  });
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -114,6 +126,7 @@ export default function RequestsPage() {
       const payload = {
         warehouseId: parseInt(data.warehouseId),
         notes: data.notes,
+        priority:data.priority,
         items: data.items.map(item => ({
           itemId: parseInt(item.itemId),
           quantity: item.quantity,
@@ -292,6 +305,30 @@ export default function RequestsPage() {
     
     return false;
   };
+  const selectedWarehouseId = form.watch("warehouseId");
+
+  const availableItems = useMemo(() => {
+    if (!selectedWarehouseId) return [];
+
+    // Filter inventory records for this warehouse
+    const warehouseInventory = inventory?.filter(
+      (inv: any) => inv.warehouseId === Number(selectedWarehouseId)
+    ) || [];
+
+    // Join with items table
+    return warehouseInventory
+      .map((inv: any) => {
+        const item = items?.find((i: any) => i.id === inv.itemId);
+        if (!item || item.status !== "active") return null;
+        return {
+          ...item,
+          quantity: inv.quantity, // add quantity to display
+        };
+      })
+      .filter(Boolean); // remove nulls
+  }, [inventory, items, selectedWarehouseId]);
+
+
 
   if (requestsLoading || itemsLoading || warehousesLoading || usersLoading) {
     return (
@@ -408,6 +445,7 @@ export default function RequestsPage() {
                                     variant="ghost"
                                     size="sm"
                                     className="text-green-600"
+                                    title="Approve Request"
                                     onClick={() => handleUpdateStatus(request.id, "approved")}
                                   >
                                     <CheckCircle className="h-4 w-4" />
@@ -416,6 +454,7 @@ export default function RequestsPage() {
                                     variant="ghost"
                                     size="sm"
                                     className="text-red-600"
+                                    title="Reject Request"
                                     onClick={() => handleUpdateStatus(request.id, "rejected")}
                                   >
                                     <X className="h-4 w-4" />
@@ -439,7 +478,7 @@ export default function RequestsPage() {
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Create New Inventory Request</DialogTitle>
+            <DialogTitle>Create New Inventory CheckOut Request</DialogTitle>
             <DialogDescription>
               Fill in the details to request items for your location
             </DialogDescription>
@@ -448,10 +487,11 @@ export default function RequestsPage() {
           <form onSubmit={form.handleSubmit(handleSubmit)}>
             <div className="space-y-4 py-4">
               <div className="space-y-2">
-                <Label htmlFor="warehouseId">Destination Warehouse</Label>
+                <Label htmlFor="warehouseId">Source Warehouse</Label>
                 <Select
                   onValueChange={(value) => form.setValue("warehouseId", value)}
                   defaultValue={form.getValues("warehouseId")}
+                  disabled={user?.role==='employee' && user.isWarehouseOperator===false}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select a warehouse" />
@@ -525,22 +565,33 @@ export default function RequestsPage() {
                     <div className="flex-1 space-y-2">
                       <Label htmlFor={`items.${index}.itemId`}>Item</Label>
                       <Select
+                        disabled={!selectedWarehouseId}
                         onValueChange={(value) => form.setValue(`items.${index}.itemId`, value)}
                         defaultValue={form.getValues(`items.${index}.itemId`)}
                       >
                         <SelectTrigger>
-                          <SelectValue placeholder="Select an item" />
+                          <SelectValue
+                            placeholder={
+                              !selectedWarehouseId
+                                ? "Select warehouse first"
+                                : "Select an item"
+                            }
+                          />
                         </SelectTrigger>
                         <SelectContent>
-                          {items?.filter((item: any) => item.status === "active").length > 0 ? (
-                            items.filter((item: any) => item.status === "active").map((item: any) => (
+                          {!selectedWarehouseId ? (
+                            <div className="p-2 text-sm text-gray-500">
+                              Please select a warehouse first.
+                            </div>
+                          ) : availableItems.length > 0 ? (
+                            availableItems.map((item: any) => (
                               <SelectItem key={item.id} value={item.id.toString()}>
-                                {item.name} ({item.sku})
+                                {item.name} ({item.sku}) <span className={item.quantity>0?"text-green-600":"text-red-600"}>  Available: {item.quantity}</span>
                               </SelectItem>
                             ))
                           ) : (
                             <div className="p-2 text-sm text-gray-500">
-                              No active items available. Create items in Item Master first.
+                              No items in selected warehouse inventory.
                             </div>
                           )}
                         </SelectContent>

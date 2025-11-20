@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useCurrency } from "@/hooks/use-currency";
 import {
   Select,
   SelectContent,
@@ -103,6 +104,7 @@ export default function SettingsPage() {
   const [editingLocation, setEditingLocation] = useState<any>(null);
   const [editingDepartment, setEditingDepartment] = useState<any>(null);
   const queryClient = useQueryClient()
+  const {currencySymbol} = useCurrency();
 
   const { data: approvalSettings, isLoading } = useQuery({
     queryKey: ["/api/approval-settings"],
@@ -698,7 +700,7 @@ export default function SettingsPage() {
                               {setting.minApprovalLevel}
                             </TableCell>
                             <TableCell>
-                              {setting.maxAmount ? `${setting.maxAmount}` : "No limit"}
+                              {setting.maxAmount ? `${currencySymbol} ${setting.maxAmount}` : "No limit"}
                             </TableCell>
                             <TableCell>
                               {setting.requiresSecondApproval ? "Yes" : "No"}

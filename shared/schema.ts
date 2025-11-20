@@ -78,12 +78,14 @@ export const locations = pgTable("locations", {
   country: text("country").notNull().default("India"),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
   locationsCityIdx: index("locations_city_idx").on(table.city),
   locationsStateIdx: index("locations_state_idx").on(table.state),
   locationsCountryIdx: index("locations_country_idx").on(table.country),
   locationsActiveIdx: index("locations_active_idx").on(table.isActive),
   locationsCreatedAtIdx: index("locations_created_at_idx").on(table.createdAt),
+  locationsUpdatedAtIdx: index("locations_updated_at_idx").on(table.updatedAt),
 }));
 
 export const insertLocationSchema = createInsertSchema(locations).pick({
@@ -563,7 +565,10 @@ export const transferItems = pgTable("transfer_items", {
   actualQuantity: integer("actual_quantity"), // quantity actually received
   condition: text("condition").default("good"), // good, damaged, missing
   notes: text("notes"),
-  itemStatus: text("item_status")
+  itemStatus: text("item_status"),
+  isDisposed: boolean('is_disposed').default(false),
+  disposalDate: timestamp("disposal_date", { mode: 'string' }),
+  disposalReason: text("disposal_reason"),
 });
 
 export const insertTransferItemSchema = createInsertSchema(transferItems).omit({
@@ -746,6 +751,7 @@ export const issueActivities = pgTable("issue_activities", {
   userId: integer("user_id").notNull().references(() => users.id),
   action: text("action").notNull(), // created, assigned, status_changed, resolved, closed, reopened, commented
   previousValue: text("previous_value"), // Previous status, assignee, etc.
+  description: text("description"),
   newValue: text("new_value"), // New status, assignee, etc.
   comment: text("comment"), // User comment or resolution notes
   createdAt: timestamp("created_at").defaultNow().notNull(),

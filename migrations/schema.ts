@@ -328,29 +328,6 @@ export const organizationSettings = pgTable("organization_settings", {
 	check("organization_settings_created_at_not_null", sql`NOT NULL created_at`),
 ]);
 
-export const rejectedGoods = pgTable("rejected_goods", {
-	id: serial().primaryKey().notNull(),
-	transferId: integer("transfer_id").notNull(),
-	itemId: integer("item_id").notNull(),
-	quantity: integer().notNull(),
-	rejectionReason: text("rejection_reason").notNull(),
-	rejectedBy: integer("rejected_by").notNull(),
-	rejectedAt: timestamp("rejected_at", { mode: 'string' }).defaultNow().notNull(),
-	warehouseId: integer("warehouse_id").notNull(),
-	status: text().default('rejected').notNull(),
-	notes: text(),
-}, (table) => [
-	check("rejected_goods_id_not_null", sql`NOT NULL id`),
-	check("rejected_goods_transfer_id_not_null", sql`NOT NULL transfer_id`),
-	check("rejected_goods_item_id_not_null", sql`NOT NULL item_id`),
-	check("rejected_goods_quantity_not_null", sql`NOT NULL quantity`),
-	check("rejected_goods_rejection_reason_not_null", sql`NOT NULL rejection_reason`),
-	check("rejected_goods_rejected_by_not_null", sql`NOT NULL rejected_by`),
-	check("rejected_goods_rejected_at_not_null", sql`NOT NULL rejected_at`),
-	check("rejected_goods_warehouse_id_not_null", sql`NOT NULL warehouse_id`),
-	check("rejected_goods_status_not_null", sql`NOT NULL status`),
-]);
-
 export const requestApprovals = pgTable("request_approvals", {
 	id: serial().primaryKey().notNull(),
 	requestId: integer("request_id").notNull(),
@@ -415,6 +392,29 @@ export const requests = pgTable("requests", {
 	check("requests_priority_not_null", sql`NOT NULL priority`),
 	check("requests_submitted_at_not_null", sql`NOT NULL submitted_at`),
 	check("requests_created_at_not_null", sql`NOT NULL created_at`),
+]);
+
+export const rejectedGoods = pgTable("rejected_goods", {
+	id: serial().primaryKey().notNull(),
+	transferId: integer("transfer_id").notNull(),
+	itemId: integer("item_id").notNull(),
+	quantity: integer().notNull(),
+	rejectionReason: text("rejection_reason").notNull(),
+	rejectedBy: integer("rejected_by").notNull(),
+	rejectedAt: timestamp("rejected_at", { mode: 'string' }).defaultNow().notNull(),
+	warehouseId: integer("warehouse_id").notNull(),
+	status: text().default('rejected').notNull(),
+	notes: text(),
+}, (table) => [
+	check("rejected_goods_id_not_null", sql`NOT NULL id`),
+	check("rejected_goods_transfer_id_not_null", sql`NOT NULL transfer_id`),
+	check("rejected_goods_item_id_not_null", sql`NOT NULL item_id`),
+	check("rejected_goods_quantity_not_null", sql`NOT NULL quantity`),
+	check("rejected_goods_rejection_reason_not_null", sql`NOT NULL rejection_reason`),
+	check("rejected_goods_rejected_by_not_null", sql`NOT NULL rejected_by`),
+	check("rejected_goods_rejected_at_not_null", sql`NOT NULL rejected_at`),
+	check("rejected_goods_warehouse_id_not_null", sql`NOT NULL warehouse_id`),
+	check("rejected_goods_status_not_null", sql`NOT NULL status`),
 ]);
 
 export const transactions = pgTable("transactions", {
@@ -486,70 +486,6 @@ export const transferNotifications = pgTable("transfer_notifications", {
 	check("transfer_notifications_created_at_not_null", sql`NOT NULL created_at`),
 ]);
 
-export const transferUpdates = pgTable("transfer_updates", {
-	id: serial().primaryKey().notNull(),
-	transferId: integer("transfer_id").notNull(),
-	updatedBy: integer("updated_by").notNull(),
-	status: text().notNull(),
-	updateType: text("update_type").notNull(),
-	description: text(),
-	metadata: text(),
-	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
-}, (table) => [
-	check("transfer_updates_id_not_null", sql`NOT NULL id`),
-	check("transfer_updates_transfer_id_not_null", sql`NOT NULL transfer_id`),
-	check("transfer_updates_updated_by_not_null", sql`NOT NULL updated_by`),
-	check("transfer_updates_status_not_null", sql`NOT NULL status`),
-	check("transfer_updates_update_type_not_null", sql`NOT NULL update_type`),
-	check("transfer_updates_created_at_not_null", sql`NOT NULL created_at`),
-]);
-
-export const transfers = pgTable("transfers", {
-	id: serial().primaryKey().notNull(),
-	transferCode: text("transfer_code").notNull(),
-	sourceWarehouseId: integer("source_warehouse_id").notNull(),
-	destinationWarehouseId: integer("destination_warehouse_id").notNull(),
-	initiatedBy: integer("initiated_by").notNull(),
-	approvedBy: integer("approved_by"),
-	status: text().default('pending').notNull(),
-	transferMode: text("transfer_mode").default('courier').notNull(),
-	expectedShipmentDate: timestamp("expected_shipment_date", { mode: 'string' }),
-	expectedArrivalDate: timestamp("expected_arrival_date", { mode: 'string' }),
-	actualShipmentDate: timestamp("actual_shipment_date", { mode: 'string' }),
-	actualArrivalDate: timestamp("actual_arrival_date", { mode: 'string' }),
-	courierName: text("courier_name"),
-	trackingNumber: text("tracking_number"),
-	receiptNumber: text("receipt_number"),
-	handoverPersonName: text("handover_person_name"),
-	handoverPersonContact: text("handover_person_contact"),
-	handoverDate: timestamp("handover_date", { mode: 'string' }),
-	receiptDocument: text("receipt_document"),
-	receivedBy: integer("received_by"),
-	receivedDate: timestamp("received_date", { mode: 'string' }),
-	receiverNotes: text("receiver_notes"),
-	overallCondition: text("overall_condition").default('good'),
-	notes: text(),
-	returnReason: text("return_reason"),
-	returnCourierName: text("return_courier_name"),
-	returnTrackingNumber: text("return_tracking_number"),
-	returnShippedDate: timestamp("return_shipped_date", { mode: 'string' }),
-	returnDeliveredDate: timestamp("return_delivered_date", { mode: 'string' }),
-	disposalReason: text("disposal_reason"),
-	disposalDate: timestamp("disposal_date", { mode: 'string' }),
-	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
-	updatedAt: timestamp("updated_at", { mode: 'string' }),
-}, (table) => [
-	unique("transfers_transfer_code_unique").on(table.transferCode),
-	check("transfers_id_not_null", sql`NOT NULL id`),
-	check("transfers_transfer_code_not_null", sql`NOT NULL transfer_code`),
-	check("transfers_source_warehouse_id_not_null", sql`NOT NULL source_warehouse_id`),
-	check("transfers_destination_warehouse_id_not_null", sql`NOT NULL destination_warehouse_id`),
-	check("transfers_initiated_by_not_null", sql`NOT NULL initiated_by`),
-	check("transfers_status_not_null", sql`NOT NULL status`),
-	check("transfers_transfer_mode_not_null", sql`NOT NULL transfer_mode`),
-	check("transfers_created_at_not_null", sql`NOT NULL created_at`),
-]);
-
 export const warehouseOperators = pgTable("warehouse_operators", {
 	id: serial().primaryKey().notNull(),
 	userId: integer("user_id").notNull(),
@@ -615,37 +551,6 @@ export const users = pgTable("users", {
 	check("users_created_at_not_null", sql`NOT NULL created_at`),
 ]);
 
-export const issueActivities = pgTable("issue_activities", {
-	id: serial().primaryKey().notNull(),
-	issueId: integer("issue_id").notNull(),
-	userId: integer("user_id").notNull(),
-	action: text().notNull(),
-	previousValue: text("previous_value"),
-	newValue: text("new_value"),
-	comment: text(),
-	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
-}, (table) => [
-	index("issue_activities_action_idx").using("btree", table.action.asc().nullsLast().op("text_ops")),
-	index("issue_activities_created_at_idx").using("btree", table.createdAt.asc().nullsLast().op("timestamp_ops")),
-	index("issue_activities_issue_idx").using("btree", table.issueId.asc().nullsLast().op("int4_ops")),
-	index("issue_activities_user_idx").using("btree", table.userId.asc().nullsLast().op("int4_ops")),
-	foreignKey({
-			columns: [table.issueId],
-			foreignColumns: [issues.id],
-			name: "issue_activities_issue_id_issues_id_fk"
-		}),
-	foreignKey({
-			columns: [table.userId],
-			foreignColumns: [users.id],
-			name: "issue_activities_user_id_users_id_fk"
-		}),
-	check("issue_activities_id_not_null", sql`NOT NULL id`),
-	check("issue_activities_issue_id_not_null", sql`NOT NULL issue_id`),
-	check("issue_activities_user_id_not_null", sql`NOT NULL user_id`),
-	check("issue_activities_action_not_null", sql`NOT NULL action`),
-	check("issue_activities_created_at_not_null", sql`NOT NULL created_at`),
-]);
-
 export const warehouses = pgTable("warehouses", {
 	id: serial().primaryKey().notNull(),
 	name: text().notNull(),
@@ -707,6 +612,102 @@ export const items = pgTable("items", {
 	check("items_created_at_not_null", sql`NOT NULL created_at`),
 ]);
 
+export const issueActivities = pgTable("issue_activities", {
+	id: serial().primaryKey().notNull(),
+	issueId: integer("issue_id").notNull(),
+	userId: integer("user_id").notNull(),
+	action: text().notNull(),
+	previousValue: text("previous_value"),
+	newValue: text("new_value"),
+	comment: text(),
+	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
+	description: text(),
+}, (table) => [
+	index("issue_activities_action_idx").using("btree", table.action.asc().nullsLast().op("text_ops")),
+	index("issue_activities_created_at_idx").using("btree", table.createdAt.asc().nullsLast().op("timestamp_ops")),
+	index("issue_activities_issue_idx").using("btree", table.issueId.asc().nullsLast().op("int4_ops")),
+	index("issue_activities_user_idx").using("btree", table.userId.asc().nullsLast().op("int4_ops")),
+	foreignKey({
+			columns: [table.issueId],
+			foreignColumns: [issues.id],
+			name: "issue_activities_issue_id_issues_id_fk"
+		}),
+	foreignKey({
+			columns: [table.userId],
+			foreignColumns: [users.id],
+			name: "issue_activities_user_id_users_id_fk"
+		}),
+	check("issue_activities_id_not_null", sql`NOT NULL id`),
+	check("issue_activities_issue_id_not_null", sql`NOT NULL issue_id`),
+	check("issue_activities_user_id_not_null", sql`NOT NULL user_id`),
+	check("issue_activities_action_not_null", sql`NOT NULL action`),
+	check("issue_activities_created_at_not_null", sql`NOT NULL created_at`),
+]);
+
+export const transferUpdates = pgTable("transfer_updates", {
+	id: serial().primaryKey().notNull(),
+	transferId: integer("transfer_id").notNull(),
+	updatedBy: integer("updated_by").notNull(),
+	status: text().notNull(),
+	updateType: text("update_type").notNull(),
+	description: text(),
+	metadata: text(),
+	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	check("transfer_updates_id_not_null", sql`NOT NULL id`),
+	check("transfer_updates_transfer_id_not_null", sql`NOT NULL transfer_id`),
+	check("transfer_updates_updated_by_not_null", sql`NOT NULL updated_by`),
+	check("transfer_updates_status_not_null", sql`NOT NULL status`),
+	check("transfer_updates_update_type_not_null", sql`NOT NULL update_type`),
+	check("transfer_updates_created_at_not_null", sql`NOT NULL created_at`),
+]);
+
+export const transfers = pgTable("transfers", {
+	id: serial().primaryKey().notNull(),
+	transferCode: text("transfer_code").notNull(),
+	sourceWarehouseId: integer("source_warehouse_id").notNull(),
+	destinationWarehouseId: integer("destination_warehouse_id").notNull(),
+	initiatedBy: integer("initiated_by").notNull(),
+	approvedBy: integer("approved_by"),
+	status: text().default('pending').notNull(),
+	transferMode: text("transfer_mode").default('courier').notNull(),
+	expectedShipmentDate: timestamp("expected_shipment_date", { mode: 'string' }),
+	expectedArrivalDate: timestamp("expected_arrival_date", { mode: 'string' }),
+	actualShipmentDate: timestamp("actual_shipment_date", { mode: 'string' }),
+	actualArrivalDate: timestamp("actual_arrival_date", { mode: 'string' }),
+	courierName: text("courier_name"),
+	trackingNumber: text("tracking_number"),
+	receiptNumber: text("receipt_number"),
+	handoverPersonName: text("handover_person_name"),
+	handoverPersonContact: text("handover_person_contact"),
+	handoverDate: timestamp("handover_date", { mode: 'string' }),
+	receiptDocument: text("receipt_document"),
+	receivedBy: integer("received_by"),
+	receivedDate: timestamp("received_date", { mode: 'string' }),
+	receiverNotes: text("receiver_notes"),
+	overallCondition: text("overall_condition").default('good'),
+	notes: text(),
+	returnReason: text("return_reason"),
+	returnCourierName: text("return_courier_name"),
+	returnTrackingNumber: text("return_tracking_number"),
+	returnShippedDate: timestamp("return_shipped_date", { mode: 'string' }),
+	returnDeliveredDate: timestamp("return_delivered_date", { mode: 'string' }),
+	disposalReason: text("disposal_reason"),
+	disposalDate: timestamp("disposal_date", { mode: 'string' }),
+	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
+	updatedAt: timestamp("updated_at", { mode: 'string' }),
+}, (table) => [
+	unique("transfers_transfer_code_unique").on(table.transferCode),
+	check("transfers_id_not_null", sql`NOT NULL id`),
+	check("transfers_transfer_code_not_null", sql`NOT NULL transfer_code`),
+	check("transfers_source_warehouse_id_not_null", sql`NOT NULL source_warehouse_id`),
+	check("transfers_destination_warehouse_id_not_null", sql`NOT NULL destination_warehouse_id`),
+	check("transfers_initiated_by_not_null", sql`NOT NULL initiated_by`),
+	check("transfers_status_not_null", sql`NOT NULL status`),
+	check("transfers_transfer_mode_not_null", sql`NOT NULL transfer_mode`),
+	check("transfers_created_at_not_null", sql`NOT NULL created_at`),
+]);
+
 export const session = pgTable("session", {
 	sid: varchar().primaryKey().notNull(),
 	sess: json().notNull(),
@@ -752,6 +753,9 @@ export const transferItems = pgTable("transfer_items", {
 	condition: text().default('good'),
 	notes: text(),
 	itemStatus: text("item_status"),
+	isDisposed: boolean("is_disposed").default(false),
+	disposalDate: timestamp("disposal_date", { mode: 'string' }),
+	disposalReason: text("disposal_reason"),
 }, (table) => [
 	check("transfer_items_id_not_null", sql`NOT NULL id`),
 	check("transfer_items_transfer_id_not_null", sql`NOT NULL transfer_id`),

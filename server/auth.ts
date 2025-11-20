@@ -209,6 +209,8 @@ export function setupAuth(app: Express) {
 app.post("/api/forgot-password", async (req, res, next) => {
   try {
     const { email } = req.body;
+    const userExist = storage.getUserByEmail(email);
+   
     
     console.log("=== FORGOT PASSWORD REQUEST ===");
     console.log("Request email:", email);
@@ -226,8 +228,8 @@ app.post("/api/forgot-password", async (req, res, next) => {
     if (!user) {
       console.log("❌ No user found with email:", email);
       // For security, don't reveal if email exists or not
-      return res.status(200).json({ 
-        message: "If an account with this email exists, you will receive a password reset link." 
+      return res.status(400).json({ 
+        message: "Email does not exist." 
       });
     }
 
