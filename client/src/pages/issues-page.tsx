@@ -1325,7 +1325,7 @@ export default function IssuesPage() {
                           <SelectItem value="admins">All Admins</SelectItem>
                           <SelectItem value="managers">All Managers</SelectItem>
                           <SelectItem value="specific">Specific Users</SelectItem>
-                          <SelectItem value="all">All Users (Admin Only)</SelectItem>
+                          {user?.role==='admin' &&   ( <SelectItem value="all">All Users</SelectItem>) }
                         </SelectContent>
                       </Select>
                       <FormMessage />

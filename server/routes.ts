@@ -102,6 +102,140 @@ const logAuditEvent = async (
     console.error('Failed to log audit event:', error);
   }
 };
+const FIELD_RESOLVERS: Record<
+  string,
+  (id: number) => Promise<string | number | null>
+> = {
+  managerId: async (id) => (await storage.getUser(id))?.name || null,
+
+  warehouseId: async (id) => (await storage.getWarehouse(id))?.name || null,
+  sourceWarehouseId: async (id) => (await storage.getWarehouse(id))?.name || null,
+  destinationWarehouseId: async (id) =>
+    (await storage.getWarehouse(id))?.name || null,
+
+  departmentId: async (id) => (await storage.getDepartment(id))?.name || null,
+
+  itemId: async (id) => (await storage.getItem(id))?.name || null,
+};
+async function resolveFieldValues(values: any) {
+  const resolved: any = {};
+
+  for (const key of Object.keys(values)) {
+    const val = values[key];
+
+    if (val === null || val === undefined) continue;
+
+    if (FIELD_RESOLVERS[key]) {
+      resolved[key] = await FIELD_RESOLVERS[key](val);
+    } else {
+      resolved[key] = val;
+    }
+  }
+
+  return resolved;
+}
+
+
+async function computeDiff(oldObj: any, newObj: any) {
+  const rawOld: any = {};
+  const rawNew: any = {};
+
+  for (const key of Object.keys(newObj)) {
+    if (key.toLowerCase().endsWith("by")) continue;
+
+    const oldVal = oldObj[key];
+    const newVal = newObj[key];
+
+    if (JSON.stringify(oldVal) === JSON.stringify(newVal)) continue;
+
+    if (oldVal === null || oldVal === undefined) {
+      rawNew[key] = newVal;
+      continue;
+    }
+
+    rawOld[key] = oldVal;
+    rawNew[key] = newVal;
+  }
+
+  const oldValues = await resolveFieldValues(rawOld || {});
+  const newValues = await resolveFieldValues(rawNew || {});
+
+  return { oldValues, newValues };
+}
+
+
+const USER_AUDIT_FIELDS = [
+  "username",
+  "name",
+  "email",
+  "role",
+  "isWarehouseOperator",
+  "isActive"
+];
+async function computeUserDiff(oldObj: any, newObj: any) {
+  const rawOld: any = {};
+  const rawNew: any = {};
+
+  for (const key of USER_AUDIT_FIELDS) {
+    const oldVal = oldObj[key];
+    const newVal = newObj[key];
+
+    if (JSON.stringify(oldVal) === JSON.stringify(newVal)) continue;
+
+    if (oldVal === null || oldVal === undefined) {
+      rawNew[key] = newVal;
+      continue;
+    }
+
+    rawOld[key] = oldVal;
+    rawNew[key] = newVal;
+  }
+
+  const oldValues = await resolveFieldValues(rawOld || {});
+  const newValues = await resolveFieldValues(rawNew || {});
+
+  return { oldValues, newValues };
+}
+
+
+const TRANSFER_REJECT_FIELDS = [
+  "status",
+  "rejectionReason",
+  "rejectedBy",
+  "rejectedDate"
+];
+
+async function computeTransferRejectDiff(oldObj: any, newObj: any) {
+  const rawOld: any = {};
+  const rawNew: any = {};
+
+  for (const key of TRANSFER_REJECT_FIELDS) {
+    if (key.toLowerCase().endsWith("by")) continue;
+
+    const oldVal = oldObj[key];
+    const newVal = newObj[key];
+
+    if (JSON.stringify(oldVal) === JSON.stringify(newVal)) continue;
+
+    if (oldVal === null || oldVal === undefined) {
+      rawNew[key] = newVal;
+      continue;
+    }
+
+    rawOld[key] = oldVal;
+    rawNew[key] = newVal;
+  }
+
+  const oldValues = await resolveFieldValues(rawOld || {});
+  const newValues = await resolveFieldValues(rawNew || {});
+
+  return { oldValues, newValues };
+}
+
+
+
+
+
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Setup authentication routes
@@ -343,6 +477,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     res.json(users);
   });
+  app.get("/api/usersName", async (req, res) => {
+    if (!req.user) {
+      return res.status(401).json({ message: "Not authenticated" });
+      }
+
+    const user = req.user;
+
+    if (user.role === "employee" && !user.isWarehouseOperator) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+
+    const users = await storage.getAllUsers();
+
+    // ✅ Return only id and name
+    const simplifiedUsers = users.map((u: any) => ({
+      id: u.id,
+      name: u.name,
+    }));
+
+    res.json(simplifiedUsers);
+  });
+
 
   // Get active users only (for dropdowns and selections)
   app.get("/api/users/active", async (req, res) => {
@@ -376,12 +532,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const user = await storage.createUser(req.body);
+
+      // 🔥 Filter only fields allowed in audit log
+      const filteredAuditValues: any = {};
+      for (const key of USER_AUDIT_FIELDS) {
+        filteredAuditValues[key] = user[key] ?? null;
+      }
+
+      // 🔥 Convert IDs → names (if any exist on creation)
+      const newValuesResolved = await resolveFieldValues(filteredAuditValues);
+
+      // Save audit log
       await storage.createAuditLog({
         userId: req.user!.id,
         action: "CREATED",
-        entityType: "User",
-        details: `Created User  ${user.name} `
+        entityType: "user",
+        entityId: user.id,
+        details: `User ${user.name} was created`,
+        oldValues: null,
+        newValues: JSON.stringify(newValuesResolved),
+        ipAddress: req.ip || req.connection.remoteAddress,
+        userAgent: req.get("User-Agent"),
       });
+
       res.status(201).json(user);
     } catch (error: any) {
       res.status(400).json({ message: error.message });
@@ -395,69 +568,77 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       console.log("User update request body:", JSON.stringify(req.body, null, 2));
 
-      // 1️⃣ Validate incoming data (partial schema)
+      // 1️⃣ Validate incoming data
       const userData = insertUserSchema.partial().parse(req.body);
 
-      // 2️⃣ Fetch existing user
+      // 2️⃣ Fetch existing
       const existingUser = await storage.getUser(userId);
       if (!existingUser) return res.status(404).json({ message: "User not found" });
 
-      // 3️⃣ Clean undefined/empty fields
-      const cleanUserData = Object.entries(userData).reduce((acc, [key, value]) => {
-        if (value !== undefined && value !== "") acc[key] = value;
+      // 3️⃣ Remove empty fields
+      const cleanUserData = Object.entries(userData).reduce((acc, [key, val]) => {
+        if (val !== undefined && val !== "") acc[key] = val;
         return acc;
       }, {} as any);
 
-      // 4️⃣ Handle uniqueness only if field actually changed
+      // 4️⃣ Username uniqueness check
       if (cleanUserData.username && cleanUserData.username !== existingUser.username) {
         const existingByUsername = await storage.getUserByUsername(cleanUserData.username);
-        if (existingByUsername) return res.status(400).json({ message: "Username already exists" });
+        if (existingByUsername)
+          return res.status(400).json({ message: "Username already exists" });
       }
 
+      // 5️⃣ Email uniqueness check
       if (cleanUserData.email && cleanUserData.email !== existingUser.email) {
         const allUsers = await storage.getAllUsers();
-        const existingByEmail = allUsers.find(u => u.email === cleanUserData.email && u.id !== userId);
-        if (existingByEmail) return res.status(400).json({ message: "Email already exists" });
+        const exists = allUsers.find(u => u.email === cleanUserData.email && u.id !== userId);
+        if (exists) return res.status(400).json({ message: "Email already exists" });
       }
 
-      // 5️⃣ Handle warehouse validation only if warehouseId is actually changing
+      // 6️⃣ Handle warehouse logic
       if (
         cleanUserData.warehouseId !== undefined &&
         cleanUserData.warehouseId !== existingUser.warehouseId
       ) {
         const allWarehouses = await storage.getAllWarehouses();
-        const managedWarehouses = allWarehouses.filter(w => w.managerId === userId);
+        const managed = allWarehouses.filter(w => w.managerId === userId);
 
-        for (const warehouse of managedWarehouses) {
-          // If the user manages any warehouse that isn't the new one, auto-unassign
-          if (warehouse.id !== cleanUserData.warehouseId) {
-            console.log(`Auto-unassigning ${warehouse.name} from user ${userId}`);
-            await storage.updateWarehouse(warehouse.id, { managerId: null });
+        for (const w of managed) {
+          if (w.id !== cleanUserData.warehouseId) {
+            console.log(`Auto-unassigning ${w.name} from user ${userId}`);
+            await storage.updateWarehouse(w.id, { managerId: null });
           }
         }
       }
 
-      // 6️⃣ Update the user (only changed fields)
+      // 7️⃣ Update the user
       const updatedUser = await storage.updateUser(userId, cleanUserData);
       if (!updatedUser) return res.status(404).json({ message: "User not found" });
 
-      // 7️⃣ Create audit log for meaningful changes only
-      const changedFields = Object.entries(cleanUserData)
-      .filter(([key, newValue]) => existingUser[key] !== newValue)
-      .map(([key]) => key);
-      if (changedFields.length > 0) {
-        await storage.createAuditLog({
-          userId: req.user!.id,
-          action: 'UPDATED',
-          entityType: 'user',
-          entityId: userId,
-          details: `User ${existingUser.username} updated (${changedFields.join(", ")})`,
-          oldValues: JSON.stringify(existingUser),
-          newValues: JSON.stringify(cleanUserData),
-          ipAddress: req.ip || req.connection.remoteAddress,
-          userAgent: req.get('User-Agent')
-        });
+      // 8️⃣ Compute basic diff
+      const { oldValues, newValues } = await computeUserDiff(existingUser, updatedUser);
+
+      // 9️⃣ If nothing meaningful changed → skip audit log
+      if (Object.keys(newValues).length === 0) {
+        return res.json(updatedUser);
       }
+
+      // 🔥 10️⃣ Convert IDs → names BEFORE saving audit log
+      const resolvedOld = await resolveFieldValues(oldValues);
+      const resolvedNew = await resolveFieldValues(newValues);
+
+      // 11️⃣ Save audit log
+      await storage.createAuditLog({
+        userId: req.user!.id,
+        action: "UPDATED",
+        entityType: "user",
+        entityId: userId,
+        details: `User ${existingUser.username} updated`,
+        oldValues: JSON.stringify(resolvedOld),
+        newValues: JSON.stringify(resolvedNew),
+        ipAddress: req.ip || req.connection.remoteAddress,
+        userAgent: req.get("User-Agent"),
+      });
 
       res.json(updatedUser);
 
@@ -466,6 +647,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(400).json({ message: error.message });
     }
   });
+
 
 
   // Delete user (admin only)
@@ -1212,6 +1394,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get all requests with user names included
   app.get("/api/requests", async (req, res) => {
     let requests;
+    console.log('new Date ribhu',new Date());
     
     // Regular users can only see their own requests
     if (req?.user?.role === "user") {
@@ -1324,290 +1507,556 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Create request (all authenticated users)
-  app.post("/api/requests", async (req, res) => {
-    if (!req.isAuthenticated()) {
-      return res.status(401).json({ message: "Unauthorized" });
-    }
+  // app.post("/api/requests", async (req, res) => {
+  //   if (!req.isAuthenticated()) {
+  //     return res.status(401).json({ message: "Unauthorized" });
+  //   }
     
-    try {
-      const requestCode = `RQX-${(await storage.getAllRequests() ).length + 873}`;
-      const requestData = insertRequestSchema.parse({
-        ...req.body,
-        userId: req.user!.id,
-        requestCode
-      });
+  //   try {
+  //     const requestCode = `RQX-${(await storage.getAllRequests() ).length + 873}`;
+  //     const requestData = insertRequestSchema.parse({
+  //       ...req.body,
+  //       userId: req.user!.id,
+  //       requestCode
+  //     });
       
-      // Create request
-      const request = await storage.createRequest(requestData);
+  //     // Create request
+  //     const request = await storage.createRequest(requestData);
       
-      // Optimized: Get inventory data once instead of per-item queries
-      const allInventory = await storage.getAllInventory();
-      const inventoryMap = new Map();
+  //     // Optimized: Get inventory data once instead of per-item queries
+  //     const allInventory = await storage.getAllInventory();
+  //     const inventoryMap = new Map();
       
-      // Create efficient lookup map: "itemId-warehouseId" -> inventory
-      for (const inv of allInventory) {
-        const key = `${inv.itemId}-${inv.warehouseId}`;
-        inventoryMap.set(key, inv);
-      }
+  //     // Create efficient lookup map: "itemId-warehouseId" -> inventory
+  //     for (const inv of allInventory) {
+  //       const key = `${inv.itemId}-${inv.warehouseId}`;
+  //       inventoryMap.set(key, inv);
+  //     }
       
-      // Check stock availability for each item in the requested warehouse
-      let needsTransfer = false;
-      const transferRequirements = [];
+  //     // Check stock availability for each item in the requested warehouse
+  //     let needsTransfer = false;
+  //     const transferRequirements = [];
       
-      // Optimized: Batch create request items and process stock checks
-      if (req.body.items && Array.isArray(req.body.items)) {
-        // Prepare batch data for request items
-        const requestItemsData = [];
+  //     // Optimized: Batch create request items and process stock checks
+  //     if (req.body.items && Array.isArray(req.body.items)) {
+  //       // Prepare batch data for request items
+  //       const requestItemsData = [];
         
-        for (const item of req.body.items) {
-          try {
-            const requestItemData = insertRequestItemSchema.parse({
-              ...item,
-              requestId: request.id
-            });
+  //       for (const item of req.body.items) {
+  //         try {
+  //           const requestItemData = insertRequestItemSchema.parse({
+  //             ...item,
+  //             requestId: request.id
+  //           });
             
-            requestItemsData.push(requestItemData);
+  //           requestItemsData.push(requestItemData);
             
-            // Check stock using pre-loaded inventory map
-            const stockKey = `${item.itemId}-${requestData.warehouseId}`;
-            const stockInWarehouse = inventoryMap.get(stockKey);
+  //           // Check stock using pre-loaded inventory map
+  //           const stockKey = `${item.itemId}-${requestData.warehouseId}`;
+  //           const stockInWarehouse = inventoryMap.get(stockKey);
             
-            if (!stockInWarehouse || stockInWarehouse.quantity < item.quantity) {
-              needsTransfer = true;
-              const shortfall = item.quantity - (stockInWarehouse?.quantity || 0);
-              transferRequirements.push({
-                itemId: item.itemId,
-                requiredQuantity: shortfall,
-                requestedQuantity: item.quantity,
-                availableQuantity: stockInWarehouse?.quantity || 0
-              });
-            }
-          } catch (error) {
-            console.error("Error preparing request item:", error);
-          }
-        }
+  //           if (!stockInWarehouse || stockInWarehouse.quantity < item.quantity) {
+  //             needsTransfer = true;
+  //             const shortfall = item.quantity - (stockInWarehouse?.quantity || 0);
+  //             transferRequirements.push({
+  //               itemId: item.itemId,
+  //               requiredQuantity: shortfall,
+  //               requestedQuantity: item.quantity,
+  //               availableQuantity: stockInWarehouse?.quantity || 0
+  //             });
+  //           }
+  //         } catch (error) {
+  //           console.error("Error preparing request item:", error);
+  //         }
+  //       }
         
-        // Create all request items at once
-        for (const itemData of requestItemsData) {
-          await storage.createRequestItem(itemData);
-        }
-      }
+  //       // Create all request items at once
+  //       for (const itemData of requestItemsData) {
+  //         await storage.createRequestItem(itemData);
+  //       }
+  //     }
       
-      // If transfer is needed, create transfer notifications and mark request
-      if (needsTransfer) {
-        await storage.updateRequest(request.id, { 
-          status: "pending-transfer",
-          notes: `${request.notes || ''}\n\nStock Transfer Required: Some items are not available in sufficient quantities in the requested warehouse.`
-        });
+  //     // If transfer is needed, create transfer notifications and mark request
+  //     if (needsTransfer) {
+  //       await storage.updateRequest(request.id, { 
+  //         status: "pending-transfer",
+  //         notes: `${request.notes || ''}\n\nStock Transfer Required: Some items are not available in sufficient quantities in the requested warehouse.`
+  //       });
 
-        // Get all warehouses for reference
-        const allWarehouses = await storage.getAllWarehouses();
-        const allInventory = await storage.getAllInventory();
+  //       // Get all warehouses for reference
+  //       const allWarehouses = await storage.getAllWarehouses();
+  //       const allInventory = await storage.getAllInventory();
 
-        // Create transfer notifications for each item that needs transfer
-        for (const requirement of transferRequirements) {
-          // Find warehouses that have the required item
-          const availableInventory = allInventory.filter(inv => 
-            inv.itemId === requirement.itemId && 
-            inv.warehouseId !== requestData.warehouseId && 
-            inv.quantity > 0
-          );
+  //       // Create transfer notifications for each item that needs transfer
+  //       for (const requirement of transferRequirements) {
+  //         // Find warehouses that have the required item
+  //         const availableInventory = allInventory.filter(inv => 
+  //           inv.itemId === requirement.itemId && 
+  //           inv.warehouseId !== requestData.warehouseId && 
+  //           inv.quantity > 0
+  //         );
 
-          // Create notification for each warehouse that has stock
-          for (const inv of availableInventory) {
-            try {
-              const sourceWarehouse = allWarehouses.find(w => w.id === inv.warehouseId);
-              const targetWarehouse = allWarehouses.find(w => w.id === requestData.warehouseId);
+  //         // Create notification for each warehouse that has stock
+  //         for (const inv of availableInventory) {
+  //           try {
+  //             const sourceWarehouse = allWarehouses.find(w => w.id === inv.warehouseId);
+  //             const targetWarehouse = allWarehouses.find(w => w.id === requestData.warehouseId);
               
-              await storage.createTransferNotification({
-                requestId: request.id,
-                warehouseId: inv.warehouseId,
-                itemId: requirement.itemId,
-                requiredQuantity: Math.min(requirement.requiredQuantity, inv.quantity),
-                availableQuantity: inv.quantity,
-                status: 'pending',
-                notifiedUserId: null, // Will be assigned when warehouse manager checks
-                transferId: null,
-                notes: `Transfer needed for request ${request.requestCode}. Item shortage in ${targetWarehouse?.name || 'requested warehouse'}. Available in ${sourceWarehouse?.name || 'source warehouse'}.`
-              });
-            } catch (error) {
-              console.error("Error creating transfer notification:", error);
-            }
-          }
-        }
+  //             await storage.createTransferNotification({
+  //               requestId: request.id,
+  //               warehouseId: inv.warehouseId,
+  //               itemId: requirement.itemId,
+  //               requiredQuantity: Math.min(requirement.requiredQuantity, inv.quantity),
+  //               availableQuantity: inv.quantity,
+  //               status: 'pending',
+  //               notifiedUserId: null, // Will be assigned when warehouse manager checks
+  //               transferId: null,
+  //               notes: `Transfer needed for request ${request.requestCode}. Item shortage in ${targetWarehouse?.name || 'requested warehouse'}. Available in ${sourceWarehouse?.name || 'source warehouse'}.`
+  //             });
+  //           } catch (error) {
+  //             console.error("Error creating transfer notification:", error);
+  //           }
+  //         }
+  //       }
+  //     }
+
+  //     // Create approval records based on user hierarchy and approval settings
+  //     try {
+  //       // For employees, get their manager for approval
+  //       if (req.user!.role === "employee") {
+  //         const manager = await storage.getUserManager(req.user!.id);
+  //         if (manager) {
+  //           await storage.createRequestApproval({
+  //             requestId: request.id,
+  //             approverId: manager.id,
+  //             approvalLevel: "manager",
+  //             status: "pending"
+  //           });
+  //         } else {
+  //           // If no manager, require admin approval
+  //           const admins = await storage.getAllUsers();
+  //           const adminUser = admins.find(u => u.role === "admin");
+  //           if (adminUser) {
+  //             await storage.createRequestApproval({
+  //               requestId: request.id,
+  //               approverId: adminUser.id,
+  //               approvalLevel: "admin",
+  //               status: "pending"
+  //             });
+  //           }
+  //         }
+  //       } else if (req.user!.role === "manager") {
+  //         // Managers need approval from their own manager
+  //         const manager = await storage.getUserManager(req.user!.id);
+  //         if (manager) {
+  //           await storage.createRequestApproval({
+  //             requestId: request.id,
+  //             approverId: manager.id,
+  //             approvalLevel: manager.role === "admin" ? "admin" : "manager",
+  //             status: "pending"
+  //           });
+  //         } else {
+  //           // If no manager assigned, require admin approval
+  //           const admins = await storage.getAllUsers();
+  //           const adminUser = admins.find(u => u.role === "admin");
+  //           if (adminUser) {
+  //             await storage.createRequestApproval({
+  //               requestId: request.id,
+  //               approverId: adminUser.id,
+  //               approvalLevel: "admin",
+  //               status: "pending"
+  //             });
+  //           }
+  //         }
+  //       }
+  //       // Admins can auto-approve their own requests (no approval record needed)
+  //     } catch (error) {
+  //       console.error("Error creating approval records:", error);
+  //     }
+      
+  //     res.status(201).json(request);
+  //   } catch (error: any) {
+  //     res.status(400).json({ message: error.message });
+  //   }
+  // });
+app.post("/api/requests", async (req, res) => {
+  if (!req.isAuthenticated()) {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+
+  try {
+    const user = req.user!;
+    const items = req.body.items || [];
+
+    // -----------------------------------------------------
+    // 1️⃣ Generate request code FIRST
+    // -----------------------------------------------------
+    const requestCode = `RQX-${(await storage.getAllRequests()).length + 873}`;
+
+    // -----------------------------------------------------
+    // 2️⃣ Validate request input
+    // -----------------------------------------------------
+    const baseRequestData = insertRequestSchema.parse({
+      ...req.body,
+      userId: user.id,
+      requestCode,
+    });
+
+    const warehouseId = baseRequestData.warehouseId;
+
+    // -----------------------------------------------------
+    // 3️⃣ Load inventory + validate stock
+    // -----------------------------------------------------
+    const allInventory = await storage.getAllInventory();
+    const inventoryMap = new Map();
+
+    for (const inv of allInventory) {
+      inventoryMap.set(`${inv.itemId}-${inv.warehouseId}`, inv);
+    }
+
+    for (const item of items) {
+      const inv = inventoryMap.get(`${item.itemId}-${warehouseId}`);
+      const available = inv?.quantity || 0;
+
+      if (available < item.quantity) {
+        return res.status(400).json({
+          message: `Not enough stock for item ${item.itemId}. Requested ${item.quantity}, Available ${available}.`,
+        });
+      }
+    }
+
+    // -----------------------------------------------------
+    // 4️⃣ Get warehouse manager → fallback to admin
+    // -----------------------------------------------------
+    let approvers: Array<{ id: number; level: "manager" | "admin" }> = [];
+
+    const warehouse = await storage.getWarehouse(warehouseId);
+
+    if (warehouse?.managerId) {
+      // Single warehouse manager
+      approvers.push({
+        id: warehouse.managerId,
+        level: "manager",
+      });
+    } else {
+      // Fallback → multiple admins
+      const users = await storage.getAllUsers();
+      const admins = users.filter((u) => u.role === "admin");
+
+      if (admins.length === 0) {
+        return res.status(400).json({
+          message: "No warehouse manager or admins found to approve the request.",
+        });
       }
 
-      // Create approval records based on user hierarchy and approval settings
-      try {
-        // For employees, get their manager for approval
-        if (req.user!.role === "employee") {
-          const manager = await storage.getUserManager(req.user!.id);
-          if (manager) {
-            await storage.createRequestApproval({
-              requestId: request.id,
-              approverId: manager.id,
-              approvalLevel: "manager",
-              status: "pending"
-            });
-          } else {
-            // If no manager, require admin approval
-            const admins = await storage.getAllUsers();
-            const adminUser = admins.find(u => u.role === "admin");
-            if (adminUser) {
-              await storage.createRequestApproval({
-                requestId: request.id,
-                approverId: adminUser.id,
-                approvalLevel: "admin",
-                status: "pending"
-              });
-            }
-          }
-        } else if (req.user!.role === "manager") {
-          // Managers need approval from their own manager
-          const manager = await storage.getUserManager(req.user!.id);
-          if (manager) {
-            await storage.createRequestApproval({
-              requestId: request.id,
-              approverId: manager.id,
-              approvalLevel: manager.role === "admin" ? "admin" : "manager",
-              status: "pending"
-            });
-          } else {
-            // If no manager assigned, require admin approval
-            const admins = await storage.getAllUsers();
-            const adminUser = admins.find(u => u.role === "admin");
-            if (adminUser) {
-              await storage.createRequestApproval({
-                requestId: request.id,
-                approverId: adminUser.id,
-                approvalLevel: "admin",
-                status: "pending"
-              });
-            }
-          }
-        }
-        // Admins can auto-approve their own requests (no approval record needed)
-      } catch (error) {
-        console.error("Error creating approval records:", error);
-      }
-      
-      res.status(201).json(request);
-    } catch (error: any) {
-      res.status(400).json({ message: error.message });
+      approvers = admins.map((a) => ({
+        id: a.id,
+        level: "admin"
+      }));
     }
-  });
+
+    // -----------------------------------------------------
+    // 5️⃣ TRANSACTION BLOCK
+    // -----------------------------------------------------
+    const result = await db.transaction(async (tx) => {
+
+      // 5.1 Create request
+      const createdRequest = await storage.createRequestTx(tx, {
+        ...baseRequestData,
+        requestCode,
+      });
+
+      // 5.2 Create request items
+      for (const item of items) {
+        await storage.createRequestItemTx(tx, {
+          requestId: createdRequest.id,
+          itemId: item.itemId,
+          quantity: item.quantity,
+        });
+      }
+
+      // 5.3 Create approvals (MULTIPLE)
+      for (const approver of approvers) {
+        await storage.createRequestApprovalTx(tx, {
+          requestId: createdRequest.id,
+          approverId: approver.id,
+          approvalLevel: approver.level,
+          status: "pending",
+        });
+      }
+
+      return createdRequest;
+    });
+
+    // -----------------------------------------------------
+    // 6️⃣ Respond
+    // -----------------------------------------------------
+    res.status(201).json(result);
+
+  } catch (error: any) {
+    console.error("💥 Request creation error:", error);
+    return res.status(400).json({ message: error.message });
+  }
+});
+
+
+
+
 
   // Update request status (manager+)
+  // app.put("/api/requests/:id/status", checkRole("manager"), async (req, res) => {
+  //   const requestId = parseInt(req.params.id, 10);
+    
+  //   try {
+  //     const { status } = z.object({
+  //       status: z.string().refine(
+  //         s => ['pending', 'approved', 'rejected', 'completed'].includes(s),
+  //         { message: "Invalid status" }
+  //       )
+  //     }).parse(req.body);
+      
+  //     // Get request
+  //     const request = await storage.getRequest(requestId);
+  //     if (!request) {
+  //       return res.status(404).json({ message: "Request not found" });
+  //     }
+      
+  //     // If approving or completing a request, handle the inventory changes
+  //     if ((status === "approved" || status === "completed") && request.status === "pending") {
+  //       // Get all items in the request
+  //       const requestItems = await storage.getRequestItemsByRequest(requestId);
+        
+  //       // Check if items are available in the warehouse
+  //       for (const requestItem of requestItems) {
+  //         const inventory = await storage.getInventoryByItemAndWarehouse(
+  //           requestItem.itemId,
+  //           request.warehouseId
+  //         );
+          
+  //         // If item is not in the requested warehouse, check if it's available in other warehouses
+  //         if (!inventory || inventory.quantity < requestItem.quantity) {
+  //           let foundInOtherWarehouse = false;
+            
+  //           // Check other warehouses
+  //           const allWarehouses = await storage.getAllWarehouses();
+            
+  //           for (const warehouse of allWarehouses) {
+  //             if (warehouse.id === request.warehouseId) continue;
+              
+  //             const otherInventory = await storage.getInventoryByItemAndWarehouse(
+  //               requestItem.itemId,
+  //               warehouse.id
+  //             );
+              
+  //             if (otherInventory && otherInventory.quantity >= requestItem.quantity) {
+  //               // Create a transfer transaction
+  //               const trxCode = `TRX-${(await storage.getAllTransactions()).length + 873}`;
+  //               await storage.createTransaction({
+  //                 itemId: requestItem.itemId,
+  //                 quantity: requestItem.quantity,
+  //                 transactionCode: trxCode,
+  //                 transactionType: "transfer",
+  //                 userId: req.user!.id,
+  //                 sourceWarehouseId: warehouse.id,
+  //                 destinationWarehouseId: request.warehouseId,
+  //                 requestId: request.id,
+  //                 requesterId: req.user!.id,
+  //                 status: "in-transit"
+  //               });
+                
+  //               // Update source warehouse inventory by subtracting the transferred quantity
+  //               await storage.safeSubtractInventory(
+  //                 requestItem.itemId,
+  //                 warehouse.id,
+  //                 requestItem.quantity
+  //               );
+                
+  //               foundInOtherWarehouse = true;
+  //               break;
+  //             }
+  //           }
+            
+  //           if (!foundInOtherWarehouse) {
+  //             return res.status(400).json({ 
+  //               message: `Not enough quantity of item ID ${requestItem.itemId} available in any warehouse` 
+  //             });
+  //           }
+  //         } else {
+  //           // Item is available in the requested warehouse, create an issue transaction
+  //           const issueCode = `TRX-${(await storage.getAllTransactions()).length + 873}`;
+  //           await storage.createTransaction({
+  //             itemId: requestItem.itemId,
+  //             quantity: requestItem.quantity,
+  //             transactionCode: issueCode,
+  //             transactionType: "issue",
+  //             userId: req.user!.id,
+  //             sourceWarehouseId: request.warehouseId,
+  //             requestId: request.id,
+  //             requesterId: req.user!.id,
+  //             status: "completed"
+  //           });
+            
+  //           // Update inventory by subtracting the issued quantity
+  //           await storage.safeSubtractInventory(
+  //             requestItem.itemId,
+  //             request.warehouseId,
+  //             requestItem.quantity
+  //           );
+  //         }
+  //       }
+  //     }
+      
+  //     // Update request status
+  //     const updatedRequest = await storage.updateRequest(requestId, { status });
+      
+  //     res.json(updatedRequest);
+  //   } catch (error: any) {
+  //     res.status(400).json({ message: error.message });
+  //   }
+  // });
   app.put("/api/requests/:id/status", checkRole("manager"), async (req, res) => {
     const requestId = parseInt(req.params.id, 10);
-    
+
     try {
       const { status } = z.object({
-        status: z.string().refine(
-          s => ['pending', 'approved', 'rejected', 'completed'].includes(s),
-          { message: "Invalid status" }
-        )
+        status: z.enum(["approved", "rejected", "completed"])
       }).parse(req.body);
-      
-      // Get request
+
       const request = await storage.getRequest(requestId);
       if (!request) {
         return res.status(404).json({ message: "Request not found" });
       }
-      
-      // If approving or completing a request, handle the inventory changes
-      if ((status === "approved" || status === "completed") && request.status === "pending") {
-        // Get all items in the request
-        const requestItems = await storage.getRequestItemsByRequest(requestId);
-        
-        // Check if items are available in the warehouse
-        for (const requestItem of requestItems) {
-          const inventory = await storage.getInventoryByItemAndWarehouse(
-            requestItem.itemId,
-            request.warehouseId
-          );
-          
-          // If item is not in the requested warehouse, check if it's available in other warehouses
-          if (!inventory || inventory.quantity < requestItem.quantity) {
-            let foundInOtherWarehouse = false;
-            
-            // Check other warehouses
-            const allWarehouses = await storage.getAllWarehouses();
-            
-            for (const warehouse of allWarehouses) {
-              if (warehouse.id === request.warehouseId) continue;
-              
-              const otherInventory = await storage.getInventoryByItemAndWarehouse(
-                requestItem.itemId,
-                warehouse.id
+
+      // -----------------------------------------------------
+      // APPROVE
+      // -----------------------------------------------------
+      if (status === "approved") {
+        if (request.status !== "pending") {
+          return res.status(400).json({
+            message: "Only pending requests can be approved"
+          });
+        }
+
+        const result = await db.transaction(async (tx) => {
+          // get all approval records
+          const approvals = await storage.getRequestApprovalsByRequestTx(tx, requestId);
+
+          // update all approval entries
+          for (const ap of approvals) {
+            await storage.updateRequestApprovalTx(tx, ap.id, {
+              status: "approved",
+              approvedAt: new Date(),
+            });
+          }
+
+          // update the request status
+          return await storage.updateRequestTx(tx, requestId, { status: "approved" });
+        });
+
+        return res.json(result);
+      }
+
+      // -----------------------------------------------------
+      // REJECT
+      // -----------------------------------------------------
+      if (status === "rejected") {
+        if (request.status !== "pending") {
+          return res.status(400).json({
+            message: "Only pending requests can be rejected"
+          });
+        }
+
+        const result = await db.transaction(async (tx) => {
+          const approvals = await storage.getRequestApprovalsByRequestTx(tx, requestId);
+
+          // update all approvals to rejected
+          for (const ap of approvals) {
+            await storage.updateRequestApprovalTx(tx, ap.id, {
+              status: "rejected",
+              approvedAt: new Date(),
+            });
+          }
+
+          // update the request
+          return await storage.updateRequestTx(tx, requestId, { status: "rejected" });
+        });
+
+        return res.json(result);
+      }
+
+      // -----------------------------------------------------
+      // COMPLETED (checkout execution)
+      // -----------------------------------------------------
+      if (status === "completed") {
+        if (request.status !== "approved") {
+          return res.status(400).json({
+            message: "Only approved requests can be completed"
+          });
+        }
+
+        const result = await db.transaction(async (tx) => {
+          const requestItems = await storage.getRequestItemsByRequestTx(tx, requestId);
+          const warehouseId = request.warehouseId;
+
+          for (const item of requestItems) {
+            const inv = await storage.getInventoryByItemAndWarehouseTx(
+              tx,
+              item.itemId,
+              warehouseId
+            );
+
+            if (!inv || inv.quantity < item.quantity) {
+              throw new Error(
+                `Not enough stock for item ${item.itemId} to complete the request`
               );
-              
-              if (otherInventory && otherInventory.quantity >= requestItem.quantity) {
-                // Create a transfer transaction
-                const trxCode = `TRX-${(await storage.getAllTransactions()).length + 873}`;
-                await storage.createTransaction({
-                  itemId: requestItem.itemId,
-                  quantity: requestItem.quantity,
-                  transactionCode: trxCode,
-                  transactionType: "transfer",
-                  userId: req.user!.id,
-                  sourceWarehouseId: warehouse.id,
-                  destinationWarehouseId: request.warehouseId,
-                  requestId: request.id,
-                  requesterId: req.user!.id,
-                  status: "in-transit"
-                });
-                
-                // Update source warehouse inventory by subtracting the transferred quantity
-                await storage.safeSubtractInventory(
-                  requestItem.itemId,
-                  warehouse.id,
-                  requestItem.quantity
-                );
-                
-                foundInOtherWarehouse = true;
-                break;
+            }
+
+            const sub = await storage.safeSubtractInventoryTx(
+              tx,
+              item.itemId,
+              warehouseId,
+              item.quantity
+            );
+
+            if (!sub.success) {
+              if (sub.reason === "insufficient_stock") {
+                throw new Error(`Not enough stock for item ${item.itemId}`);
+              }
+              if (sub.reason === "inventory_missing") {
+                throw new Error(`Inventory record missing for item ${item.itemId}`);
               }
             }
-            
-            if (!foundInOtherWarehouse) {
-              return res.status(400).json({ 
-                message: `Not enough quantity of item ID ${requestItem.itemId} available in any warehouse` 
-              });
-            }
-          } else {
-            // Item is available in the requested warehouse, create an issue transaction
-            const issueCode = `TRX-${(await storage.getAllTransactions()).length + 873}`;
-            await storage.createTransaction({
-              itemId: requestItem.itemId,
-              quantity: requestItem.quantity,
-              transactionCode: issueCode,
+
+            // issue transaction
+            await storage.createTransactionTx(tx, {
+              transactionCode: `ISS-${Date.now()}`,
               transactionType: "issue",
+              itemId: item.itemId,
+              quantity: item.quantity,
+              sourceWarehouseId: warehouseId,
               userId: req.user!.id,
-              sourceWarehouseId: request.warehouseId,
               requestId: request.id,
-              requesterId: req.user!.id,
-              status: "completed"
+              requesterId: request.userId,
+              status: "completed",
             });
-            
-            // Update inventory by subtracting the issued quantity
-            await storage.safeSubtractInventory(
-              requestItem.itemId,
-              request.warehouseId,
-              requestItem.quantity
-            );
           }
-        }
+
+          // finally mark the request complete
+          return await storage.updateRequestTx(tx, requestId, {
+            status: "completed"
+          });
+        });
+
+        return res.json(result);
       }
-      
-      // Update request status
-      const updatedRequest = await storage.updateRequest(requestId, { status });
-      
-      res.json(updatedRequest);
+
     } catch (error: any) {
-      res.status(400).json({ message: error.message });
+      return res.status(400).json({ message: error.message });
     }
   });
+
+
+
 
   // ==== Report Routes ====
   // Get inventory stock report
@@ -1732,6 +2181,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const allItems = await storage.getAllItems();
       const allInventory = await storage.getAllInventory();
       const allTransactions = await storage.getAllTransactions();
+      const allTransfers = await storage.getAllTransfers();
       const allRequests = await storage.getAllRequests();
       
       // Current metrics
@@ -1748,9 +2198,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       
       const pendingRequests = allRequests.filter(req => req.status === 'pending');
-      const activeTransfers = allTransactions.filter(t => 
-        t.transactionType === 'transfer' && t.status === 'in-transit'
-      );
+      // const activeTransfers = allTransactions.filter(t => 
+      //   t.transactionType === 'transfer' && t.status === 'in-transit'
+      // );
+
+      const activeTransfers = allTransfers.filter(t =>
+        t.status === 'pending' || t.status==='in-transit' || t.status=== 'return-requested' || t.status === 'return-approved' || t.status === 'return_shipped' || t.status==='partial-return-requested'
+      )
       
       // Calculate historical data for comparisons
       const lastMonthItems = allItems.filter(item => 
@@ -1893,6 +2347,105 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Approve or reject approval request
+  // app.patch("/api/approvals/:id/:action", async (req: Request, res: Response) => {
+  //   try {
+  //     const { id, action } = req.params;
+  //     const { notes } = req.body;
+
+  //     if (!req.user) {
+  //       return res.status(401).json({ message: "Not authenticated" });
+  //     }
+
+  //     if (!['approve', 'reject'].includes(action)) {
+  //       return res.status(400).json({ message: "Invalid action. Must be 'approve' or 'reject'" });
+  //     }
+
+  //     const approvalId = parseInt(id, 10);
+  //     if (isNaN(approvalId)) {
+  //       return res.status(400).json({ message: "Invalid approval ID" });
+  //     }
+
+  //     // Get the approval record
+  //     const approval = await storage.getRequestApproval(approvalId);
+  //     if (!approval) {
+  //       return res.status(404).json({ message: "Approval not found" });
+  //     }
+
+  //     // Check if user has permission to approve this request
+  //     if (approval.approverId !== req.user.id) {
+  //       return res.status(403).json({ message: "Not authorized to approve this request" });
+  //     }
+
+  //     // Check if already processed
+  //     if (approval.status !== 'pending') {
+  //       return res.status(400).json({ message: "Approval already processed" });
+  //     }
+
+  //     // Update approval record
+  //     const updatedApproval = await storage.updateRequestApproval(approvalId, {
+  //       status: action === 'approve' ? 'approved' : 'rejected',
+  //       approvedAt: new Date(),
+  //       comments: notes || null
+  //     });
+
+  //     // Update request status based on approval
+  //     const request = await storage.getRequest(approval.requestId);
+  //     if (request && action === 'approve') {
+  //       // Update request to approved status
+  //       await storage.updateRequest(approval.requestId, { status: 'approved' });
+        
+  //       // Process inventory deduction for approved checkout request
+  //       if (request.status !== 'completed') {
+  //         const requestItems = await storage.getRequestItemsByRequest(approval.requestId);
+          
+  //         // Create issue transactions and update inventory for each item
+  //         for (const requestItem of requestItems) {
+  //           // Create issue transaction record
+  //           const transactionCode = `ISS-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  //           await storage.createTransaction({
+  //             transactionCode,
+  //             transactionType: 'issue',
+  //             itemId: requestItem.itemId,
+  //             quantity: requestItem.quantity,
+  //             sourceWarehouseId: request.warehouseId,
+  //             destinationWarehouseId: null,
+  //             userId: req.user.id,
+  //             status: 'completed',
+  //             completedAt: new Date(),
+  //             rate: null,
+  //             totalValue: null,
+  //             supplierName: null,
+  //             supplierContact: null,
+  //             purchaseOrderNumber: null,
+  //             deliveryChallanNumber: null
+  //           });
+            
+  //           // Update inventory - reduce quantity
+  //           const currentInventory = await storage.getInventoryByItemAndWarehouse(
+  //             requestItem.itemId, 
+  //             request.warehouseId
+  //           );
+            
+  //           if (currentInventory) {
+  //             const newQuantity = Math.max(0, currentInventory.quantity - requestItem.quantity);
+  //             await storage.updateInventory(currentInventory.id, { quantity: newQuantity });
+  //           }
+  //         }
+          
+  //         // Mark request as completed after inventory updates
+  //         await storage.updateRequest(approval.requestId, { status: 'completed' });
+  //       }
+  //     } else if (request && action === 'reject') {
+  //       await storage.updateRequest(approval.requestId, { status: 'rejected' });
+  //     }
+
+  //     res.json(updatedApproval);
+  //   } catch (error: any) {
+  //     console.error("Error processing approval:", error);
+  //     res.status(500).json({ message: "Failed to process approval" });
+  //   }
+  // });
+  // Approve or reject approval request
   app.patch("/api/approvals/:id/:action", async (req: Request, res: Response) => {
     try {
       const { id, action } = req.params;
@@ -1902,7 +2455,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Not authenticated" });
       }
 
-      if (!['approve', 'reject'].includes(action)) {
+      if (!["approve", "reject"].includes(action)) {
         return res.status(400).json({ message: "Invalid action. Must be 'approve' or 'reject'" });
       }
 
@@ -1911,86 +2464,72 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid approval ID" });
       }
 
-      // Get the approval record
+      // Fetch the approval record
       const approval = await storage.getRequestApproval(approvalId);
       if (!approval) {
         return res.status(404).json({ message: "Approval not found" });
       }
 
-      // Check if user has permission to approve this request
+      // Check permission
       if (approval.approverId !== req.user.id) {
-        return res.status(403).json({ message: "Not authorized to approve this request" });
+        return res.status(403).json({
+          message: "You are not authorized to approve or reject this request"
+        });
       }
 
-      // Check if already processed
-      if (approval.status !== 'pending') {
-        return res.status(400).json({ message: "Approval already processed" });
+      // Cannot approve again
+      if (approval.status !== "pending") {
+        return res.status(400).json({
+          message: "This approval request is already processed"
+        });
       }
 
-      // Update approval record
-      const updatedApproval = await storage.updateRequestApproval(approvalId, {
-        status: action === 'approve' ? 'approved' : 'rejected',
-        approvedAt: new Date(),
-        comments: notes || null
+      // Begin transaction
+      const result = await db.transaction(async (tx) => {
+        // Fetch the request
+        const request = await storage.getRequestTx(tx, approval.requestId);
+        if (!request) throw new Error("Request not found");
+
+        // Fetch all approval records for this request
+        const allApprovals = await storage.getRequestApprovalsByRequestTx(tx, request.id);
+
+        // Determine new status
+        const newStatus = action === "approve" ? "approved" : "rejected";
+
+        // 1️⃣ Update this specific approval
+        const updatedApproval = await storage.updateRequestApprovalTx(tx, approvalId, {
+          status: newStatus,
+          comments: notes || null,
+          approvedAt: new Date(),
+        });
+
+        // 2️⃣ Update ALL approval records to the same status
+        for (const ap of allApprovals) {
+          if (ap.id !== approvalId) {
+            await storage.updateRequestApprovalTx(tx, ap.id, {
+              status: newStatus,
+              approvedAt: new Date(),
+            });
+          }
+        }
+
+        // 3️⃣ Update request status
+        await storage.updateRequestTx(tx, request.id, {
+          status: newStatus,
+        });
+
+        return updatedApproval;
       });
 
-      // Update request status based on approval
-      const request = await storage.getRequest(approval.requestId);
-      if (request && action === 'approve') {
-        // Update request to approved status
-        await storage.updateRequest(approval.requestId, { status: 'approved' });
-        
-        // Process inventory deduction for approved checkout request
-        if (request.status !== 'completed') {
-          const requestItems = await storage.getRequestItemsByRequest(approval.requestId);
-          
-          // Create issue transactions and update inventory for each item
-          for (const requestItem of requestItems) {
-            // Create issue transaction record
-            const transactionCode = `ISS-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-            await storage.createTransaction({
-              transactionCode,
-              transactionType: 'issue',
-              itemId: requestItem.itemId,
-              quantity: requestItem.quantity,
-              sourceWarehouseId: request.warehouseId,
-              destinationWarehouseId: null,
-              userId: req.user.id,
-              status: 'completed',
-              completedAt: new Date(),
-              rate: null,
-              totalValue: null,
-              supplierName: null,
-              supplierContact: null,
-              purchaseOrderNumber: null,
-              deliveryChallanNumber: null
-            });
-            
-            // Update inventory - reduce quantity
-            const currentInventory = await storage.getInventoryByItemAndWarehouse(
-              requestItem.itemId, 
-              request.warehouseId
-            );
-            
-            if (currentInventory) {
-              const newQuantity = Math.max(0, currentInventory.quantity - requestItem.quantity);
-              await storage.updateInventory(currentInventory.id, { quantity: newQuantity });
-            }
-          }
-          
-          // Mark request as completed after inventory updates
-          await storage.updateRequest(approval.requestId, { status: 'completed' });
-        }
-      } else if (request && action === 'reject') {
-        await storage.updateRequest(approval.requestId, { status: 'rejected' });
-      }
+      return res.json(result);
 
-      res.json(updatedApproval);
     } catch (error: any) {
-      console.error("Error processing approval:", error);
-      res.status(500).json({ message: "Failed to process approval" });
+      console.error("Approval error:", error);
+      return res.status(500).json({ message: error.message || "Failed to process approval" });
     }
   });
+
+
 
   // Export transactions to CSV
   app.get("/api/export/transactions", async (req, res) => {
@@ -2916,12 +3455,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         // 2️⃣ Fetch transfer info inside tx
         const transfer = await storage.getTransferTx(tx, rg.transferId);
+        console.log('transfer',transfer)
         if (!transfer) throw new Error("Transfer not found");
 
-        const sourceWarehouse = await storage.getWarehouseTx(tx, transfer.sourceWarehouseId);
+        const rows = await storage.getWarehouseTx(tx, transfer.sourceWarehouseId);
+        const sourceWarehouse = rows[0];
+        console.log('sourceWarehouse',sourceWarehouse);
 
         // 3️⃣ Permission check
         if (user.role !== "admin" && sourceWarehouse?.managerId !== user.id) {
+          console.log('managerId',sourceWarehouse?.managerId)
+          console.log('userId',user.id);
           throw new Error("You don't have permission to change rejected goods status");
         }
 
@@ -2953,21 +3497,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
 
           // 4.2 — Create transaction
-          await storage.createTransactionTx(tx, {
-            itemId: rg.itemId,
-            quantity: rg.quantity,
-            transactionType: "check-in",
-            sourceWarehouseId: transfer.sourceWarehouseId,
-            destinationWarehouseId: transfer.destinationWarehouseId,
-            userId: user.id,
-            status: "completed",
-            checkInDate: new Date(),
-          });
+          // await storage.createTransactionTx(tx, {
+          //   itemId: rg.itemId,
+          //   quantity: rg.quantity,
+          //   transactionType: "check-in",
+          //   sourceWarehouseId: transfer.sourceWarehouseId,
+          //   destinationWarehouseId: transfer.destinationWarehouseId,
+          //   userId: user.id,
+          //   status: "completed",
+          //   checkInDate: new Date(),
+          // });
+          
 
           // 4.3 — Update transfer item
           await storage.updateTransferItemTx(tx, transferItem.id, {
             itemStatus: "restocked"
           });
+      
+
+          console.table([
+            {
+              transferId: rg.transferId,
+              itemId: transferItem.id,
+              newStatus: 'restocked'
+            }
+          ]);
+          const updatedTransaction = await storage.updateTransactionByTransferAndItemIdTx(tx,rg.transferId,transferItem.itemId,{status:'restocked',completedAt: new Date(),checkInDate: new Date()});
+              console.log('updateTransactionByTransferAndItemIdTx', updatedTransaction);
         }
 
         // ------------------------------------------
@@ -2975,16 +3531,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // ------------------------------------------
         if (status === "dispose") {
 
-          await storage.createTransactionTx(tx, {
-            itemId: rg.itemId,
-            quantity: rg.quantity,
-            transactionType: "disposal",
-            sourceWarehouseId: transfer.sourceWarehouseId,
-            destinationWarehouseId: transfer.destinationWarehouseId,
-            userId: user.id,
-            status: "completed",
-            checkInDate: new Date(),
-          });
+          // await storage.createTransactionTx(tx, {
+          //   itemId: rg.itemId,
+          //   quantity: rg.quantity,
+          //   transactionType: "disposal",
+          //   sourceWarehouseId: transfer.sourceWarehouseId,
+          //   destinationWarehouseId: transfer.destinationWarehouseId,
+          //   userId: user.id,
+          //   status: "completed",
+          //   checkInDate: new Date(),
+          // });
+          const updatedTransaction = await storage.updateTransactionByTransferAndItemIdTx(tx,rg.transferId,transferItem.itemId,{status:'disposed',completedAt : new Date(), checkInDate: new Date()});
+          console.log('updateTransactionByTransferAndItemIdTx',updatedTransaction);
+
+          console.table([
+            {
+              transferId: rg.transferId,
+              itemId: transferItem.id,
+              newStatus: 'restocked'
+            }
+          ]);
 
           await storage.updateTransferItemTx(tx, transferItem.id, {
             itemStatus: "dispose",
@@ -3072,139 +3638,119 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
 // Record return shipment details (Destination warehouse manager)
-app.post(
-  "/api/transfers/:transferId/return-shipment",
-  async (req: Request, res: Response) => {
-    console.log(
-      `🚚 POST /api/transfers/${req.params.transferId}/return-shipment hit`
-    );
+  app.post("/api/transfers/:transferId/return-shipment", async (req: Request, res: Response) => {
+    console.log(`🚚 POST /api/transfers/${req.params.transferId}/return-shipment hit`);
     console.log("Request body:", req.body);
 
     try {
       if (!req.isAuthenticated()) {
         return res.status(401).json({ message: "Unauthorized" });
       }
-      const transferId = parseInt(req.params.transferId);
-      const { returnCourierName, returnTrackingNumber, returnShippedDate } =
-        req.body;
 
-      if (!returnCourierName || returnCourierName.trim() === "") {
-        console.warn("Validation failed: Courier name is required");
+      const transferId = parseInt(req.params.transferId);
+      const { returnCourierName, returnTrackingNumber, returnShippedDate } = req.body;
+
+      // Validation
+      if (!returnCourierName?.trim()) {
         return res.status(400).json({ message: "Courier name is required" });
       }
-
-      if (!returnTrackingNumber || returnTrackingNumber.trim() === "") {
-        console.warn("Validation failed: Tracking number is required");
+      if (!returnTrackingNumber?.trim()) {
         return res.status(400).json({ message: "Tracking number is required" });
       }
       if (!returnShippedDate) {
-        console.warn("Validation failed: Return Shipped Date is required");
-        return res
-          .status(400)
-          .json({ message: "Return Shipped Date is required" });
+        return res.status(400).json({ message: "Return Shipped Date is required" });
       }
+
       const ReturnShippedDate = new Date(returnShippedDate);
-      console.log(`Parsed ReturnShippedDate: ${ReturnShippedDate}`);
 
       const user = req.user;
-      console.log(
-        `User performing action: ID=${user?.id}, Role=${user?.role}, WarehouseID=${user?.warehouseId}`
-      );
-
-      // Verify user has permission to update this transfer
-      console.log(`Fetching transfer ${transferId} for permission check...`);
       const transfer = await storage.getTransfer(transferId);
-      if (!transfer) {
-        console.warn(`Transfer ${transferId} not found`);
-        return res.status(404).json({ message: "Transfer not found" });
-      }
-      console.log(
-        `Transfer found. Destination Warehouse ID: ${transfer.destinationWarehouseId}`
-      );
+      if (!transfer) return res.status(404).json({ message: "Transfer not found" });
 
-      // Check if user is destination warehouse manager or admin
-      const destinationWarehouse = await storage.getWarehouse(
-        transfer.destinationWarehouseId
-      );
+      // Permission check
       if (
         user.role !== "admin" &&
-        (user.role !== "manager" ||
-          user.warehouseId !== transfer.destinationWarehouseId)
+        (user.role !== "manager" || user.warehouseId !== transfer.destinationWarehouseId)
       ) {
-        console.error(
-          `Permission denied for user ${user.id}. Not admin or destination manager.`
-        );
         return res.status(403).json({
           message: "Only destination warehouse manager can record return shipment",
         });
       }
-      console.log(`User ${user.id} permission granted.`);
-      const id = user?.id;
 
-      console.log(`Calling storage.recordReturnShipment for transfer ${transferId}...`);
+      // Update transfer
       const updatedTransfer = await storage.updateTransfer(transferId, {
         returnCourierName,
         returnTrackingNumber,
-        returnShippedDate:ReturnShippedDate,
-        status:'return_shipped'
+        returnShippedDate: ReturnShippedDate,
+        status: "return_shipped",
       });
 
       if (!updatedTransfer) {
-        console.warn(`Failed to update transfer ${transferId} after storage call.`);
         return res.status(404).json({ message: "Transfer not found" });
       }
-      console.log(
-        `Transfer ${transferId} updated successfully. New status: ${updatedTransfer.status}`
-      );
 
-      if (updatedTransfer) {
-        console.log(`Creating transfer update log...`);
-        await storage.createTransferUpdate({
-          transferId,
-          updatedBy: req.user!.id,
-          status: updatedTransfer.status,
-          updateType: req.body.updateType || "return_shipment_recorded",
-          description:
-            req.body.updateDescription ||
-            `Return shipment recorded: ${returnCourierName} (${returnTrackingNumber})`,
-          metadata: req.body.metadata
-            ? JSON.stringify(req.body.metadata)
-            : undefined,
-        });
-        console.log(`Transfer update log created.`);
+      // Transfer update log
+      await storage.createTransferUpdate({
+        transferId,
+        updatedBy: req.user!.id,
+        status: updatedTransfer.status,
+        updateType: req.body.updateType || "return_shipment_recorded",
+        description:
+          req.body.updateDescription ||
+          `Return shipment recorded: ${returnCourierName} (${returnTrackingNumber})`,
+        metadata: req.body.metadata ? JSON.stringify(req.body.metadata) : undefined,
+      });
 
-        // Create audit log for transfer update
-        console.log(`Creating audit log...`);
-        await storage.createAuditLog({
-          userId: req.user!.id,
-          action: "UPDATED",
-          entityType: "transfer",
-          entityId: transferId,
-          details: `Transfer ${transfer.transferCode} return shipment recorded`,
-          oldValues: JSON.stringify({
-            status: transfer.status,
-            returnCourierName: transfer.returnCourierName,
-            returnTrackingNumber: transfer.returnTrackingNumber,
-            returnShippedDate: transfer.returnShippedDate,
-          }),
-          newValues: JSON.stringify(updatedTransfer),
-          ipAddress: req.ip || req.connection.remoteAddress,
-          userAgent: req.get("User-Agent"),
-        });
-        console.log(`Audit log created.`);
+      // 🔥 Compute diff (only selected fields)
+      const oldValues: any = {};
+      const newValues: any = {};
+
+      const fields = [
+        "status",
+        "returnCourierName",
+        "returnTrackingNumber",
+        "returnShippedDate",
+      ];
+
+      for (const field of fields) {
+        const oldVal = transfer[field];
+        const newVal = updatedTransfer[field];
+
+        const formattedOld =
+          field === "returnShippedDate" && oldVal ? new Date(oldVal).toISOString() : oldVal;
+        const formattedNew =
+          field === "returnShippedDate" && newVal ? new Date(newVal).toISOString() : newVal;
+
+        if (formattedOld !== formattedNew) {
+          oldValues[field] = formattedOld ?? undefined;
+          newValues[field] = formattedNew ?? undefined;
+        }
       }
 
-      console.log(`🎉 Successfully recorded return shipment for transfer ${transferId}.`);
+      // 🔥 Convert any IDs → names (if diff contains them)
+      const resolvedOld = await resolveFieldValues(oldValues);
+      const resolvedNew = await resolveFieldValues(newValues);
+
+      // Audit Log
+      await storage.createAuditLog({
+        userId: req.user!.id,
+        action: "UPDATED",
+        entityType: "transfer",
+        entityId: transferId,
+        details: `Transfer ${transfer.transferCode} return shipment recorded`,
+        oldValues: Object.keys(resolvedOld).length ? JSON.stringify(resolvedOld) : null,
+        newValues: Object.keys(resolvedNew).length ? JSON.stringify(resolvedNew) : null,
+        ipAddress: req.ip || req.connection.remoteAddress,
+        userAgent: req.get("User-Agent"),
+      });
+
       res.json(updatedTransfer);
     } catch (error) {
-      console.error(
-        `💥 Error in POST /api/transfers/${req.params.transferId}/return-shipment:`,
-        error
-      );
+      console.error(`💥 Error in return shipment:`, error);
       res.status(500).json({ message: "Failed to record return shipment" });
     }
-  }
-);
+  });
+
 
   // Record return delivery (Source warehouse manager or admin)
   app.post("/api/transfers/:transferId/return-delivery", async (req: Request, res: Response) => {
@@ -3248,58 +3794,74 @@ app.post(
       const transferId = parseInt(req.params.transferId);
       const { rejectionReason } = req.body;
       const user = req.user!;
-      
+
       // Get transfer details
       const transfer = await storage.getTransfer(transferId);
       if (!transfer) {
         return res.status(404).json({ message: "Transfer not found" });
       }
 
-      // Check if transfer is in pending status
+      // Must be pending
       if (transfer.status !== "pending") {
         return res.status(400).json({ message: "Only pending transfers can be rejected" });
       }
 
-      // Check if user is admin or the one who initiated the transfer
+      // Permission check
       if (user.role !== "admin" && transfer.initiatedBy !== user.id) {
-        return res.status(403).json({ message: "Only admins or transfer creators can reject transfers" });
+        return res.status(403).json({
+          message: "Only admins or transfer creators can reject transfers",
+        });
       }
 
-      // Update transfer status to rejected
+      // Update transfer
       const updatedTransfer = await storage.updateTransfer(transferId, {
         status: "rejected",
         rejectionReason,
-        rejectedBy: user.id,
         rejectedDate: new Date(),
-        updatedAt: new Date()
+        updatedAt: new Date(),
+        // ❗ We DO NOT save rejectedBy in audit diff (frontend already identifies updater)
+        // rejectedBy: user.id,
       });
 
-      // Create audit log
+      // Compute diff (only meaningful fields)
+      const { oldValues, newValues } = computeTransferRejectDiff(transfer, updatedTransfer);
+
+      // ❗ Remove rejectedBy from diff entirely
+      delete oldValues["rejectedBy"];
+      delete newValues["rejectedBy"];
+
+      // Convert any ID fields → names
+      const resolvedOld = await resolveFieldValues(oldValues);
+      const resolvedNew = await resolveFieldValues(newValues);
+
+      // Audit log
       await storage.createAuditLog({
-        action: "transfer_rejected",
+        userId: user.id,
+        action: "UPDATED",
         entityType: "transfer",
         entityId: transferId,
-        userId: user.id,
-        details: {
-          transferCode: transfer.transferCode,
-          rejectionReason,
-          rejectedBy: user.name || user.username
-        }
+        details: `Transfer ${transfer.transferCode} was rejected`,
+        oldValues: Object.keys(resolvedOld).length ? JSON.stringify(resolvedOld) : null,
+        newValues: Object.keys(resolvedNew).length ? JSON.stringify(resolvedNew) : null,
+        ipAddress: req.ip || req.connection.remoteAddress,
+        userAgent: req.get("User-Agent"),
       });
 
       res.json(updatedTransfer);
+
     } catch (error) {
       console.error("Error rejecting transfer:", error);
       res.status(500).json({ message: "Failed to reject transfer" });
     }
   });
 
+
   // Get disposed inventory with filtering
   // Dispose inventory endpoint
   app.post("/api/inventory/dispose", requireAuth, async (req: Request, res: Response) => {
     try {
       const user = req.user as any;
-      
+
       // Only admins can dispose inventory
       if (user.role !== "admin") {
         return res.status(403).json({ message: "Only administrators can dispose inventory" });
@@ -3311,7 +3873,7 @@ app.post(
         return res.status(400).json({ message: "Inventory ID, quantity, and disposal reason are required" });
       }
 
-      // Get the inventory record from all warehouses
+      // Get inventory from any warehouse
       const allInventory = await storage.getAllInventory();
       const inventory = allInventory.find((inv: any) => inv.id === parseInt(inventoryId));
       if (!inventory) {
@@ -3323,45 +3885,45 @@ app.post(
         return res.status(400).json({ message: "Cannot dispose more than available quantity" });
       }
 
-      // Create a disposal transfer with transfer code
+      // Create disposal transfer
       const transferCode = `DISP-${Date.now()}`;
+
       const disposalTransfer = await storage.createTransfer({
         transferCode,
         sourceWarehouseId: inventory.warehouseId,
-        destinationWarehouseId: inventory.warehouseId, // Same warehouse for disposal
-        initiatedBy: user.id,
+        destinationWarehouseId: inventory.warehouseId,
+        initiatedBy: user.id,      // Will NOT appear in audit log because we skip "*By"
         status: "disposed",
         disposalReason,
         disposalDate: new Date(),
-        approvedBy: user.id,
+        approvedBy: user.id,       // skipped in audit
         transferMode: "disposal",
-        notes: `Direct disposal from inventory by admin: ${user.name}`,
+        notes: `Direct disposal from inventory by admin: ${user.name}`
       });
 
-      // Update transfer with the generated code
-      await storage.updateTransfer(disposalTransfer.id, { 
-        notes: `${transferCode} - Direct disposal from inventory by admin: ${user.name}` 
+      await storage.updateTransfer(disposalTransfer.id, {
+        notes: `${transferCode} - Direct disposal from inventory by admin: ${user.name}`
       });
 
-      // Create transfer item
+      // Create disposal transfer item
       await storage.createTransferItem({
         transferId: disposalTransfer.id,
         itemId: inventory.itemId,
         requestedQuantity: quantity,
         approvedQuantity: quantity,
         actualQuantity: quantity,
-        itemStatus:'dispose',
-        isDisposed:true
+        itemStatus: "dispose",
+        isDisposed: true
       });
 
-      // Create disposal transaction for movement history
+      // History transaction
       await storage.createTransaction({
         transactionCode: `TXN-${transferCode}`,
         transactionType: "disposal",
         itemId: inventory.itemId,
-        quantity: quantity,
+        quantity,
         sourceWarehouseId: inventory.warehouseId,
-        destinationWarehouseId: inventory.warehouseId, // Use same warehouse for disposal
+        destinationWarehouseId: inventory.warehouseId,
         userId: user.id,
         status: "completed",
         completedAt: new Date()
@@ -3371,27 +3933,44 @@ app.post(
       const newQuantity = inventory.quantity - quantity;
       await storage.updateInventory(inventoryId, { quantity: newQuantity });
 
-      // Create audit log
+      // -------------------------
+      // 🔥 AUDIT LOG (with diff)
+      // -------------------------
+
+      const oldValues = { quantity: inventory.quantity };
+      const newValues = { quantity: newQuantity };
+
+      // Convert IDs → names
+      const resolvedOld = await resolveFieldValues(oldValues);
+      const resolvedNew = await resolveFieldValues(newValues);
+
       await storage.createAuditLog({
         userId: user.id,
-        action: "dispose_inventory",
+        action: "UPDATED",                        // Standardized
         entityType: "inventory",
         entityId: inventoryId,
-        oldValues: JSON.stringify({ quantity: inventory.quantity }),
-        newValues: JSON.stringify({ quantity: newQuantity }),
-        details: `Disposed ${quantity} units. Reason: ${disposalReason}`
+        details: `Disposed ${quantity} units. Reason: ${disposalReason}`,
+        oldValues: JSON.stringify(resolvedOld),
+        newValues: JSON.stringify(resolvedNew),
+        ipAddress: req.ip || req.connection.remoteAddress,
+        userAgent: req.get("User-Agent"),
       });
 
-      res.json({ 
+      // -------------------------
+      // Response
+      // -------------------------
+      res.json({
         message: "Inventory disposed successfully",
         disposalTransfer,
-        remainingQuantity: newQuantity 
+        remainingQuantity: newQuantity
       });
+
     } catch (error) {
       console.error("Error disposing inventory:", error);
       res.status(500).json({ message: "Failed to dispose inventory" });
     }
   });
+
 
 app.get("/api/disposed-inventory", async (req: Request, res: Response) => {
   try {
@@ -3404,93 +3983,153 @@ app.get("/api/disposed-inventory", async (req: Request, res: Response) => {
 
     // Get all disposed transfers
     const disposedTransfers = await storage.getTransfersByStatus("disposed");
-    const disposedTransfers1 = await storage.getTransfersByStatus("return-rejected")
-    const disposedTransfers2 = await storage.getTransfersByStatus('returned');
-    const disposedTransfers3 = [...disposedTransfers,...disposedTransfers1,...disposedTransfers2]
-    console.log(`📦 Found ${disposedTransfers.length} disposed transfers`);
+    const disposedTransfers1 = await storage.getTransfersByStatus("return-rejected");
+    const disposedTransfers2 = await storage.getTransfersByStatus("returned");
+    const disposedTransfers3 = [...disposedTransfers, ...disposedTransfers1, ...disposedTransfers2];
 
-    // Calculate global item unit values as of current date
+    console.log(`📦 Found Transfers:`, {
+      disposed: disposedTransfers.length,
+      returnRejected: disposedTransfers1.length,
+      returned: disposedTransfers2.length,
+      total: disposedTransfers3.length,
+    });
+
+    // Global unit value map
     const { itemUnitValues } = await calculateItemUnitValues(new Date());
     console.log("💰 Item Unit Values Map Size:", itemUnitValues.size);
 
     let disposedItems: any[] = [];
 
-    // Get items from disposed transfers
+    // -------------------------------------------
+    // LOOP TRANSFERS
+    // -------------------------------------------
     for (const transfer of disposedTransfers3) {
+      console.log("\n===============================");
+      console.log("🔁 PROCESSING TRANSFER:");
+      console.log({
+        transferId: transfer.id,
+        transferCode: transfer.transferCode,
+        sourceWarehouseId: transfer.sourceWarehouseId,
+        destinationWarehouseId: transfer.destinationWarehouseId,
+        transferStatus: transfer.status,
+        disposalDate: transfer.disposalDate,
+        disposalReason: transfer.disposalReason,
+        approvedBy: transfer.approvedBy,
+      });
+
       const transferItems = await storage.getTransferItemsByTransfer(transfer.id);
-      console.log(`🔍 Transfer ID ${transfer.id} — Total Items: ${transferItems.length}`);
 
-      const disposedTransferItems = transferItems.filter(item => item.isDisposed === true);
-      console.log(`♻️ Transfer ID ${transfer.id} — Disposed Items: ${disposedTransferItems.length}`);
+      console.log(`🔍 Transfer ${transfer.id} — Items Found: ${transferItems.length}`);
 
+      const disposedTransferItems = transferItems.filter(
+        (item) => item.isDisposed === true
+      );
+
+      console.log(`♻️ Transfer ${transfer.id} — Disposed Items Count: ${disposedTransferItems.length}`);
+
+      // -------------------------------------------
+      // LOOP DISPOSED ITEMS
+      // -------------------------------------------
       for (const transferItem of disposedTransferItems) {
+        console.log("\n🔹 PROCESSING TRANSFER ITEM:", {
+          transferItemId: transferItem.id,
+          itemId: transferItem.itemId,
+          requestedQuantity: transferItem.requestedQuantity,
+          actualQuantity: transferItem.actualQuantity,
+          itemStatus: transferItem.itemStatus,
+          disposalDate: transferItem.disposalDate,
+          disposalReason: transferItem.disposalReason,
+        });
+
         const item = await storage.getItem(transferItem.itemId);
-        const warehouse = await storage.getWarehouse(transfer.destinationWarehouseId);
-        const approvedByUser = transfer.approvedBy ? await storage.getUser(transfer.approvedBy) : null;
-        
-        // Get the global unit value for this item
+        const warehouse = await storage.getWarehouse(transfer.sourceWarehouseId); // <-- CHECK HERE
+        const approvedByUser = transfer.approvedBy
+          ? await storage.getUser(transfer.approvedBy)
+          : null;
+
+        console.log("🏭 Warehouse Returned:", warehouse);
+
+        // Compare mismatch
+        if (warehouse && warehouse.id !== transfer.sourceWarehouseId) {
+          console.log("❗❗ WAREHOUSE MISMATCH DETECTED ❗❗", {
+            warehouseReturnedId: warehouse?.id,
+            expectedSourceWarehouseId: transfer.sourceWarehouseId,
+          });
+        }
+
         const unitValue = itemUnitValues.get(transferItem.itemId) || 0;
         const quantity = transferItem.actualQuantity || transferItem.requestedQuantity;
         const totalValue = unitValue * quantity;
 
-        disposedItems.push({
+        const record = {
           transferId: transfer.id,
           transferCode: transfer.transferCode || `DISP-${transfer.id}`,
           itemId: transferItem.itemId,
           item,
           warehouse,
-          warehouseId: transfer.sourceWarehouseId,
+          warehouseId: transfer.sourceWarehouseId, // <-- CHECK HERE
           quantity,
           unitValue,
           totalValue,
-          disposalDate: transfer.disposalDate? transfer.disposalDate:transferItem.disposalDate,
-          disposalReason: transfer.disposalReason ? transfer.disposalReason:transferItem.disposalReason,
-          approvedBy: approvedByUser?.name || 'System',
-          approvedById: transfer.approvedBy
-        });
+          disposalDate: transfer.disposalDate || transferItem.disposalDate,
+          disposalReason: transfer.disposalReason || transferItem.disposalReason,
+          approvedBy: approvedByUser?.name || "System",
+          approvedById: transfer.approvedBy,
+        };
+
+        console.log("📦 FINAL RECORD ADDED:", record);
+
+        disposedItems.push(record);
       }
     }
 
-    console.log(`🧾 Total Disposed Items before filters: ${disposedItems.length}`);
+    console.log(`\n🧾 Total Disposed Items before filters: ${disposedItems.length}`);
 
-    // Apply filters
+    // -------------------------------------------
+    // FILTERS WITH DEBUG
+    // -------------------------------------------
+
     if (warehouseId) {
-      disposedItems = disposedItems.filter(item => item.warehouseId === parseInt(warehouseId as string));
+      disposedItems = disposedItems.filter(
+        (item) => item.warehouseId === parseInt(warehouseId as string)
+      );
       console.log(`🏭 Filtered by warehouseId=${warehouseId} → ${disposedItems.length} items`);
     }
 
     if (itemId) {
-      disposedItems = disposedItems.filter(item => item.itemId === parseInt(itemId as string));
+      disposedItems = disposedItems.filter(
+        (item) => item.itemId === parseInt(itemId as string)
+      );
       console.log(`📦 Filtered by itemId=${itemId} → ${disposedItems.length} items`);
     }
 
     if (dateFrom) {
       const fromDate = new Date(dateFrom as string);
-      disposedItems = disposedItems.filter(item => 
-        item.disposalDate && new Date(item.disposalDate) >= fromDate
+      disposedItems = disposedItems.filter(
+        (item) => item.disposalDate && new Date(item.disposalDate) >= fromDate
       );
       console.log(`📅 Filtered from date=${dateFrom} → ${disposedItems.length} items`);
     }
 
     if (dateTo) {
       const toDate = new Date(dateTo as string);
-      toDate.setHours(23, 59, 59, 999); // End of day
-      disposedItems = disposedItems.filter(item => 
-        item.disposalDate && new Date(item.disposalDate) <= toDate
+      toDate.setHours(23, 59, 59, 999);
+      disposedItems = disposedItems.filter(
+        (item) => item.disposalDate && new Date(item.disposalDate) <= toDate
       );
       console.log(`📅 Filtered to date=${dateTo} → ${disposedItems.length} items`);
     }
 
     if (approvedBy && approvedBy !== "all") {
       const approverIdFilter = parseInt(approvedBy as string);
-      disposedItems = disposedItems.filter(item => {
-        const transfer = disposedTransfers.find(t => t.id === item.transferId);
+      disposedItems = disposedItems.filter((item) => {
+        const transfer = disposedTransfers3.find((t) => t.id === item.transferId);
         return transfer && transfer.approvedBy === approverIdFilter;
       });
       console.log(`👤 Filtered by approvedBy=${approvedBy} → ${disposedItems.length} items`);
     }
 
-    console.log(`✅ Final Disposed Items Returned: ${disposedItems.length}`);
+    console.log(`\n✅ FINAL Returned Disposed Items: ${disposedItems.length}`);
     res.json(disposedItems);
 
   } catch (error) {
@@ -3498,6 +4137,7 @@ app.get("/api/disposed-inventory", async (req: Request, res: Response) => {
     res.status(500).json({ message: "Failed to fetch disposed inventory" });
   }
 });
+
 
 
 
@@ -3584,7 +4224,9 @@ app.get("/api/disposed-inventory", async (req: Request, res: Response) => {
         return res.status(401).json({ message: "Unauthorized" });
       }
 
-      const transfers = await storage.getAllTransfers();
+      const alltransfers = await storage.getAllTransfers();
+      const transfers = alltransfers.filter(t=> t.status!=='disposed');
+
       
       // Enrich transfers with additional data
       const enrichedTransfers = await Promise.all(transfers.map(async (transfer) => {
@@ -3595,12 +4237,13 @@ app.get("/api/disposed-inventory", async (req: Request, res: Response) => {
         const transferItems = await storage.getTransferItemsByTransfer(transfer.id);
         const transferUpdates = await storage.getTransferUpdatesByTransfer(transfer.id);
         const approvedUpdate = transferUpdates.find((item) => item.status === "approved");
-        const returnRequested = transferUpdates.find((item)=>item.status==='return-requested');
+        const returnRequested = transferUpdates.find((item)=>item.status==='return-requested'|| item.status==='partial-return-requested');
         const returnApproved = transferUpdates.find((item)=>item.status === "return-approved");
         const returnRejected= transferUpdates.find((item)=>item.status === 'return-rejected')
         const returnShipped = transferUpdates.find((item)=>item.status==='return_shipped');
         const returned = transferUpdates.find((item)=>item.status === 'returned');
         const rejected = transferUpdates.find((item)=>item.status==='rejected');
+        const inTransit= transferUpdates.find((item)=>item.status==='in-transit');
         const approvedAt = approvedUpdate ? new Date(approvedUpdate.createdAt) : null;
         const returnApprovedAt = returnApproved ? new Date(returnApproved?.createdAt):null;
         const returnShippedAt = returnShipped ? new Date(returnShipped?.createdAt):null;
@@ -3621,12 +4264,12 @@ app.get("/api/disposed-inventory", async (req: Request, res: Response) => {
           approvedByUser,
           items: enrichedItems,
           approvedAt,
+          inTransit,
           returnRejected,
           returnApproved,
           returnShipped,
           returned,
           rejected,
-          transferUpdates,
           returnRequested
         };
       }));
@@ -3733,13 +4376,22 @@ app.get("/api/disposed-inventory", async (req: Request, res: Response) => {
       }
 
       // Create initial transfer update
-      await storage.createTransferUpdate({
-        transferId: transfer.id,
-        updatedBy: req.user!.id,
-        status: 'pending',
-        updateType: 'status_change',
-        description: 'Transfer created'
+      // await storage.createTransferUpdate({
+      //   transferId: transfer.id,
+      //   updatedBy: req.user!.id,
+      //   status: 'pending',
+      //   updateType: 'status_change',
+      //   description: 'Transfer created'
+      // });
+
+      await storage.createAuditLog({
+        userId: req.user!.id,
+        action: "CREATED",
+        entityType: "Transfer",
+        details: `Transfer  ${transfer.transferCode} created by ${ req?.user?.name}`,
+        ipAddress: req.ip || req.connection.remoteAddress,
       });
+
 
       res.status(201).json(transfer);
     } catch (error: any) {
@@ -4278,31 +4930,36 @@ app.get("/api/disposed-inventory", async (req: Request, res: Response) => {
         
         // Allow admins or warehouse managers to approve pending transfers
         if (newStatus === 'approved' && transfer.status === 'pending') {
-          return user.role === 'admin' || managesSourceWarehouse || managesDestinationWarehouse;
+          return user.role === 'admin' || managesSourceWarehouse ;
+        }
+        if (newStatus === 'rejected' && transfer.status === 'pending') {
+          return user.role === 'admin' || managesSourceWarehouse ;
         }
         if (newStatus === 'in-transit' && transfer.status === 'approved') {
           return managesSourceWarehouse || user.role === 'admin';
         }
-        if ((newStatus === 'completed' || newStatus === 'rejected') && transfer.status === 'in-transit') {
+        if (newStatus === 'completed'  && transfer.status === 'in-transit') {
           console.log('managesDestination warehouse ',managesDestinationWarehouse)
-          return managesDestinationWarehouse;
+          return managesDestinationWarehouse || user.role==='admin';
         }
         // Allow admins or relevant warehouse managers to reject pending transfers
-        if (newStatus === 'rejected' && transfer.status === 'pending') {
-          return user.role === 'admin' || managesSourceWarehouse || managesDestinationWarehouse;
-        }
+        
         if ((newStatus === 'return-requested' || newStatus ==='partial-return-requested') && transfer.status==='in-transit'){
           return user.role==='admin' || managesDestinationWarehouse;
         }
-        if(newStatus==='returned' && transfer.status === 'return_shipped'){
-          return managesDestinationWarehouse || user?.role==='admin'
-        }
-        if(newStatus==='return-approved'){
+         if(newStatus==='return-approved'){
           return managesSourceWarehouse || user.role==='admin'
         }
         if(newStatus==='return-rejected'){
           return managesSourceWarehouse || user.role==='admin'
         }
+        if(newStatus==='return_shipped'){
+          return managesDestinationWarehouse || user.role==='admin'
+        }
+        if(newStatus==='returned' && transfer.status === 'return_shipped'){
+          return managesSourceWarehouse || user?.role==='admin'
+        }
+       
 
         return false;
       };
@@ -4400,6 +5057,8 @@ app.get("/api/disposed-inventory", async (req: Request, res: Response) => {
                 await storage.createTransactionTx(tx, {
                   itemId: item.itemId,
                   sourceWarehouseId: currentTransfer.sourceWarehouseId,
+                  destinationWarehouseId:currentTransfer.destinationWarehouseId,
+                  transferId,
                   userId: req.user!.id,
                   requesterId: req.user!.id,
                   transactionType: 'transfer',
@@ -4419,18 +5078,21 @@ app.get("/api/disposed-inventory", async (req: Request, res: Response) => {
                 const addRes = await storage.safeAddInventoryTx(tx, item.itemId, currentTransfer.destinationWarehouseId, qtyToAdd);
                 if (!addRes.success) {
                   if (addRes.reason === 'exceeds_capacity') throw new Error(`Destination capacity exceeded for item ${item.itemId}`);
-                  throw new Error('Inventory missing for item ' + item.itemId);
+                  if (addRes.reason === 'inventory_missing'){
+                    await storage.createInventoryTx(tx,{
+                      itemId: item.itemId,
+                      warehouseId: currentTransfer.destinationWarehouseId,
+                      quantity: qtyToAdd
+                    });
+                  }
                 }
 
                 // create transaction record for this addition
-                await storage.createTransactionTx(tx, {
-                  itemId: item.itemId,
+                await storage.updateTransactionByTransferAndItemIdTx(tx, transferId,item.itemId, {
                   destinationWarehouseId: currentTransfer.destinationWarehouseId,
-                  userId: req.user!.id,
-                  requesterId: filteredData.receivedBy || req.user!.id,
-                  transactionType: 'check-in',
-                  quantity: qtyToAdd,
-                  createdAt: new Date()
+                  checkInDate: new Date(),
+                  completedAt: new Date(),
+                  status:'completed'
                 } as any);
               }
 
@@ -4466,25 +5128,34 @@ app.get("/api/disposed-inventory", async (req: Request, res: Response) => {
               // After updating the items, process accepted items (example: adding accepted quantity back)
               const updatedItems = await storage.getTransferItemsByTransferTx(tx, transferId);
               const accepted = updatedItems.filter((i: any) => i.itemStatus === 'Accepted');
+              const rejected = updatedItems.filter ((i:any)=> i.itemStatus === 'Returned');
               for (const item of accepted) {
                 const qtyToAdd = item.actualQuantity || item.requestedQuantity;
                 const addRes = await storage.safeAddInventoryTx(tx, item.itemId, currentTransfer.destinationWarehouseId, qtyToAdd);
                 if (!addRes.success) {
                   if (addRes.reason === 'exceeds_capacity') throw new Error(`Destination capacity exceeded for item ${item.itemId}`);
-                  throw new Error('Inventory missing for item ' + item.itemId);
+                  if (addRes.reason === 'inventory_missing'){
+                    await storage.createInventoryTx(tx,{
+                      itemId: item.itemId,
+                      warehouseId: currentTransfer.destinationWarehouseId,
+                      quantity: qtyToAdd
+                    });
+                  }
                 }
 
-                await storage.createTransactionTx(tx, {
-                  itemId: item.itemId,
+                await storage.updateTransactionByTransferAndItemIdTx(tx,transferId,item.itemId, {
                   destinationWarehouseId: currentTransfer.destinationWarehouseId,
-                  userId: req.user!.id,
-                  requesterId: filteredData.receivedBy || req.user!.id,
-                  transactionType: 'check-in',
-                  quantity: qtyToAdd,
-                  createdAt: new Date()
+                  status:'completed',
+                  checkInDate: new Date(),
+                  completedAt: new Date()
                   } as any
                 );
 
+              }
+              for ( const item of rejected){
+                await storage.updateTransactionByTransferAndItemIdTx(tx,transferId,item.itemId,{
+                  status:'rejected'
+                })
               }
             }
 
@@ -4506,17 +5177,11 @@ app.get("/api/disposed-inventory", async (req: Request, res: Response) => {
                 } as any);
 
                 // create a disposal transaction (example)
-                await storage.createTransactionTx(tx, {
-                  transactionCode: `TXN-DISPOSE-${transferId}-${item.itemId}`,
-                  transactionType: 'disposal',
-                  itemId: item.itemId,
-                  quantity: item.actualQuantity || item.requestedQuantity,
-                  sourceWarehouseId: currentTransfer.sourceWarehouseId,
-                  userId: req.user!.id,
-                  status: 'completed',
-                  checkInDate: new Date(),
-                  createdAt: new Date()
+                const updatedTransaction = await storage.updateTransactionByTransferAndItemIdTx(tx,transferId,item.itemId, {
+                  status:'disposed',
+                  completedAt: new Date()
                 } as any);
+                console.log('updatedTransaction',updatedTransaction)
 
                 // mark transfer item as disposed
                 await storage.updateTransferItemTx(tx, item.id, {
@@ -4546,6 +5211,10 @@ app.get("/api/disposed-inventory", async (req: Request, res: Response) => {
                   notes: filteredData.receiverNotes
                 });
 
+                await storage.updateTransactionByTransferAndItemIdTx(tx,transferId,item.itemId,{
+                  status:'rejected'
+                })
+
                 // // Create transaction record for rejection
                 // await storage.createTransaction({
                 //   itemId: item.itemId,
@@ -4572,25 +5241,20 @@ app.get("/api/disposed-inventory", async (req: Request, res: Response) => {
               metadata: req.body.metadata ? JSON.stringify(req.body.metadata) : undefined,
               createdAt: new Date()
             } as any);
+            const { oldValues, newValues } = await computeDiff(currentTransfer, updatedTransfer);
 
             await storage.createAuditLogTx(tx, {
               userId: req.user!.id,
-              action: 'UPDATED',
-              entityType: 'transfer',
+              action: "UPDATED",
+              entityType: "transfer",
               entityId: transferId,
               details: `Transfer ${currentTransfer.transferCode} updated`,
-              oldValues: JSON.stringify({
-                status: currentTransfer.status,
-                notes: currentTransfer.notes,
-                courierName: currentTransfer.courierName,
-                handoverPersonName: currentTransfer.handoverPersonName,
-                trackingNumber: currentTransfer.trackingNumber
-              }),
-              newValues: JSON.stringify(filteredData),
+              oldValues: JSON.stringify(oldValues),
+              newValues: JSON.stringify(newValues),
               ipAddress: req.ip || req.connection.remoteAddress,
-              userAgent: req.get('User-Agent'),
-              createdAt: new Date()
-            } as any);
+              userAgent: req.get("User-Agent"),
+            });
+
 
             // return the updated transfer to be sent in response
             return updatedTransfer;
@@ -5213,13 +5877,48 @@ app.get("/api/disposed-inventory", async (req: Request, res: Response) => {
           } else if (transaction.transactionType === 'issue' && transaction.sourceWarehouseId === invItem.warehouseId) {
             inventoryAsOfDate -= transaction.quantity;
           } else if (transaction.transactionType === 'transfer') {
-            if (transaction.sourceWarehouseId === invItem.warehouseId) {
-              inventoryAsOfDate -= transaction.quantity;
+
+              const src = transaction.sourceWarehouseId;
+              const dest = transaction.destinationWarehouseId;
+              const qty = transaction.quantity;
+              const status = transaction.status;
+              let effectiveDate = null;
+
+              if (status === "approved" || status === "in-transit") {
+                effectiveDate = transaction.createdAt;
+              } else if (status === "completed") {
+                effectiveDate = transaction.completedAt;
+              } else if (status === "restocked") {
+                effectiveDate = transaction.completedAt;
+              } else if (status === "disposed") {
+                effectiveDate = transaction.completedAt;
+              } else if (status === "rejected") {
+                effectiveDate = transaction.createdAt;
+              }
+
+              if(effectiveDate && effectiveDate > asOfDate){
+                continue;
+              }
+
+              if(status ==='approved' || status === 'in-transit'){
+                if(src=== invItem.warehouseId) inventoryAsOfDate -= qty;
+              }
+              if (status === 'completed'){
+                if(src=== invItem.warehouseId) inventoryAsOfDate -=qty;
+                if(dest === invItem.warehouseId) inventoryAsOfDate +=qty
+              }
+              if (status === 'rejected'){
+                if(src=== invItem.warehouseId) inventoryAsOfDate -=qty;
+              }
+              if (status === 'restocked'){
+                //do nothing
+              }
+              if (status === 'disposed'){
+                if(src===invItem.warehouseId) inventoryAsOfDate -=qty;
+              }
+
             }
-            if (transaction.destinationWarehouseId === invItem.warehouseId && transaction.status === 'completed') {
-              inventoryAsOfDate += transaction.quantity;
-            }
-          }
+
         }
 
         // Skip if no inventory as of the selected date
@@ -5688,6 +6387,12 @@ app.post("/api/email-settings/test", checkRole("admin"), async (req, res) => {
       if (user.role === 'admin' && !isActive) {
         return res.status(400).json({ message: "Cannot deactivate admin users" });
       }
+      if(isActive){
+        const activeUsers= await storage.getActiveUsers();
+        if(activeUsers.length>=50){
+          return res.status(400).json({message:`Cannot activate user. Active user count is already ${activeUsers.length}`})
+        }
+      }
 
       const updatedUser = await storage.updateUserStatus(userId, isActive);
       res.json(updatedUser);
@@ -5697,6 +6402,118 @@ app.post("/api/email-settings/test", checkRole("admin"), async (req, res) => {
   });
 
   // Low Stock Report API
+  // app.get("/api/reports/low-stock", async (req, res) => {
+  //   try {
+  //     if (!req.user) {
+  //       return res.status(401).json({ message: "Not authenticated" });
+  //     }
+
+  //     const { 
+  //       asOfDate = new Date().toISOString().split('T')[0],
+  //       warehouseId,
+  //       itemId, 
+  //       status,
+  //       categoryId
+  //     } = req.query;
+
+  //     // Get all necessary data
+  //     const allItems = await storage.getAllItems();
+  //     const allInventory = await storage.getAllInventory();
+  //     const allWarehouses = await storage.getAllWarehouses();
+  //     const allCategories = await storage.getAllCategories();
+  //     const allTransactions = await storage.getAllTransactions();
+
+  //     // Create maps for quick lookups
+  //     const itemMap = new Map();
+  //     allItems.forEach(item => itemMap.set(item.id, item));
+
+  //     const warehouseMap = new Map();
+  //     allWarehouses.forEach(warehouse => warehouseMap.set(warehouse.id, warehouse));
+
+  //     const categoryMap = new Map();
+  //     allCategories.forEach(category => categoryMap.set(category.id, category));
+
+  //     // Filter inventory based on criteria
+  //     let filteredInventory = allInventory.filter(inv => {
+  //       const item = itemMap.get(inv.itemId);
+  //       if (!item) return false;
+
+  //       // Check if stock is below minimum level
+  //       const isLowStock = inv.quantity < item.minStockLevel;
+  //       if (!isLowStock) return false;
+
+  //       // Apply filters
+  //       if (warehouseId && inv.warehouseId !== parseInt(warehouseId as string)) return false;
+  //       if (itemId && inv.itemId !== parseInt(itemId as string)) return false;
+  //       if (categoryId && item.categoryId !== parseInt(categoryId as string)) return false;
+
+  //       return true;
+  //     });
+
+  //     // Build low stock report data
+  //     const lowStockData = filteredInventory.map(inv => {
+  //       const item = itemMap.get(inv.itemId);
+  //       const warehouse = warehouseMap.get(inv.warehouseId);
+  //       const category = item.categoryId ? categoryMap.get(item.categoryId) : null;
+
+  //       const stockDifference = inv.quantity - item.minStockLevel;
+  //       const stockPercentage = Math.round((inv.quantity / item.minStockLevel) * 100);
+
+  //       // Determine status based on stock level
+  //       let itemStatus: 'critical' | 'low' | 'warning';
+  //       if (inv.quantity <= 0) {
+  //         itemStatus = 'critical';
+  //       } else if (stockPercentage <= 25) {
+  //         itemStatus = 'critical';
+  //       } else if (stockPercentage <= 50) {
+  //         itemStatus = 'low';
+  //       } else {
+  //         itemStatus = 'warning';
+  //       }
+
+  //       // Find last restock date from transactions
+  //       const itemTransactions = allTransactions
+  //         .filter(t => 
+  //           t.itemId === inv.itemId && 
+  //           t.destinationWarehouseId === inv.warehouseId &&
+  //           (t.transactionType === 'check-in' || t.transactionType === 'adjustment' )
+  //         )
+  //         .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+  //       const lastRestockDate = itemTransactions.length > 0 ? itemTransactions[0].createdAt : null;
+
+  //       return {
+  //         id: inv.id,
+  //         itemId: inv.itemId,
+  //         itemName: item.name,
+  //         itemSku: item.sku,
+  //         warehouseId: inv.warehouseId,
+  //         warehouseName: warehouse?.name || 'Unknown',
+  //         currentQuantity: inv.quantity,
+  //         minStockLevel: item.minStockLevel,
+  //         unit: item.unit,
+  //         categoryName: category?.name,
+  //         stockDifference,
+  //         stockPercentage,
+  //         lastRestockDate,
+  //         status: itemStatus
+  //       };
+  //     });
+
+  //     // Apply status filter if specified
+  //     const finalData = status 
+  //       ? lowStockData.filter(item => item.status === status)
+  //       : lowStockData;
+
+  //     // Sort by most critical first (lowest stock percentage)
+  //     finalData.sort((a, b) => a.stockPercentage - b.stockPercentage);
+
+  //     res.json(finalData);
+  //   } catch (error: any) {
+  //     console.error('Low stock report error:', error);
+  //     res.status(500).json({ message: error.message });
+  //   }
+  // });
   app.get("/api/reports/low-stock", async (req, res) => {
     try {
       if (!req.user) {
@@ -5704,111 +6521,201 @@ app.post("/api/email-settings/test", checkRole("admin"), async (req, res) => {
       }
 
       const { 
-        asOfDate = new Date().toISOString().split('T')[0],
+        asOfDate = new Date().toISOString().split("T")[0],
         warehouseId,
-        itemId, 
+        itemId,
         status,
         categoryId
       } = req.query;
+      
+      const targetDate = new Date(asOfDate + "T23:59:59");
 
-      // Get all necessary data
+      // Get required data
       const allItems = await storage.getAllItems();
-      const allInventory = await storage.getAllInventory();
       const allWarehouses = await storage.getAllWarehouses();
       const allCategories = await storage.getAllCategories();
       const allTransactions = await storage.getAllTransactions();
 
-      // Create maps for quick lookups
-      const itemMap = new Map();
-      allItems.forEach(item => itemMap.set(item.id, item));
+      const itemMap = new Map(allItems.map(i => [i.id, i]));
+      const warehouseMap = new Map(allWarehouses.map(w => [w.id, w]));
+      const categoryMap = new Map(allCategories.map(c => [c.id, c]));
 
-      const warehouseMap = new Map();
-      allWarehouses.forEach(warehouse => warehouseMap.set(warehouse.id, warehouse));
+      // -----------------------------
+      // 1️⃣ BUILD INVENTORY AS OF DATE
+      // -----------------------------
 
-      const categoryMap = new Map();
-      allCategories.forEach(category => categoryMap.set(category.id, category));
+      const inventorySnapshot = new Map();
 
-      // Filter inventory based on criteria
-      let filteredInventory = allInventory.filter(inv => {
+      // Helper function
+      function addQty(itemId, warehouseId, delta) {
+        const key = `${itemId}-${warehouseId}`;
+        const current = inventorySnapshot.get(key) || 0;
+        inventorySnapshot.set(key, current + delta);
+      }
+
+      const relevantTx = allTransactions.filter(
+        tx => new Date(tx.createdAt) <= targetDate
+      );
+
+      for (const tx of relevantTx) {
+        const src = tx.sourceWarehouseId;
+        const dest = tx.destinationWarehouseId;
+        const qty = tx.quantity;
+
+        // ------------------------
+        // CHECK-IN
+        // ------------------------
+        if (tx.transactionType === "check-in") {
+          addQty(tx.itemId, dest, qty);
+        }
+
+        // ------------------------
+        // CHECK-OUT
+        // ------------------------
+        else if (tx.transactionType === "check-out") {
+          addQty(tx.itemId, src, -qty);
+        }
+
+        // ------------------------
+        // ADJUSTMENT
+        // ------------------------
+        else if (tx.transactionType === "adjustment") {
+          addQty(tx.itemId, tx.warehouseId, tx.adjustmentValue);
+        }
+
+        // ------------------------
+        // TRANSFER — FULL STATUS LOGIC
+        // ------------------------
+        else if (tx.transactionType === "transfer") {
+
+          let effectiveDate = null;
+
+          if (tx.status === "approved" || tx.status === "in-transit") {
+            effectiveDate = tx.createdAt;
+          } 
+          else if (
+            tx.status === "completed" ||
+            tx.status === "restocked" ||
+            tx.status === "disposed"
+          ) {
+            effectiveDate = tx.completedAt;
+          } 
+          else if (tx.status === "rejected") {
+            effectiveDate = tx.createdAt;
+          }
+
+          if (!effectiveDate) continue;
+          if (new Date(effectiveDate) > targetDate) continue;
+
+          // ------------ STATUS LOGIC ------------
+          if (tx.status === "approved" || tx.status === "in-transit") {
+            // Items left source but not received yet
+            addQty(tx.itemId, src, -qty);
+          }
+
+          else if (tx.status === "completed") {
+            // Both warehouses affected
+            addQty(tx.itemId, src, -qty);
+            addQty(tx.itemId, dest, qty);
+          }
+
+          else if (tx.status === "rejected") {
+            // Items left source when approved
+            // Destination rejects — stock still out
+            addQty(tx.itemId, src, -qty);
+          }
+
+          else if (tx.status === "restocked") {
+            // Items returned to source warehouse
+            addQty(tx.itemId, src, qty);
+          }
+
+          else if (tx.status === "disposed") {
+            // Items destroyed after rejection
+            addQty(tx.itemId, src, -qty);
+          }
+        }
+      }
+
+      // Convert snapshot map → list
+      const inventoryList = [...inventorySnapshot.entries()].map(([key, qty]) => {
+        const [itemIdStr, warehouseIdStr] = key.split("-");
+        return {
+          itemId: parseInt(itemIdStr),
+          warehouseId: parseInt(warehouseIdStr),
+          quantity: qty
+        };
+      });
+
+      // -----------------------------------
+      // 2️⃣ FILTER INVENTORY FOR LOW-STOCK
+      // -----------------------------------
+      let filteredInventory = inventoryList.filter(inv => {
         const item = itemMap.get(inv.itemId);
         if (!item) return false;
 
-        // Check if stock is below minimum level
         const isLowStock = inv.quantity < item.minStockLevel;
         if (!isLowStock) return false;
 
-        // Apply filters
-        if (warehouseId && inv.warehouseId !== parseInt(warehouseId as string)) return false;
-        if (itemId && inv.itemId !== parseInt(itemId as string)) return false;
-        if (categoryId && item.categoryId !== parseInt(categoryId as string)) return false;
+        if (warehouseId && inv.warehouseId !== parseInt(warehouseId)) return false;
+        if (itemId && inv.itemId !== parseInt(itemId)) return false;
+        if (categoryId && item.categoryId !== parseInt(categoryId)) return false;
 
         return true;
       });
 
-      // Build low stock report data
+      // -----------------------------------
+      // 3️⃣ BUILD RESPONSE OBJECT
+      // -----------------------------------
       const lowStockData = filteredInventory.map(inv => {
         const item = itemMap.get(inv.itemId);
         const warehouse = warehouseMap.get(inv.warehouseId);
-        const category = item.categoryId ? categoryMap.get(item.categoryId) : null;
+        const category = categoryMap.get(item.categoryId);
 
-        const stockDifference = inv.quantity - item.minStockLevel;
         const stockPercentage = Math.round((inv.quantity / item.minStockLevel) * 100);
 
-        // Determine status based on stock level
-        let itemStatus: 'critical' | 'low' | 'warning';
-        if (inv.quantity <= 0) {
-          itemStatus = 'critical';
-        } else if (stockPercentage <= 25) {
-          itemStatus = 'critical';
-        } else if (stockPercentage <= 50) {
-          itemStatus = 'low';
-        } else {
-          itemStatus = 'warning';
-        }
+        let itemStatus = "warning";
+        if (inv.quantity <= 0 || stockPercentage <= 25) itemStatus = "critical";
+        else if (stockPercentage <= 50) itemStatus = "low";
 
-        // Find last restock date from transactions
-        const itemTransactions = allTransactions
+        const lastRestock = allTransactions
           .filter(t => 
-            t.itemId === inv.itemId && 
+            t.itemId === inv.itemId &&
             t.destinationWarehouseId === inv.warehouseId &&
-            (t.transactionType === 'check-in' || t.transactionType === 'adjustment')
+            (t.transactionType === "check-in" || t.transactionType === "adjustment") &&
+            new Date(t.createdAt) <= targetDate
           )
-          .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-
-        const lastRestockDate = itemTransactions.length > 0 ? itemTransactions[0].createdAt : null;
+          .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
         return {
-          id: inv.id,
           itemId: inv.itemId,
           itemName: item.name,
-          itemSku: item.sku,
           warehouseId: inv.warehouseId,
-          warehouseName: warehouse?.name || 'Unknown',
+          warehouseName: warehouse?.name,
           currentQuantity: inv.quantity,
           minStockLevel: item.minStockLevel,
-          unit: item.unit,
           categoryName: category?.name,
-          stockDifference,
           stockPercentage,
-          lastRestockDate,
+          lastRestockDate: lastRestock[0]?.createdAt || null,
           status: itemStatus
         };
       });
 
-      // Apply status filter if specified
       const finalData = status 
-        ? lowStockData.filter(item => item.status === status)
+        ? lowStockData.filter(i => i.status === status)
         : lowStockData;
 
-      // Sort by most critical first (lowest stock percentage)
       finalData.sort((a, b) => a.stockPercentage - b.stockPercentage);
 
       res.json(finalData);
-    } catch (error: any) {
-      console.error('Low stock report error:', error);
+
+    } catch (error) {
+      console.error("Low stock report error:", error);
       res.status(500).json({ message: error.message });
     }
   });
+
+
 
   // Analytics API endpoints
   
@@ -5873,68 +6780,118 @@ app.post("/api/email-settings/test", checkRole("admin"), async (req, res) => {
   });
 
   // Most Ordered Items Analytics
+  // app.get("/api/analytics/most-ordered", async (req, res) => {
+  //   try {
+  //     if (!req.user) {
+  //       return res.status(401).json({ message: "Not authenticated" });
+  //     }
+
+  //     const { startDate, endDate, departmentId, warehouseId } = req.query;
+      
+  //     const allRequests = await storage.getAllRequests();
+  //     const allRequestItems = [];
+      
+  //     for (const request of allRequests) {
+  //       const items = await storage.getRequestItemsByRequest(request.id);
+  //       items.forEach(item => allRequestItems.push({ ...item, request }));
+  //     }
+
+  //     // Filter by date range and other criteria
+  //     const filteredItems = allRequestItems.filter(item => {
+  //       const reqDate = new Date(item.request.createdAt || '');
+  //       const start = new Date(startDate as string);
+  //       const end = new Date(endDate as string);
+        
+  //       let matchesDate = reqDate >= start && reqDate <= end;
+  //       let matchesDept = !departmentId || departmentId === 'all' || item.request.userId;
+  //       let matchesWarehouse = !warehouseId || warehouseId === 'all';
+  //       // Only include completed/approved requests for accurate analytics
+  //       let isApproved = item.request.status === 'completed' ;
+        
+  //       return matchesDate && matchesDept && matchesWarehouse && isApproved;
+  //     });
+
+  //     // Group by item
+  //     const itemOrders = new Map();
+  //     const allItems = await storage.getAllItems();
+      
+  //     filteredItems.forEach(reqItem => {
+  //       const item = allItems.find(i => i.id === reqItem.itemId);
+  //       if (!item) return;
+        
+  //       if (!itemOrders.has(reqItem.itemId)) {
+  //         itemOrders.set(reqItem.itemId, {
+  //           itemId: reqItem.itemId,
+  //           name: item.name,
+  //           sku: item.sku,
+  //           orderCount: 0,
+  //           totalQuantity: 0
+  //         });
+  //       }
+        
+  //       const order = itemOrders.get(reqItem.itemId);
+  //       order.orderCount++;
+  //       order.totalQuantity += reqItem.quantity;
+  //     });
+
+  //     const mostOrdered = Array.from(itemOrders.values())
+  //       .sort((a, b) => b.orderCount - a.orderCount);
+
+  //     res.json(mostOrdered);
+  //   } catch (error: any) {
+  //     res.status(500).json({ message: error.message });
+  //   }
+  // });
+  // Most Ordered Items Analytics (CORRECT VERSION)
   app.get("/api/analytics/most-ordered", async (req, res) => {
     try {
       if (!req.user) {
         return res.status(401).json({ message: "Not authenticated" });
       }
 
-      const { startDate, endDate, departmentId, warehouseId } = req.query;
-      
-      const allRequests = await storage.getAllRequests();
-      const allRequestItems = [];
-      
-      for (const request of allRequests) {
-        const items = await storage.getRequestItemsByRequest(request.id);
-        items.forEach(item => allRequestItems.push({ ...item, request }));
-      }
+      const { startDate, endDate } = req.query;
 
-      // Filter by date range and other criteria
-      const filteredItems = allRequestItems.filter(item => {
-        const reqDate = new Date(item.request.createdAt || '');
-        const start = new Date(startDate as string);
-        const end = new Date(endDate as string);
-        
-        let matchesDate = reqDate >= start && reqDate <= end;
-        let matchesDept = !departmentId || departmentId === 'all' || item.request.userId;
-        let matchesWarehouse = !warehouseId || warehouseId === 'all';
-        // Only include completed/approved requests for accurate analytics
-        let isApproved = item.request.status === 'completed' || item.request.status === 'approved';
-        
-        return matchesDate && matchesDept && matchesWarehouse && isApproved;
+      const allTransactions = await storage.getAllTransactions();
+
+      const filtered = allTransactions.filter(t => {
+        if (t.transactionType !== "issue") return false;
+        const date = new Date(t.createdAt);
+        return date >= new Date(startDate) && date <= new Date(endDate);
       });
 
-      // Group by item
-      const itemOrders = new Map();
+      const itemMap = new Map();
+
       const allItems = await storage.getAllItems();
-      
-      filteredItems.forEach(reqItem => {
-        const item = allItems.find(i => i.id === reqItem.itemId);
-        if (!item) return;
-        
-        if (!itemOrders.has(reqItem.itemId)) {
-          itemOrders.set(reqItem.itemId, {
-            itemId: reqItem.itemId,
+      const itemsById = new Map(allItems.map(i => [i.id, i]));
+
+      for (const trx of filtered) {
+        if (!itemMap.has(trx.itemId)) {
+          const item = itemsById.get(trx.itemId);
+          itemMap.set(trx.itemId, {
+            itemId: trx.itemId,
             name: item.name,
             sku: item.sku,
+            totalQuantity: 0,
             orderCount: 0,
-            totalQuantity: 0
           });
         }
-        
-        const order = itemOrders.get(reqItem.itemId);
-        order.orderCount++;
-        order.totalQuantity += reqItem.quantity;
-      });
 
-      const mostOrdered = Array.from(itemOrders.values())
-        .sort((a, b) => b.orderCount - a.orderCount);
+        const entry = itemMap.get(trx.itemId);
+        entry.totalQuantity += trx.quantity;
+        entry.orderCount += 1; // or unique request ID
+      }
 
-      res.json(mostOrdered);
-    } catch (error: any) {
+      const result = Array.from(itemMap.values()).sort(
+        (a, b) => b.totalQuantity - a.totalQuantity
+      );
+
+      res.json(result);
+    } catch (error) {
       res.status(500).json({ message: error.message });
     }
   });
+
+
 
   // Department Consumption Analytics
   app.get("/api/analytics/department-consumption", async (req, res) => {

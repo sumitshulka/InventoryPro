@@ -52,7 +52,7 @@ export default function RejectedGoodsPage() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  const { data: rejectedGoods = [], isLoading } = useQuery({
+  const { data: UnSortedRejectedGoods = [], isLoading } = useQuery({
     queryKey: ['/api/rejected-goods'],
   });
 
@@ -211,6 +211,12 @@ export default function RejectedGoodsPage() {
     setActionType(action);
     setActionDialogOpen(true);
   };
+  const rejectedGoods = UnSortedRejectedGoods
+  ? [...(UnSortedRejectedGoods as RejectedGoods[])].sort(
+      (a, b) => new Date(b.rejectedAt).getTime() - new Date(a.rejectedAt).getTime()
+    )
+  : [];
+
 
   const filteredGoods = (rejectedGoods as RejectedGoods[]).filter(item => item.status === 'rejected');
   const processedGoods = (rejectedGoods as RejectedGoods[]).filter(item => item.status !== 'rejected');

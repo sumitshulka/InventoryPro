@@ -40,6 +40,7 @@ export const users = pgTable("users", {
   resetToken: text("reset_token"),
   resetTokenExpiry: text("reset_token_expiry"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
   usersRoleIdx: index("users_role_idx").on(table.role),
   usersManagerIdx: index("users_manager_idx").on(table.managerId),
@@ -254,6 +255,7 @@ export const transactions = pgTable("transactions", {
   id: serial("id").primaryKey(),
   transactionCode: text("transaction_code").notNull().unique(),
   itemId: integer("item_id").notNull(),
+  transferId: integer("transfer_id"),
   quantity: integer("quantity").notNull(),
   transactionType: text("transaction_type").notNull(),
   sourceWarehouseId: integer("source_warehouse_id"),

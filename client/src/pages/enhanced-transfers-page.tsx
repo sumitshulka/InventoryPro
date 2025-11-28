@@ -280,6 +280,9 @@ export default function EnhancedTransfersPage() {
   const { data: users, isLoading: userLoading } = useQuery({
     queryKey: ["/api/users", refreshKey],
   });
+  const { data: usersName,isLoading:userNameLoading} = useQuery({
+    queryKey:["/api/usersName",refreshKey]
+  })
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -643,8 +646,8 @@ export default function EnhancedTransfersPage() {
     return item ? item.name : `Item #${itemId}`;
   };
   const getUserName = (userId: number) => {
-    if (!users) return "";
-    const user = users.find((u: any) => u.id === userId);
+    if (!usersName) return "";
+    const user = usersName.find((u: any) => u.id === userId);
     return user ? user.name : "";
   };
 
@@ -708,8 +711,21 @@ export default function EnhancedTransfersPage() {
         return <Package className="w-4 h-4" />;
     }
   };
+  // 1️⃣ Start with all transfers
+let roleFilteredTransfers =
+  transfers && Array.isArray(transfers) ? transfers : [];
 
-  const filteredTransfers = (transfers && Array.isArray(transfers) ? transfers : []).filter((transfer: any) => {
+// 2️⃣ If user is warehouse operator (employee + isWarehouseOperator = true), filter transfers
+if (user?.role === "employee" && user?.isWarehouseOperator && user?.warehouseId) {
+  roleFilteredTransfers = roleFilteredTransfers?.filter((t: any) =>
+    t.sourceWarehouseId === user.warehouseId ||
+    t.destinationWarehouseId === user.warehouseId
+  )|| [];
+}
+// 3️⃣ Other roles: admin, managers → see all transfers (no change)
+
+
+  const filteredTransfers = (Array.isArray(roleFilteredTransfers) ? roleFilteredTransfers : []).filter((transfer: any) => {
     switch (activeTab) {
       case "pending":
         return transfer.status === "pending" || transfer.status === "approved";
@@ -900,7 +916,7 @@ export default function EnhancedTransfersPage() {
                                   <FileText className="h-4 w-4" />
                                 </Button>
                                 {transfer.status === "pending" && (
-                                  <>
+                                  <>{(user?.role === 'admin' || transfer.sourceWarehouse?.managerId === user?.id) && (
                                     <Button
                                       variant="ghost"
                                       size="sm"
@@ -910,7 +926,8 @@ export default function EnhancedTransfersPage() {
                                     >
                                       <CheckCircle className="h-4 w-4" />
                                     </Button>
-                                    {(user?.role === 'admin' || transfer.initiatedBy === user?.id) && (
+                                  )}
+                                    {(user?.role === 'admin' || transfer.sourceWarehouse?.managerId === user?.id) && (
                                       <Button
                                         variant="ghost"
                                         size="sm"
@@ -1141,7 +1158,7 @@ export default function EnhancedTransfersPage() {
                             
                             // Non-admin users can only select warehouses they manage or are assigned to
                             return user?.warehouseId === w.id || w.managerId === user?.id;
-                          });
+                          })|| [];
                           
                           return availableWarehouses?.length > 0 ? (
                             availableWarehouses.map((warehouse: any) => (
@@ -1309,7 +1326,7 @@ export default function EnhancedTransfersPage() {
                               <SelectContent>
                                 {itemsAvailableInWarehouse.length > 0 ? (
                                   itemsAvailableInWarehouse.map((item: any) => {
-                                    const availableQty = inventory.find(
+                                    const availableQty = inventory?.find(
                                       inv => inv.itemId === item.id && inv.warehouseId === sourceWarehouseId
                                     )?.quantity || 0;
 
@@ -1848,7 +1865,7 @@ export default function EnhancedTransfersPage() {
                         {selectedTransfer.status}
                       </span>
                     </div>
-                    <div>
+                    {/* <div>
                       <span className="font-medium">Priority:</span>
                       <span className={`ml-2 px-2 py-1 rounded text-xs font-medium ${
                         selectedTransfer.priority === 'high' ? 'bg-red-100 text-red-800' :
@@ -1857,10 +1874,15 @@ export default function EnhancedTransfersPage() {
                       }`}>
                         {selectedTransfer.priority}
                       </span>
-                    </div>
+                    </div> */}
                     <div>
                       <span className="font-medium">Transport:</span>
-                      <span className="ml-2">{selectedTransfer.transportMethod}</span>
+                        <span className="ml-2 capitalize">
+                          {selectedTransfer.transferMode === 'courier' ? 'Courier Service' : 
+                            selectedTransfer.transferMode === 'handover' ? 'In-Person Handover' : 
+                            selectedTransfer.transferMode === 'pickup' ? 'Pickup' : 
+                            selectedTransfer.transferMode}
+                        </span> 
                     </div>
                     <div>
                       <span className="font-medium">From:</span>
@@ -2029,7 +2051,7 @@ export default function EnhancedTransfersPage() {
                       <div className="flex-1">
                         <div className="font-medium text-sm">Transfer Created</div>
                         <div className="text-xs text-gray-600">{formatDateTime(selectedTransfer?.createdAt)}</div>
-                        <div className="text-xs text-gray-700">Transfer request initiated</div>
+                        <div className="text-xs text-gray-700">Transfer request initiated by: {selectedTransfer?.initiatedByUser.name}</div>
                       </div>
                     </div>
 
@@ -2058,12 +2080,12 @@ export default function EnhancedTransfersPage() {
                           <div className="text-xs text-gray-600">{formatDateTime(selectedTransfer.handoverDate)}</div>
                           <div className="text-xs text-gray-700">
                             {selectedTransfer.transferMode === 'courier' && selectedTransfer.courierName ? (
-                              <>Items handed over to courier: {selectedTransfer.courierName}</>
+                              <>Items handed over to courier: {selectedTransfer.courierName} by : {getUserName(selectedTransfer?.inTransit?.updatedBy)}</> 
                             ) : selectedTransfer.transferMode === 'handover' && selectedTransfer.handoverPersonName ? (
                               <>Items handed over to: {selectedTransfer.handoverPersonName}
-                                {selectedTransfer.handoverPersonContact && ` (${selectedTransfer.handoverPersonContact})`}</>
+                                {selectedTransfer.handoverPersonContact && ` (${selectedTransfer.handoverPersonContact})`} by : {getUserName(selectedTransfer?.inTransit?.updatedBy)}</>
                             ) : (
-                              'Items handed over to transport'
+                              `Items handed over to transport by : ${getUserName(selectedTransfer?.inTransit?.updatedBy)}`
                             )}
                           </div>
                           {selectedTransfer.trackingNumber && (
@@ -2088,7 +2110,7 @@ export default function EnhancedTransfersPage() {
                           <div className="text-xs text-gray-600">{formatDateTime(selectedTransfer.receivedDate)}</div>
                           <div className="text-xs text-gray-700">
                             {selectedTransfer.receivedBy ? (
-                              <>Items received and processed by: {selectedTransfer.receivedBy}</>
+                              <>Items received and processed by: {getUserName(selectedTransfer.receivedBy)}</>
                             ) : (
                               'Items received and processed'
                             )}
@@ -2194,7 +2216,7 @@ export default function EnhancedTransfersPage() {
                         <div className="flex-1">
                           <div className="font-medium text-sm">Return Shipment Initiated</div>
                           <div className="text-xs text-gray-600">{formatDateTime(selectedTransfer.returnShipped?.createdAt)}</div>
-                          <div className="text-xs text-gray-700">{selectedTransfer.returnShipped?.description}</div>
+                          <div className="text-xs text-gray-700"> Retrun Shipment Initiated by : {getUserName(selectedTransfer?.returnShipped?.updatedBy)}</div>
                           {selectedTransfer.returnCourierName && (
                             <div className="text-xs text-blue-600 mt-1">
                               Courier: {selectedTransfer.returnCourierName}
@@ -2215,7 +2237,7 @@ export default function EnhancedTransfersPage() {
                         <div className="flex-1">
                           <div className="font-medium text-sm">Return Completed</div>
                           <div className="text-xs text-gray-600">{formatDateTime(selectedTransfer.returned?.createdAt)}</div>
-                          <div className="text-xs text-gray-700">{selectedTransfer.returned?.description}</div>
+                          <div className="text-xs text-gray-700">Return Received by : {getUserName(selectedTransfer.returned?.updatedBy)}</div>
                           {selectedTransfer.returnDeliveredDate && (
                             <div className="text-xs text-gray-600 mt-1">
                               Delivered: {formatDateTime(selectedTransfer.returnDeliveredDate)}

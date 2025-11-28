@@ -163,7 +163,7 @@ export default function WarehousesPage() {
   // Filter warehouses based on archive status
   const activeWarehouses = warehouses?.filter((warehouse: any) => warehouse.isActive === true && warehouse.status !=='deleted') || [];
   const archivedWarehouses = warehouses?.filter((warehouse: any) => warehouse.status === 'deleted') || [];
-  const inactiveWarehouses = warehouses?.filter((warehouse:any) => warehouse.isActive=== false && warehouse.status !=='deleted')
+  const inactiveWarehouses = warehouses?.filter((warehouse:any) => warehouse.isActive=== false && warehouse.status !=='deleted') || [];
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),

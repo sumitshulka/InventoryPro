@@ -29,22 +29,27 @@ export default function AuditTrailPage() {
       log.details?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       log.user?.name?.toLowerCase().includes(searchTerm.toLowerCase());
     
-    const matchesAction = actionFilter === "all" || log.action === actionFilter;
+  const matchesAction =
+    actionFilter === "all" ||
+    log.action?.toLowerCase() === actionFilter.toLowerCase();
     const matchesUser = userFilter === "all" || log.userId?.toString() === userFilter;
     
     return matchesSearch && matchesAction && matchesUser;
   });
 
   const getActionBadgeColor = (action: string) => {
-    switch (action?.toLowerCase()) {
-      case 'create': return 'bg-green-100 text-green-800';
-      case 'update': return 'bg-blue-100 text-blue-800';
-      case 'delete': return 'bg-red-100 text-red-800';
-      case 'login': return 'bg-purple-100 text-purple-800';
-      case 'logout': return 'bg-gray-100 text-gray-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
+    const a = action?.toLowerCase();
+
+    if (a.includes("create")) return "bg-green-100 text-green-800";
+    if (a.includes("update")) return "bg-blue-100 text-blue-800";
+    if (a.includes("delete")) return "bg-red-100 text-red-800";
+    if (a.includes("login")) return "bg-purple-100 text-purple-800";
+    if (a.includes("logout")) return "bg-gray-100 text-gray-800";
+    if (a.includes("dispose")) return "bg-orange-100 text-orange-800";
+
+    return "bg-gray-100 text-gray-800";
   };
+
 
   const uniqueActions = [...new Set(auditLogs.map((log: any) => log.action))];
 
@@ -174,7 +179,7 @@ export default function AuditTrailPage() {
                                 {log.details || 'No details available'}
                               </p>
                               
-                              {/* Enhanced display for transfer updates */}
+                              {/* Enhanced display for transfer updates
                               {log.entityType === 'transfer' && log.action === 'UPDATE' && (log.oldValues || log.newValues) && (
                                 <div className="mt-2 space-y-2">
                                   {(() => {
@@ -227,7 +232,7 @@ export default function AuditTrailPage() {
                               )}
                               
                               {/* Enhanced display for user updates */}
-                              {log.entityType === 'user' && log.action === 'UPDATE' && (log.oldValues || log.newValues) && (
+                              {/* {log.entityType === 'user' && log.action === 'UPDATE' && (log.oldValues || log.newValues) && (
                                 <div className="mt-2 space-y-2">
                                   {(() => {
                                     try {
@@ -269,7 +274,70 @@ export default function AuditTrailPage() {
                                     }
                                   })()}
                                 </div>
+                              )} */} 
+                              {/* Universal Diff Renderer */}
+                             {/* Universal Diff Renderer */}
+                              {(log.oldValues || log.newValues) && (
+                                <div className="mt-2 space-y-2">
+                                  {(() => {
+                                    try {
+                                      const oldValues = log.oldValues ? JSON.parse(log.oldValues) : {};
+                                      const newValues = log.newValues ? JSON.parse(log.newValues) : {};
+
+                                      const changes = [];
+
+                                      for (const key of Object.keys(newValues)) {
+                                        const oldVal = oldValues[key];
+                                        const newVal = newValues[key];
+
+                                        const hasMeaningfulOld =
+                                          oldVal !== null && oldVal !== undefined && oldVal !== "";
+
+                                        if (!hasMeaningfulOld) {
+                                          // show ONLY the new value
+                                          changes.push({
+                                            field: key,
+                                            old: null,
+                                            new: newVal,
+                                            showDirection: false
+                                          });
+                                        } else if (oldVal !== newVal) {
+                                          // show old → new diff
+                                          changes.push({
+                                            field: key,
+                                            old: oldVal,
+                                            new: newVal,
+                                            showDirection: true
+                                          });
+                                        }
+                                      }
+
+                                      if (changes.length === 0) return null;
+
+                                      return (
+                                        <div className="text-sm">
+                                          <div className="font-medium text-gray-700 mb-1">Changes:</div>
+                                          <ul className="list-disc list-inside space-y-1 text-gray-600">
+                                            {changes.map((c, idx) => (
+                                              <li key={idx}>
+                                                <strong>{c.field}:</strong>{" "}
+                                                {c.showDirection
+                                                  ? `${c.old} → ${c.new}`
+                                                  : `${c.new}`} 
+                                              </li>
+                                            ))}
+                                          </ul>
+                                        </div>
+                                      );
+                                    } catch (e) {
+                                      console.error("Diff parse error", e);
+                                      return null;
+                                    }
+                                  })()}
+                                </div>
                               )}
+
+
                               
                               {log.metadata && (
                                 <div className="text-sm text-gray-600">

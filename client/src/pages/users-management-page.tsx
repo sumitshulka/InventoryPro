@@ -295,9 +295,9 @@ export default function UsersManagementPage() {
     }
   };
 
-  const toggleUserStatusMutation = useMutation({
+   const toggleUserStatusMutation = useMutation({
     mutationFn: async ({ userId, isActive }: { userId: number; isActive: boolean }) => {
-      return apiRequest(`/api/users/${userId}/status`, "PATCH", { isActive });
+      return apiRequest("PATCH",`/api/users/${userId}/status`,  { isActive });
     },
     onSuccess: () => {
       toast({

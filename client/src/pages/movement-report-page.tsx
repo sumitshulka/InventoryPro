@@ -160,13 +160,14 @@ export default function MovementReportPage() {
 
   // Group transactions by type for summary
   const getTransactionCounts = () => {
-    if (!transactions) return { checkIn: 0, issue: 0, transfer: 0, total: 0 };
+    if (!transactions) return { checkIn: 0, issue: 0, transfer: 0, total: 0, disposal:0 };
     
     const counts = {
       checkIn: 0,
       issue: 0,
       transfer: 0,
-      total: 0
+      total: 0,
+      disposal:0,
     };
     
     filteredTransactions.forEach((transaction: any) => {
@@ -181,6 +182,9 @@ export default function MovementReportPage() {
           break;
         case "transfer":
           counts.transfer++;
+          break;
+        case "disposal":
+          counts.disposal++;
           break;
       }
     });
@@ -241,7 +245,7 @@ export default function MovementReportPage() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
@@ -249,7 +253,7 @@ export default function MovementReportPage() {
                 <p className="text-sm font-medium text-gray-500">Total Movements</p>
                 <h2 className="text-3xl font-bold">{transactionCounts.total}</h2>
               </div>
-              <div className="bg-primary bg-opacity-10 p-3 rounded-full">
+              <div className="bg-white bg-opacity-10 p-3 rounded-full">
                 <Package className="h-6 w-6 text-primary" />
               </div>
             </div>
@@ -291,8 +295,22 @@ export default function MovementReportPage() {
                 <p className="text-sm font-medium text-gray-500">Transfers</p>
                 <h2 className="text-3xl font-bold text-blue-600">{transactionCounts.transfer}</h2>
               </div>
-              <div className="bg-blue-100 p-3 rounded-full">
+              <div className="bg-red-100 p-3 rounded-full">
                 <ArrowRightLeft className="h-6 w-6 text-blue-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-500">Disposed</p>
+                <h2 className="text-3xl font-bold text-red-700">{transactionCounts.disposal}</h2>
+              </div>
+              <div className="bg-red-300 px-3 py-2  rounded-full">
+                <span className="material-icons">delete_forever</span>
               </div>
             </div>
           </CardContent>
@@ -338,6 +356,7 @@ export default function MovementReportPage() {
                   <SelectItem value="check-in">Check-ins</SelectItem>
                   <SelectItem value="issue">Issues</SelectItem>
                   <SelectItem value="transfer">Transfers</SelectItem>
+                  <SelectItem value='disposal'>Disposed</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -423,7 +442,7 @@ export default function MovementReportPage() {
                   <TableHead>Quantity</TableHead>
                   <TableHead>Source</TableHead>
                   <TableHead>Destination</TableHead>
-                  <TableHead>Cost</TableHead>
+                  <TableHead>Unit Cost</TableHead>
                   <TableHead>Date</TableHead>
                   <TableHead>Status</TableHead>
                 </TableRow>
@@ -450,9 +469,13 @@ export default function MovementReportPage() {
                           {transaction.transactionType === "transfer" && (
                             <ArrowRightLeft className="h-4 w-4 text-blue-600" />
                           )}
+                          {transaction.transactionType === "disposal" && (
+                            <span className="material-icons text-[19px] leading-none">delete_forever</span>
+                          )}
                           <span className={`px-2 py-1 text-xs rounded-full ${getTransactionTypeColor(transaction.transactionType)}`}>
                             {transaction.transactionType === "check-in" ? "Check-in" : 
-                             transaction.transactionType === "issue" ? "Issue" : "Transfer"}
+                             transaction.transactionType === "issue" ? "Issue" :
+                             transaction.transactionType === "transfer" ? "Transfer" : "Disposed"}
                           </span>
                         </div>
                       </TableCell>
@@ -498,7 +521,7 @@ export default function MovementReportPage() {
                       <TableCell>
                         <span className={`px-2 py-1 text-xs rounded-full ${getStatusColor(transaction.status)}`}>
                           {transaction.status === "in-transit" ? "In Transit" : 
-                           transaction.status.charAt(0).toUpperCase() + transaction.status.slice(1)}
+                           (transaction.status || 'Unknown').charAt(0).toUpperCase() + (transaction.status || 'Unknown').slice(1)}
                         </span>
                       </TableCell>
                     </TableRow>

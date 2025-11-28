@@ -1,5 +1,5 @@
 import { useState,useMemo } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation,useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -15,7 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest } from "@/lib/queryClient";
 import { Loader2, CalendarIcon, Plus, Trash2, Package } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
@@ -68,6 +68,9 @@ export default function CheckInPage() {
   const { toast } = useToast();
   const { user } = useAuth();
   const { currencySymbol, formatCurrencyFull } = useCurrency();
+  const [refreshKey, setRefreshKey] = useState(0);
+  const queryClient = useQueryClient();
+  
 
   const { data: items = [], isLoading: itemsLoading } = useQuery<Array<{
     id: number;
@@ -208,6 +211,9 @@ export default function CheckInPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/reports/inventory-stock"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard/summary"] });
       queryClient.invalidateQueries({ queryKey: ["/api/warehouses/stats"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/warehouses"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
+      setRefreshKey(prev => prev + 1);
       toast({
         title: "Success",
         description: `Successfully checked in ${variables.items.length} item(s)`,
@@ -297,7 +303,7 @@ export default function CheckInPage() {
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel>Destination Warehouse *</FormLabel>
-                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <Select key={refreshKey} onValueChange={field.onChange} value={field.value}>
                               <FormControl>
                                 <SelectTrigger>
                                   <SelectValue placeholder="Select warehouse" />

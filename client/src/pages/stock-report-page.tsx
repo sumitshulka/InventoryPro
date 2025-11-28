@@ -88,11 +88,11 @@ export default function StockReportPage() {
   });
 
   // Apply filters to inventory data
-  const filteredInventory = inventoryReport
+  const filteredInventory = Array.isArray(inventoryReport)
     ? inventoryReport.filter((item: any) => {
         const matchesSearch = 
-          item.item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          item.item.sku.toLowerCase().includes(searchTerm.toLowerCase());
+          (item.item?.name || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+          (item.item?.sku || "").toLowerCase().includes(searchTerm.toLowerCase());
         
         const matchesWarehouse = 
           warehouseFilter === "all" || 
@@ -100,7 +100,7 @@ export default function StockReportPage() {
         
         const matchesCategory = 
           categoryFilter === "all" || 
-          item.item.categoryId?.toString() === categoryFilter;
+          item.item?.categoryId?.toString() === categoryFilter;
         
         const matchesStock = 
           stockFilter === "all" || 
@@ -110,12 +110,12 @@ export default function StockReportPage() {
         return matchesSearch && matchesWarehouse && matchesCategory && matchesStock;
       })
     : [];
-  const LowStockInventories = inventoryReport ? inventoryReport.filter((item:any)=>item.isLowStock===true):[];
+  const LowStockInventories = Array.isArray(inventoryReport) ? inventoryReport.filter((item:any)=>item.isLowStock===true):[];
 
   // Calculate totals for each item across all warehouses
   const calculateTotals = () => {
-    if (!inventoryReport) return [];
-    
+    if (!Array.isArray(inventoryReport)) return [];
+
     const totals = new Map();
     
     inventoryReport.forEach((item: any) => {
@@ -279,11 +279,11 @@ export default function StockReportPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Warehouses</SelectItem>
-                  {warehouses?.map((warehouse: any) => (
+                  {warehouses && Array.isArray(warehouses) ? warehouses?.map((warehouse: any) => (
                     <SelectItem key={warehouse.id} value={warehouse.id.toString()}>
                       {warehouse.name}
                     </SelectItem>
-                  ))}
+                  )) : null}
                 </SelectContent>
               </Select>
             </div>
@@ -298,11 +298,11 @@ export default function StockReportPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Categories</SelectItem>
-                  {categories?.map((category: any) => (
+                  {categories && Array.isArray(categories) ?categories?.map((category: any) => (
                     <SelectItem key={category.id} value={category.id.toString()}>
                       {category.name}
                     </SelectItem>
-                  ))}
+                  )):null}
                 </SelectContent>
               </Select>
             </div>
@@ -354,11 +354,11 @@ export default function StockReportPage() {
                 ) : (
                   filteredInventory.map((inv: any) => (
                     <TableRow key={`${inv.itemId}-${inv.warehouseId}`}>
-                      <TableCell className="font-medium">{inv.item.sku}</TableCell>
-                      <TableCell>{inv.item.name}</TableCell>
-                      <TableCell>{inv.warehouse.name}</TableCell>
+                      <TableCell className="font-medium">{inv.item?.sku}</TableCell>
+                      <TableCell>{inv.item?.name}</TableCell>
+                      <TableCell>{inv.warehouse?.name || 'Unknown Warehouse'}</TableCell>
                       <TableCell className="text-right">{inv.quantity}</TableCell>
-                      <TableCell className="text-right">{inv.item.minStockLevel}</TableCell>
+                      <TableCell className="text-right">{inv.item?.minStockLevel}</TableCell>
                       <TableCell>
                         {inv.isLowStock ? (
                           <span className="px-2 py-1 bg-red-100 text-red-800 rounded-full text-xs font-medium">

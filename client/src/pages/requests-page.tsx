@@ -287,24 +287,32 @@ export default function RequestsPage() {
 
   // Function to check if current user can approve a specific request
   const canApproveRequest = (request: any) => {
-    if (!user) return false;
-    
-    // Admin can approve any request, including their own
+    if (!user || !warehouses) return false;
+
+    // Admin can approve everything
     if (user.role === "admin") return true;
-    
-    // Non-admin users cannot approve their own requests
-    if (request.userId === user.id) return false;
-    
-    // For managers, they can only approve requests from their subordinates
-    // This requires checking if the requester reports to this manager
-    if (user.role === "manager") {
-      // Check if the request is from a user who reports to this manager
-      const requester = users?.find((u: any) => u.id === request.userId);
-      return requester?.managerId === user.id;
+
+    // Find the warehouse of this request
+    const warehouse = warehouses.find((w: any) => w.id === request.warehouseId);
+    if (!warehouse) return false;
+
+    // warehouse.managerId might be a single number or array
+    let managers = warehouse.managerId;
+    if (!managers) return false;
+
+    if (!Array.isArray(managers)) {
+      managers = [managers];
     }
-    
+
+    // If current user is one of the managers → approve allowed (even their own request)
+    if (managers.includes(user.id)) {
+      return true;
+    }
+
     return false;
   };
+
+
   const selectedWarehouseId = form.watch("warehouseId");
 
   const availableItems = useMemo(() => {
@@ -327,6 +335,7 @@ export default function RequestsPage() {
       })
       .filter(Boolean); // remove nulls
   }, [inventory, items, selectedWarehouseId]);
+  
 
 
 
@@ -439,7 +448,7 @@ export default function RequestsPage() {
                               >
                                 <Eye className="h-4 w-4" />
                               </Button>
-                              {canApproveRequest(request) && request.status === "pending" && (
+                              { canApproveRequest(request) && request.status === "pending" && (
                                 <>
                                   <Button
                                     variant="ghost"
@@ -560,74 +569,90 @@ export default function RequestsPage() {
                   <p className="text-sm text-red-500">{form.formState.errors.items.root?.message}</p>
                 )}
                 
-                {fields.map((field, index) => (
-                  <div key={field.id} className="flex items-start space-x-3">
-                    <div className="flex-1 space-y-2">
-                      <Label htmlFor={`items.${index}.itemId`}>Item</Label>
-                      <Select
-                        disabled={!selectedWarehouseId}
-                        onValueChange={(value) => form.setValue(`items.${index}.itemId`, value)}
-                        defaultValue={form.getValues(`items.${index}.itemId`)}
+                {fields.map((field, index) => {
+                  const selectedItemId = form.watch(`items.${index}.itemId`);
+
+                  const selectedItem = availableItems.find(
+                    (i: any) => i.id === Number(selectedItemId)
+                  );
+
+                  const maxQty = selectedItem?.quantity ?? 0;
+
+                  return (
+                    <div key={field.id} className="flex items-start space-x-3">
+                      <div className="flex-1 space-y-2">
+                        <Label>Item</Label>
+                        <Select
+                          disabled={!selectedWarehouseId}
+                          onValueChange={(value) => {
+                            form.setValue(`items.${index}.itemId`, value);
+                            form.setValue(`items.${index}.quantity`, "");
+                          }}
+                          defaultValue={form.getValues(`items.${index}.itemId`)}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select an item" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {availableItems.length > 0 ? (
+                              availableItems.map((item: any) => (
+                                <SelectItem key={item.id} value={item.id.toString()}>
+                                  {item.name} ({item.sku}){" "}
+                                  <span
+                                    className={item.quantity > 0 ? "text-green-600" : "text-red-600"}
+                                  >
+                                    Available: {item.quantity}
+                                  </span>
+                                </SelectItem>
+                              ))
+                            ) : (
+                              <div className="p-2 text-sm text-gray-500">
+                                No items available
+                              </div>
+                            )}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {/* ✔ CLEAN QUANTITY FIELD — NO EXTRA MESSAGES */}
+                      <div className="w-24 space-y-2">
+                        <Label>Quantity</Label>
+
+                        <Input
+                          type="number"
+                          min={1}
+                          max={maxQty}
+                          placeholder="Qty"
+                          value={form.watch(`items.${index}.quantity`) || ""}
+                          onChange={(e) => {
+                            let val = Number(e.target.value);
+
+                            // Clamp the value
+                            if (val > maxQty) val = maxQty;
+                            if (val < 1) val = 1;
+
+                            form.setValue(`items.${index}.quantity`, val.toString(), {
+                              shouldValidate: true,
+                              shouldDirty: true,
+                            });
+                          }}
+                          disabled={maxQty === 0} // Disable if no stock
+                        />
+                      </div>
+
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="mt-8"
+                        onClick={() => fields.length > 1 && remove(index)}
                       >
-                        <SelectTrigger>
-                          <SelectValue
-                            placeholder={
-                              !selectedWarehouseId
-                                ? "Select warehouse first"
-                                : "Select an item"
-                            }
-                          />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {!selectedWarehouseId ? (
-                            <div className="p-2 text-sm text-gray-500">
-                              Please select a warehouse first.
-                            </div>
-                          ) : availableItems.length > 0 ? (
-                            availableItems.map((item: any) => (
-                              <SelectItem key={item.id} value={item.id.toString()}>
-                                {item.name} ({item.sku}) <span className={item.quantity>0?"text-green-600":"text-red-600"}>  Available: {item.quantity}</span>
-                              </SelectItem>
-                            ))
-                          ) : (
-                            <div className="p-2 text-sm text-gray-500">
-                              No items in selected warehouse inventory.
-                            </div>
-                          )}
-                        </SelectContent>
-                      </Select>
-                      {form.formState.errors.items?.[index]?.itemId && (
-                        <p className="text-sm text-red-500">
-                          {form.formState.errors.items[index]?.itemId?.message}
-                        </p>
-                      )}
+                        <X className="h-4 w-4" />
+                      </Button>
                     </div>
-                    <div className="w-24 space-y-2">
-                      <Label htmlFor={`items.${index}.quantity`}>Quantity</Label>
-                      <Input
-                        id={`items.${index}.quantity`}
-                        type="number"
-                        min="1"
-                        placeholder="Qty"
-                        {...form.register(`items.${index}.quantity`)}
-                      />
-                      {form.formState.errors.items?.[index]?.quantity && (
-                        <p className="text-sm text-red-500">
-                          {form.formState.errors.items[index]?.quantity?.message}
-                        </p>
-                      )}
-                    </div>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="mt-8"
-                      onClick={() => fields.length > 1 && remove(index)}
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ))}
+                  );
+                })}
+
               </div>
             </div>
 
@@ -733,7 +758,7 @@ export default function RequestsPage() {
             </div>
 
             <DialogFooter>
-              {selectedRequest && canApproveRequest(selectedRequest) && (
+              {selectedRequest &&  canApproveRequest(selectedRequest) && (
                 <div className="flex space-x-2 mr-auto">
                   {selectedRequest.status === "pending" && (
                     <>

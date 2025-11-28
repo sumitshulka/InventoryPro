@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState,useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -60,13 +60,33 @@ export default function ApprovalManagementPage() {
   });
 
   // Fetch additional data for context
-  const { data: items = [] } = useQuery({
+  const { data: unsafeitems = [] } = useQuery({
     queryKey: ["/api/items"],
   });
+  const items= unsafeitems || [];
+
 
   const { data: warehouses = [] } = useQuery({
     queryKey: ["/api/warehouses"],
   });
+    // ✅ ADD THIS EFFECT HERE
+  useEffect(() => {
+    if (!selectedApproval) return;
+
+    const stillExists = pendingApprovals.some(
+      (p) => p.id === selectedApproval.id
+    );
+
+    if (!stillExists) {
+      setSelectedApproval(null);
+      setActionNotes("");
+
+      toast({
+        title: "Updated",
+        description: "This request was already processed by another approver.",
+      });
+    }
+  }, [pendingApprovals, selectedApproval, toast]);
 
   const approvalMutation = useMutation({
     mutationFn: async ({ 

@@ -91,6 +91,7 @@ import createMemoryStore from "memorystore";
 import { db, pool } from "./db";
 import { eq, and, desc, or, ne, sql } from "drizzle-orm";
 import {alias} from 'drizzle-orm/pg-core';
+import { TicketX } from "lucide-react";
 const MemoryStore = createMemoryStore(session);
 const PostgresSessionStore = connectPg(session);
 
@@ -225,12 +226,12 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getAllUsers(): Promise<User[]> {
-    return await db.select().from(users);
+    return await db.select().from(users).orderBy(desc(users.updatedAt));
   }
 
   async updateUser(id: number, userData: Partial<InsertUser>): Promise<User | undefined> {
     const [updatedUser] = await db.update(users)
-      .set(userData)
+      .set({...userData,updatedAt:new Date()})
       .where(eq(users.id, id))
       .returning();
     return updatedUser;
@@ -419,9 +420,18 @@ export class DatabaseStorage implements IStorage {
       .where(and(eq(inventory.itemId, itemId), eq(inventory.warehouseId, warehouseId)));
     return inv;
   }
+  async getInventoryByItemAndWarehouseTx(tx:any,itemId: number, warehouseId: number): Promise<Inventory | undefined> {
+    const [inv] = await tx.select().from(inventory)
+      .where(and(eq(inventory.itemId, itemId), eq(inventory.warehouseId, warehouseId)));
+    return inv;
+  }
 
   async createInventory(inv: InsertInventory): Promise<Inventory> {
     const [newInventory] = await db.insert(inventory).values(inv).returning();
+    return newInventory;
+  }
+  async createInventoryTx(tx:any,inv: InsertInventory): Promise<Inventory> {
+    const [newInventory] = await tx.insert(inventory).values(inv).returning();
     return newInventory;
   }
 
@@ -434,8 +444,9 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateInventory(id: number, inventoryData: Partial<InsertInventory>): Promise<Inventory | undefined> {
+    const lastUpdatedInventoryData={...inventoryData,lastUpdated:new Date()}
     const [updatedInventory] = await db.update(inventory)
-      .set(inventoryData)
+      .set(lastUpdatedInventoryData)
       .where(eq(inventory.id, id))
       .returning();
     return updatedInventory;
@@ -606,8 +617,11 @@ export class DatabaseStorage implements IStorage {
 
   // safeAddInventoryTx: locks row FOR UPDATE and adds with capacity check
   async safeAddInventoryTx(tx: any, itemId: number, warehouseId: number, quantity: number) {
+
+    // 1️⃣ Lock inventory row for this item + warehouse
     const result = await tx.execute(sql`
-      SELECT * FROM inventory
+      SELECT *
+      FROM inventory
       WHERE item_id = ${itemId}
         AND warehouse_id = ${warehouseId}
       FOR UPDATE
@@ -616,10 +630,48 @@ export class DatabaseStorage implements IStorage {
     const current = result.rows[0];
     if (!current) return { success: false, reason: "inventory_missing" };
 
-    const newQty = current.quantity + quantity;
-    if (current.max_capacity && newQty > current.max_capacity) {
-      return { success: false, reason: "exceeds_capacity" };
+    // 2️⃣ Get warehouse total capacity
+    const warehouseResult = await tx.execute(sql`
+      SELECT capacity
+      FROM warehouses
+      WHERE id = ${warehouseId}
+      FOR UPDATE
+    `);
+
+    if (warehouseResult.rowCount === 0)
+      return { success: false, reason: "warehouse_missing" };
+
+    const warehouseCapacity = warehouseResult.rows[0].capacity;
+
+    // 3️⃣ Get total quantity stored in this warehouse
+    const warehouseUsedResult = await tx.execute(sql`
+      SELECT COALESCE(SUM(quantity), 0) AS used
+      FROM (
+        SELECT quantity
+        FROM inventory
+        WHERE warehouse_id = ${warehouseId}
+        FOR UPDATE
+      ) AS locked_rows
+    `);
+
+
+    const usedCapacity = warehouseUsedResult.rows[0].used;
+
+    // 4️⃣ Compute available free space
+    const availableSpace = warehouseCapacity - usedCapacity;
+
+    if (availableSpace < quantity) {
+      return { 
+        success: false, 
+        reason: "exceeds_warehouse_capacity", 
+        warehouseCapacity,
+        usedCapacity,
+        availableSpace
+      };
     }
+
+    // 5️⃣ Update the inventory quantity
+    const newQty = current.quantity + quantity;
 
     const updateResult = await tx.execute(sql`
       UPDATE inventory
@@ -631,6 +683,7 @@ export class DatabaseStorage implements IStorage {
 
     return { success: true, inventory: updateResult.rows[0] };
   }
+
 
 
 
@@ -673,6 +726,42 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(transactions)
       .where(or(eq(transactions.sourceWarehouseId, warehouseId), eq(transactions.destinationWarehouseId, warehouseId)));
   }
+  async updateTransactionByTransferAndItemId(
+    transferId: number,
+    itemId: number,
+    transactionData: Partial<InsertTransaction>
+  ): Promise<Transaction | undefined> {
+    const [updatedTransaction] = await db.update(transactions)
+      .set(transactionData)
+      .where(
+        and(
+          eq(transactions.transferId, transferId),
+          eq(transactions.itemId, itemId)
+        )
+      )
+      .returning();
+
+    return updatedTransaction;
+  }
+    async updateTransactionByTransferAndItemIdTx(
+    tx: any,
+    transferId: number,
+    itemId: number,
+    transactionData: Partial<InsertTransaction>
+  ): Promise<Transaction | undefined> {
+    const [updatedTransaction] = await tx.update(transactions)
+      .set(transactionData)
+      .where(
+        and(
+          eq(transactions.transferId, transferId),
+          eq(transactions.itemId, itemId)
+        )
+      )
+      .returning();
+
+    return updatedTransaction;
+  }
+
 
   async updateTransaction(id: number, transactionData: Partial<InsertTransaction>): Promise<Transaction | undefined> {
     const [updatedTransaction] = await db.update(transactions)
@@ -692,6 +781,10 @@ export class DatabaseStorage implements IStorage {
     const [request] = await db.select().from(requests).where(eq(requests.id, id));
     return request;
   }
+  async getRequestTx(tx:any,id: number): Promise<Request | undefined> {
+    const [request] = await tx.select().from(requests).where(eq(requests.id, id));
+    return request;
+  }
 
   async getRequestByCode(code: string): Promise<Request | undefined> {
     const [request] = await db.select().from(requests).where(eq(requests.requestCode, code));
@@ -704,6 +797,13 @@ export class DatabaseStorage implements IStorage {
     console.log('left create request',newRequest);
     return newRequest;
   }
+  async createRequestTx(tx:any,request: InsertRequest): Promise<Request> {
+    console.log('entered createRequest', request);
+    const [newRequest] = await tx.insert(requests).values([request]).returning();
+    console.log('left create request',newRequest);
+    return newRequest;
+  }
+  
 
   async getAllRequests(): Promise<Request[]> {
     return await db.select().from(requests);
@@ -724,6 +824,13 @@ export class DatabaseStorage implements IStorage {
       .returning();
     return updatedRequest;
   }
+  async updateRequestTx(tx:any,id: number, requestData: Partial<InsertRequest>): Promise<Request | undefined> {
+    const [updatedRequest] = await tx.update(requests)
+      .set(requestData)
+      .where(eq(requests.id, id))
+      .returning();
+    return updatedRequest;
+  }
 
   async deleteRequest(id: number): Promise<boolean> {
     const result = await db.delete(requests).where(eq(requests.id, id));
@@ -739,9 +846,16 @@ export class DatabaseStorage implements IStorage {
   async getRequestItemsByRequest(requestId: number): Promise<RequestItem[]> {
     return await db.select().from(requestItems).where(eq(requestItems.requestId, requestId));
   }
+  async getRequestItemsByRequestTx(tx:any,requestId: number): Promise<RequestItem[]> {
+    return await tx.select().from(requestItems).where(eq(requestItems.requestId, requestId));
+  }
 
   async createRequestItem(requestItem: InsertRequestItem): Promise<RequestItem> {
     const [newRequestItem] = await db.insert(requestItems).values(requestItem).returning();
+    return newRequestItem;
+  }
+  async createRequestItemTx(tx:any,requestItem: InsertRequestItem): Promise<RequestItem> {
+    const [newRequestItem] = await tx.insert(requestItems).values(requestItem).returning();
     return newRequestItem;
   }
 
@@ -767,6 +881,9 @@ export class DatabaseStorage implements IStorage {
   async getRequestApprovalsByRequest(requestId: number): Promise<RequestApproval[]> {
     return await db.select().from(requestApprovals).where(eq(requestApprovals.requestId, requestId));
   }
+  async getRequestApprovalsByRequestTx(tx:any,requestId: number): Promise<RequestApproval[]> {
+    return await tx.select().from(requestApprovals).where(eq(requestApprovals.requestId, requestId));
+  }
 
   async getRequestApprovalsByApprover(approverId: number): Promise<RequestApproval[]> {
     return await db.select().from(requestApprovals).where(eq(requestApprovals.approverId, approverId));
@@ -776,9 +893,20 @@ export class DatabaseStorage implements IStorage {
     const [newApproval] = await db.insert(requestApprovals).values(approval).returning();
     return newApproval;
   }
+  async createRequestApprovalTx(tx:any,approval: InsertRequestApproval): Promise<RequestApproval> {
+    const [newApproval] = await tx.insert(requestApprovals).values(approval).returning();
+    return newApproval;
+  }
 
   async updateRequestApproval(id: number, approvalData: Partial<InsertRequestApproval>): Promise<RequestApproval | undefined> {
     const [updatedApproval] = await db.update(requestApprovals)
+      .set(approvalData)
+      .where(eq(requestApprovals.id, id))
+      .returning();
+    return updatedApproval;
+  }
+  async updateRequestApprovalTx(tx:any,id: number, approvalData: Partial<InsertRequestApproval>): Promise<RequestApproval | undefined> {
+    const [updatedApproval] = await tx.update(requestApprovals)
       .set(approvalData)
       .where(eq(requestApprovals.id, id))
       .returning();
@@ -1501,7 +1629,7 @@ export class DatabaseStorage implements IStorage {
   async updateUserStatus(id: number, isActive: boolean): Promise<any> {
     try {
       const result = await db.update(users)
-        .set({ isActive })
+        .set({ isActive,updatedAt:new Date() })
         .where(eq(users.id, id))
         .returning();
       return result[0];

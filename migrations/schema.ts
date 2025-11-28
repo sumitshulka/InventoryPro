@@ -1,4 +1,4 @@
-import { pgTable, check, serial, text, numeric, boolean, timestamp, index, foreignKey, integer, unique, varchar, json } from "drizzle-orm/pg-core"
+import { pgTable, check, serial, text, numeric, boolean, timestamp, index, integer, foreignKey, unique, varchar, json } from "drizzle-orm/pg-core"
 import { sql } from "drizzle-orm"
 
 
@@ -18,6 +18,25 @@ export const approvalSettings = pgTable("approval_settings", {
 	check("approval_settings_requires_second_approval_not_null", sql`NOT NULL requires_second_approval`),
 	check("approval_settings_is_active_not_null", sql`NOT NULL is_active`),
 	check("approval_settings_created_at_not_null", sql`NOT NULL created_at`),
+]);
+
+export const inventory = pgTable("inventory", {
+	id: serial().primaryKey().notNull(),
+	itemId: integer("item_id").notNull(),
+	warehouseId: integer("warehouse_id").notNull(),
+	quantity: integer().default(0).notNull(),
+	lastUpdated: timestamp("last_updated", { mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	index("inventory_item_idx").using("btree", table.itemId.asc().nullsLast().op("int4_ops")),
+	index("inventory_item_warehouse_idx").using("btree", table.itemId.asc().nullsLast().op("int4_ops"), table.warehouseId.asc().nullsLast().op("int4_ops")),
+	index("inventory_last_updated_idx").using("btree", table.lastUpdated.asc().nullsLast().op("timestamp_ops")),
+	index("inventory_quantity_idx").using("btree", table.quantity.asc().nullsLast().op("int4_ops")),
+	index("inventory_warehouse_idx").using("btree", table.warehouseId.asc().nullsLast().op("int4_ops")),
+	check("inventory_id_not_null", sql`NOT NULL id`),
+	check("inventory_item_id_not_null", sql`NOT NULL item_id`),
+	check("inventory_warehouse_id_not_null", sql`NOT NULL warehouse_id`),
+	check("inventory_quantity_not_null", sql`NOT NULL quantity`),
+	check("inventory_last_updated_not_null", sql`NOT NULL last_updated`),
 ]);
 
 export const issues = pgTable("issues", {
@@ -149,25 +168,6 @@ export const emailSettings = pgTable("email_settings", {
 	check("email_settings_updated_at_not_null", sql`NOT NULL updated_at`),
 ]);
 
-export const inventory = pgTable("inventory", {
-	id: serial().primaryKey().notNull(),
-	itemId: integer("item_id").notNull(),
-	warehouseId: integer("warehouse_id").notNull(),
-	quantity: integer().default(0).notNull(),
-	lastUpdated: timestamp("last_updated", { mode: 'string' }).defaultNow().notNull(),
-}, (table) => [
-	index("inventory_item_idx").using("btree", table.itemId.asc().nullsLast().op("int4_ops")),
-	index("inventory_item_warehouse_idx").using("btree", table.itemId.asc().nullsLast().op("int4_ops"), table.warehouseId.asc().nullsLast().op("int4_ops")),
-	index("inventory_last_updated_idx").using("btree", table.lastUpdated.asc().nullsLast().op("timestamp_ops")),
-	index("inventory_quantity_idx").using("btree", table.quantity.asc().nullsLast().op("int4_ops")),
-	index("inventory_warehouse_idx").using("btree", table.warehouseId.asc().nullsLast().op("int4_ops")),
-	check("inventory_id_not_null", sql`NOT NULL id`),
-	check("inventory_item_id_not_null", sql`NOT NULL item_id`),
-	check("inventory_warehouse_id_not_null", sql`NOT NULL warehouse_id`),
-	check("inventory_quantity_not_null", sql`NOT NULL quantity`),
-	check("inventory_last_updated_not_null", sql`NOT NULL last_updated`),
-]);
-
 export const auditLogs = pgTable("audit_logs", {
 	id: serial().primaryKey().notNull(),
 	userId: integer("user_id").notNull(),
@@ -204,6 +204,7 @@ export const locations = pgTable("locations", {
 	country: text().default('India').notNull(),
 	isActive: boolean("is_active").default(true).notNull(),
 	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
+	updatedAt: timestamp("updated_at", { mode: 'string' }).defaultNow().notNull(),
 }, (table) => [
 	index("locations_active_idx").using("btree", table.isActive.asc().nullsLast().op("bool_ops")),
 	index("locations_city_idx").using("btree", table.city.asc().nullsLast().op("text_ops")),
@@ -220,6 +221,7 @@ export const locations = pgTable("locations", {
 	check("locations_country_not_null", sql`NOT NULL country`),
 	check("locations_is_active_not_null", sql`NOT NULL is_active`),
 	check("locations_created_at_not_null", sql`NOT NULL created_at`),
+	check("locations_updated_at_not_null", sql`NOT NULL updated_at`),
 ]);
 
 export const licenses = pgTable("licenses", {
@@ -394,29 +396,6 @@ export const requests = pgTable("requests", {
 	check("requests_created_at_not_null", sql`NOT NULL created_at`),
 ]);
 
-export const rejectedGoods = pgTable("rejected_goods", {
-	id: serial().primaryKey().notNull(),
-	transferId: integer("transfer_id").notNull(),
-	itemId: integer("item_id").notNull(),
-	quantity: integer().notNull(),
-	rejectionReason: text("rejection_reason").notNull(),
-	rejectedBy: integer("rejected_by").notNull(),
-	rejectedAt: timestamp("rejected_at", { mode: 'string' }).defaultNow().notNull(),
-	warehouseId: integer("warehouse_id").notNull(),
-	status: text().default('rejected').notNull(),
-	notes: text(),
-}, (table) => [
-	check("rejected_goods_id_not_null", sql`NOT NULL id`),
-	check("rejected_goods_transfer_id_not_null", sql`NOT NULL transfer_id`),
-	check("rejected_goods_item_id_not_null", sql`NOT NULL item_id`),
-	check("rejected_goods_quantity_not_null", sql`NOT NULL quantity`),
-	check("rejected_goods_rejection_reason_not_null", sql`NOT NULL rejection_reason`),
-	check("rejected_goods_rejected_by_not_null", sql`NOT NULL rejected_by`),
-	check("rejected_goods_rejected_at_not_null", sql`NOT NULL rejected_at`),
-	check("rejected_goods_warehouse_id_not_null", sql`NOT NULL warehouse_id`),
-	check("rejected_goods_status_not_null", sql`NOT NULL status`),
-]);
-
 export const transactions = pgTable("transactions", {
 	id: serial().primaryKey().notNull(),
 	transactionCode: text("transaction_code").notNull(),
@@ -437,6 +416,7 @@ export const transactions = pgTable("transactions", {
 	checkInDate: timestamp("check_in_date", { mode: 'string' }),
 	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
 	completedAt: timestamp("completed_at", { mode: 'string' }),
+	transferId: integer("transfer_id"),
 }, (table) => [
 	index("transactions_check_in_date_idx").using("btree", table.checkInDate.asc().nullsLast().op("timestamp_ops")),
 	index("transactions_completed_at_idx").using("btree", table.completedAt.asc().nullsLast().op("timestamp_ops")),
@@ -486,6 +466,24 @@ export const transferNotifications = pgTable("transfer_notifications", {
 	check("transfer_notifications_created_at_not_null", sql`NOT NULL created_at`),
 ]);
 
+export const transferUpdates = pgTable("transfer_updates", {
+	id: serial().primaryKey().notNull(),
+	transferId: integer("transfer_id").notNull(),
+	updatedBy: integer("updated_by").notNull(),
+	status: text().notNull(),
+	updateType: text("update_type").notNull(),
+	description: text(),
+	metadata: text(),
+	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	check("transfer_updates_id_not_null", sql`NOT NULL id`),
+	check("transfer_updates_transfer_id_not_null", sql`NOT NULL transfer_id`),
+	check("transfer_updates_updated_by_not_null", sql`NOT NULL updated_by`),
+	check("transfer_updates_status_not_null", sql`NOT NULL status`),
+	check("transfer_updates_update_type_not_null", sql`NOT NULL update_type`),
+	check("transfer_updates_created_at_not_null", sql`NOT NULL created_at`),
+]);
+
 export const warehouseOperators = pgTable("warehouse_operators", {
 	id: serial().primaryKey().notNull(),
 	userId: integer("user_id").notNull(),
@@ -512,43 +510,6 @@ export const warehouseOperators = pgTable("warehouse_operators", {
 	check("warehouse_operators_warehouse_id_not_null", sql`NOT NULL warehouse_id`),
 	check("warehouse_operators_is_active_not_null", sql`NOT NULL is_active`),
 	check("warehouse_operators_created_at_not_null", sql`NOT NULL created_at`),
-]);
-
-export const users = pgTable("users", {
-	id: serial().primaryKey().notNull(),
-	username: text().notNull(),
-	password: text().notNull(),
-	name: text().notNull(),
-	email: text().notNull(),
-	role: text().default('user').notNull(),
-	managerId: integer("manager_id"),
-	warehouseId: integer("warehouse_id"),
-	departmentId: integer("department_id"),
-	isWarehouseOperator: boolean("is_warehouse_operator").default(false).notNull(),
-	isActive: boolean("is_active").default(true).notNull(),
-	resetToken: text("reset_token"),
-	resetTokenExpiry: text("reset_token_expiry"),
-	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
-}, (table) => [
-	index("users_active_idx").using("btree", table.isActive.asc().nullsLast().op("bool_ops")),
-	index("users_created_at_idx").using("btree", table.createdAt.asc().nullsLast().op("timestamp_ops")),
-	index("users_department_idx").using("btree", table.departmentId.asc().nullsLast().op("int4_ops")),
-	index("users_email_idx").using("btree", table.email.asc().nullsLast().op("text_ops")),
-	index("users_manager_idx").using("btree", table.managerId.asc().nullsLast().op("int4_ops")),
-	index("users_reset_token_idx").using("btree", table.resetToken.asc().nullsLast().op("text_ops")),
-	index("users_role_idx").using("btree", table.role.asc().nullsLast().op("text_ops")),
-	index("users_warehouse_idx").using("btree", table.warehouseId.asc().nullsLast().op("int4_ops")),
-	index("users_warehouse_operator_idx").using("btree", table.isWarehouseOperator.asc().nullsLast().op("bool_ops")),
-	unique("users_username_unique").on(table.username),
-	check("users_id_not_null", sql`NOT NULL id`),
-	check("users_username_not_null", sql`NOT NULL username`),
-	check("users_password_not_null", sql`NOT NULL password`),
-	check("users_name_not_null", sql`NOT NULL name`),
-	check("users_email_not_null", sql`NOT NULL email`),
-	check("users_role_not_null", sql`NOT NULL role`),
-	check("users_is_warehouse_operator_not_null", sql`NOT NULL is_warehouse_operator`),
-	check("users_is_active_not_null", sql`NOT NULL is_active`),
-	check("users_created_at_not_null", sql`NOT NULL created_at`),
 ]);
 
 export const warehouses = pgTable("warehouses", {
@@ -612,6 +573,46 @@ export const items = pgTable("items", {
 	check("items_created_at_not_null", sql`NOT NULL created_at`),
 ]);
 
+export const users = pgTable("users", {
+	id: serial().primaryKey().notNull(),
+	username: text().notNull(),
+	password: text().notNull(),
+	name: text().notNull(),
+	email: text().notNull(),
+	role: text().default('user').notNull(),
+	managerId: integer("manager_id"),
+	warehouseId: integer("warehouse_id"),
+	departmentId: integer("department_id"),
+	isWarehouseOperator: boolean("is_warehouse_operator").default(false).notNull(),
+	isActive: boolean("is_active").default(true).notNull(),
+	resetToken: text("reset_token"),
+	resetTokenExpiry: text("reset_token_expiry"),
+	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
+	updatedat: timestamp({ mode: 'string' }),
+	updatedAt: timestamp("updated_at", { mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	index("users_active_idx").using("btree", table.isActive.asc().nullsLast().op("bool_ops")),
+	index("users_created_at_idx").using("btree", table.createdAt.asc().nullsLast().op("timestamp_ops")),
+	index("users_department_idx").using("btree", table.departmentId.asc().nullsLast().op("int4_ops")),
+	index("users_email_idx").using("btree", table.email.asc().nullsLast().op("text_ops")),
+	index("users_manager_idx").using("btree", table.managerId.asc().nullsLast().op("int4_ops")),
+	index("users_reset_token_idx").using("btree", table.resetToken.asc().nullsLast().op("text_ops")),
+	index("users_role_idx").using("btree", table.role.asc().nullsLast().op("text_ops")),
+	index("users_warehouse_idx").using("btree", table.warehouseId.asc().nullsLast().op("int4_ops")),
+	index("users_warehouse_operator_idx").using("btree", table.isWarehouseOperator.asc().nullsLast().op("bool_ops")),
+	unique("users_username_unique").on(table.username),
+	check("users_id_not_null", sql`NOT NULL id`),
+	check("users_username_not_null", sql`NOT NULL username`),
+	check("users_password_not_null", sql`NOT NULL password`),
+	check("users_name_not_null", sql`NOT NULL name`),
+	check("users_email_not_null", sql`NOT NULL email`),
+	check("users_role_not_null", sql`NOT NULL role`),
+	check("users_is_warehouse_operator_not_null", sql`NOT NULL is_warehouse_operator`),
+	check("users_is_active_not_null", sql`NOT NULL is_active`),
+	check("users_created_at_not_null", sql`NOT NULL created_at`),
+	check("users_updated_at_not_null", sql`NOT NULL updated_at`),
+]);
+
 export const issueActivities = pgTable("issue_activities", {
 	id: serial().primaryKey().notNull(),
 	issueId: integer("issue_id").notNull(),
@@ -644,22 +645,82 @@ export const issueActivities = pgTable("issue_activities", {
 	check("issue_activities_created_at_not_null", sql`NOT NULL created_at`),
 ]);
 
-export const transferUpdates = pgTable("transfer_updates", {
+export const session = pgTable("session", {
+	sid: varchar().primaryKey().notNull(),
+	sess: json().notNull(),
+	expire: timestamp({ precision: 6, mode: 'string' }).notNull(),
+}, (table) => [
+	index("IDX_session_expire").using("btree", table.expire.asc().nullsLast().op("timestamp_ops")),
+	check("session_sid_not_null", sql`NOT NULL sid`),
+	check("session_sess_not_null", sql`NOT NULL sess`),
+	check("session_expire_not_null", sql`NOT NULL expire`),
+]);
+
+export const disposedItems = pgTable("disposed_items", {
+	id: serial().primaryKey().notNull(),
+	itemId: integer("item_id").notNull(),
+	warehouseId: integer("warehouse_id").notNull(),
+	quantity: integer().notNull(),
+	unitValue: numeric("unit_value", { precision: 10, scale:  2 }).notNull(),
+	totalValue: numeric("total_value", { precision: 10, scale:  2 }).notNull(),
+	disposalDate: timestamp("disposal_date", { mode: 'string' }).defaultNow().notNull(),
+	disposalReason: text("disposal_reason"),
+	approvedBy: integer("approved_by").notNull(),
+	sourceType: varchar("source_type", { length: 50 }),
+	sourceId: integer("source_id"),
+	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow(),
+}, (table) => [
+	check("disposed_items_id_not_null", sql`NOT NULL id`),
+	check("disposed_items_item_id_not_null", sql`NOT NULL item_id`),
+	check("disposed_items_warehouse_id_not_null", sql`NOT NULL warehouse_id`),
+	check("disposed_items_quantity_not_null", sql`NOT NULL quantity`),
+	check("disposed_items_unit_value_not_null", sql`NOT NULL unit_value`),
+	check("disposed_items_total_value_not_null", sql`NOT NULL total_value`),
+	check("disposed_items_disposal_date_not_null", sql`NOT NULL disposal_date`),
+	check("disposed_items_approved_by_not_null", sql`NOT NULL approved_by`),
+]);
+
+export const rejectedGoods = pgTable("rejected_goods", {
 	id: serial().primaryKey().notNull(),
 	transferId: integer("transfer_id").notNull(),
-	updatedBy: integer("updated_by").notNull(),
-	status: text().notNull(),
-	updateType: text("update_type").notNull(),
-	description: text(),
-	metadata: text(),
-	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
+	itemId: integer("item_id").notNull(),
+	quantity: integer().notNull(),
+	rejectionReason: text("rejection_reason").notNull(),
+	rejectedBy: integer("rejected_by").notNull(),
+	rejectedAt: timestamp("rejected_at", { mode: 'string' }).defaultNow().notNull(),
+	warehouseId: integer("warehouse_id").notNull(),
+	status: text().default('rejected').notNull(),
+	notes: text(),
 }, (table) => [
-	check("transfer_updates_id_not_null", sql`NOT NULL id`),
-	check("transfer_updates_transfer_id_not_null", sql`NOT NULL transfer_id`),
-	check("transfer_updates_updated_by_not_null", sql`NOT NULL updated_by`),
-	check("transfer_updates_status_not_null", sql`NOT NULL status`),
-	check("transfer_updates_update_type_not_null", sql`NOT NULL update_type`),
-	check("transfer_updates_created_at_not_null", sql`NOT NULL created_at`),
+	check("rejected_goods_id_not_null", sql`NOT NULL id`),
+	check("rejected_goods_transfer_id_not_null", sql`NOT NULL transfer_id`),
+	check("rejected_goods_item_id_not_null", sql`NOT NULL item_id`),
+	check("rejected_goods_quantity_not_null", sql`NOT NULL quantity`),
+	check("rejected_goods_rejection_reason_not_null", sql`NOT NULL rejection_reason`),
+	check("rejected_goods_rejected_by_not_null", sql`NOT NULL rejected_by`),
+	check("rejected_goods_rejected_at_not_null", sql`NOT NULL rejected_at`),
+	check("rejected_goods_warehouse_id_not_null", sql`NOT NULL warehouse_id`),
+	check("rejected_goods_status_not_null", sql`NOT NULL status`),
+]);
+
+export const transferItems = pgTable("transfer_items", {
+	id: serial().primaryKey().notNull(),
+	transferId: integer("transfer_id").notNull(),
+	itemId: integer("item_id").notNull(),
+	requestedQuantity: integer("requested_quantity").notNull(),
+	approvedQuantity: integer("approved_quantity"),
+	actualQuantity: integer("actual_quantity"),
+	condition: text().default('good'),
+	notes: text(),
+	itemStatus: text("item_status"),
+	isDisposed: boolean("is_disposed").default(false),
+	disposalDate: timestamp("disposal_date", { mode: 'string' }),
+	disposalReason: text("disposal_reason"),
+}, (table) => [
+	check("transfer_items_id_not_null", sql`NOT NULL id`),
+	check("transfer_items_transfer_id_not_null", sql`NOT NULL transfer_id`),
+	check("transfer_items_item_id_not_null", sql`NOT NULL item_id`),
+	check("transfer_items_requested_quantity_not_null", sql`NOT NULL requested_quantity`),
 ]);
 
 export const transfers = pgTable("transfers", {
@@ -706,59 +767,4 @@ export const transfers = pgTable("transfers", {
 	check("transfers_status_not_null", sql`NOT NULL status`),
 	check("transfers_transfer_mode_not_null", sql`NOT NULL transfer_mode`),
 	check("transfers_created_at_not_null", sql`NOT NULL created_at`),
-]);
-
-export const session = pgTable("session", {
-	sid: varchar().primaryKey().notNull(),
-	sess: json().notNull(),
-	expire: timestamp({ precision: 6, mode: 'string' }).notNull(),
-}, (table) => [
-	index("IDX_session_expire").using("btree", table.expire.asc().nullsLast().op("timestamp_ops")),
-	check("session_sid_not_null", sql`NOT NULL sid`),
-	check("session_sess_not_null", sql`NOT NULL sess`),
-	check("session_expire_not_null", sql`NOT NULL expire`),
-]);
-
-export const disposedItems = pgTable("disposed_items", {
-	id: serial().primaryKey().notNull(),
-	itemId: integer("item_id").notNull(),
-	warehouseId: integer("warehouse_id").notNull(),
-	quantity: integer().notNull(),
-	unitValue: numeric("unit_value", { precision: 10, scale:  2 }).notNull(),
-	totalValue: numeric("total_value", { precision: 10, scale:  2 }).notNull(),
-	disposalDate: timestamp("disposal_date", { mode: 'string' }).defaultNow().notNull(),
-	disposalReason: text("disposal_reason"),
-	approvedBy: integer("approved_by").notNull(),
-	sourceType: varchar("source_type", { length: 50 }),
-	sourceId: integer("source_id"),
-	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow(),
-}, (table) => [
-	check("disposed_items_id_not_null", sql`NOT NULL id`),
-	check("disposed_items_item_id_not_null", sql`NOT NULL item_id`),
-	check("disposed_items_warehouse_id_not_null", sql`NOT NULL warehouse_id`),
-	check("disposed_items_quantity_not_null", sql`NOT NULL quantity`),
-	check("disposed_items_unit_value_not_null", sql`NOT NULL unit_value`),
-	check("disposed_items_total_value_not_null", sql`NOT NULL total_value`),
-	check("disposed_items_disposal_date_not_null", sql`NOT NULL disposal_date`),
-	check("disposed_items_approved_by_not_null", sql`NOT NULL approved_by`),
-]);
-
-export const transferItems = pgTable("transfer_items", {
-	id: serial().primaryKey().notNull(),
-	transferId: integer("transfer_id").notNull(),
-	itemId: integer("item_id").notNull(),
-	requestedQuantity: integer("requested_quantity").notNull(),
-	approvedQuantity: integer("approved_quantity"),
-	actualQuantity: integer("actual_quantity"),
-	condition: text().default('good'),
-	notes: text(),
-	itemStatus: text("item_status"),
-	isDisposed: boolean("is_disposed").default(false),
-	disposalDate: timestamp("disposal_date", { mode: 'string' }),
-	disposalReason: text("disposal_reason"),
-}, (table) => [
-	check("transfer_items_id_not_null", sql`NOT NULL id`),
-	check("transfer_items_transfer_id_not_null", sql`NOT NULL transfer_id`),
-	check("transfer_items_item_id_not_null", sql`NOT NULL item_id`),
-	check("transfer_items_requested_quantity_not_null", sql`NOT NULL requested_quantity`),
 ]);

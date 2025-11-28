@@ -125,7 +125,11 @@ export default function InventoryValuationReportPage() {
       group.totalValue += item.totalValue;
     });
     
-    return Array.from(itemGroups.values()).sort((a, b) => a.name.localeCompare(b.name));
+    return Array.from(itemGroups.values()).sort((a, b) => {
+      const nameA = a.name || "";
+      const nameB = b.name || "";
+      return nameA.localeCompare(nameB);
+    });
   }, [filteredAndSortedData]);
 
   const handleSort = (column: string) => {
