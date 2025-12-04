@@ -569,10 +569,10 @@ export default function InventoryPage() {
                             transaction.transactionType === "issue" ? "Issue" : "Transfer"}
                           </span>
                         </TableCell>
-                        <TableCell className={
-                          transaction.transactionType === "issue" ? 'text-red-600' : 'text-green-600'
-                        }>
-                          {transaction.transactionType === "issue" ? '-' : '+'}
+                        <TableCell className=
+                           {transaction.transactionType === "issue" ? 'text-red-600' : transaction.transactionType === 'check-in' ? 'text-green-600': transaction.transactionType==='transfer' && transaction.status==='completed' ? 'text-black-500' : transaction.status==='restocked'?' text-black-500':'text-red-600'}
+                      >
+                          {transaction.transactionType === "issue" ? '-' : transaction.transactionType === 'check-in' ? '+': transaction.transactionType==='transfer' && transaction.status==='completed' ? '' : transaction.status==='restocked'?'':'-'}
                           {transaction.quantity}
                         </TableCell>
                         <TableCell>

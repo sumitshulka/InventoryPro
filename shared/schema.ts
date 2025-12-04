@@ -654,7 +654,10 @@ export const rejectedGoods = pgTable("rejected_goods", {
   rejectedAt: timestamp("rejected_at").defaultNow().notNull(),
   warehouseId: integer("warehouse_id").notNull(), // Where the rejected goods are stored
   status: text("status").notNull().default("rejected"), // rejected, disposed, returned
+  approver: integer("approver"),
+  isApproved: boolean("is_approved").default(false),   
   notes: text("notes"),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
 export const insertRejectedGoodsSchema = createInsertSchema(rejectedGoods).pick({
@@ -666,6 +669,8 @@ export const insertRejectedGoodsSchema = createInsertSchema(rejectedGoods).pick(
   warehouseId: true,
   status: true,
   notes: true,
+  isApproved:true,
+  approver:true,
 });
 
 export type RejectedGoods = typeof rejectedGoods.$inferSelect;

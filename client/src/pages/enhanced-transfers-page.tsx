@@ -728,7 +728,8 @@ if (user?.role === "employee" && user?.isWarehouseOperator && user?.warehouseId)
   const filteredTransfers = (Array.isArray(roleFilteredTransfers) ? roleFilteredTransfers : []).filter((transfer: any) => {
     switch (activeTab) {
       case "pending":
-        return transfer.status === "pending" || transfer.status === "approved";
+        return transfer.status === "pending" ;
+        // || transfer.status === "approved";
       case "in-transit":
         return transfer.status === "in-transit";
       case "completed":

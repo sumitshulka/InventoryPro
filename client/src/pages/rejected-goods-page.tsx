@@ -27,6 +27,7 @@ interface RejectedGoods {
   warehouseId: number;
   status: string;
   notes?: string;
+  updatedAt: string;
   item?: {
     id: number;
     name: string;
@@ -213,7 +214,7 @@ export default function RejectedGoodsPage() {
   };
   const rejectedGoods = UnSortedRejectedGoods
   ? [...(UnSortedRejectedGoods as RejectedGoods[])].sort(
-      (a, b) => new Date(b.rejectedAt).getTime() - new Date(a.rejectedAt).getTime()
+      (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
     )
   : [];
 
@@ -320,7 +321,7 @@ export default function RejectedGoodsPage() {
                                   className="text-blue-600"
                                 >
                                   <RefreshCw className="h-3 w-3 mr-1" />
-                                  Return
+                                  Restock
                                 </Button>
                                 <Button
                                   variant="outline"

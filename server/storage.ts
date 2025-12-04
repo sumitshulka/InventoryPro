@@ -702,6 +702,15 @@ export class DatabaseStorage implements IStorage {
     const [transaction] = await db.select().from(transactions).where(eq(transactions.transactionCode, code));
     return transaction;
   }
+  async getTransactionByByTransferAndItemIdTx(tx:any,transferId: number,itemId:number): Promise<Transaction | undefined> {
+    const [transaction] = await tx.select().from(transactions).where(
+        and(
+          eq(transactions.transferId, transferId),
+          eq(transactions.itemId, itemId)
+        )
+      )
+    return transaction;
+  }
 
   async createTransaction(transaction: InsertTransaction): Promise<Transaction> {
     const TransactionCode = `TRX-${(await storage.getAllTransactions() ).length + 873}`;
@@ -1160,7 +1169,11 @@ export class DatabaseStorage implements IStorage {
   async getRejectedGood(id:number): Promise<RejectedGoods[]> {
     return await db.select().from(rejectedGoods).where(eq(rejectedGoods.id,id));
   }
-  async getRejectedGoodTx(tx: Tx, id: number): Promise<RejectedGoods[]> {
+    async getRejectedGoodsForApprover(id:number): Promise<RejectedGoods[]> {
+    return await db.select().from(rejectedGoods).where(eq(rejectedGoods.approver,id));
+  }
+
+  async getRejectedGoodTx(tx: any, id: number): Promise<RejectedGoods[]> {
     return await tx
       .select()
       .from(rejectedGoods)
@@ -1174,14 +1187,14 @@ export class DatabaseStorage implements IStorage {
 
   async updateRejectedGoods(id: number, data: Partial<InsertRejectedGoods>): Promise<RejectedGoods | undefined> {
     const [updated] = await db.update(rejectedGoods)
-      .set(data)
+      .set({...data,updatedAt: new Date()})
       .where(eq(rejectedGoods.id, id))
       .returning();
     return updated;
   }
   async updateRejectedGoodsTx(tx:any,id: number, data: Partial<InsertRejectedGoods>): Promise<RejectedGoods | undefined> {
     const [updated] = await tx.update(rejectedGoods)
-      .set(data)
+      .set({...data,updatedAt:new Date()})
       .where(eq(rejectedGoods.id, id))
       .returning();
     return updated;
