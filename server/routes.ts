@@ -3312,7 +3312,7 @@ app.post("/api/requests", async (req, res) => {
             approverId: approval.approverId,
             approvalLevel: approval.approvalLevel,
             status: approval.status,
-            notes: approval.notes,
+            notes: approval.comments,
             approvedAt: approval.approvedAt,
 
             request: {
@@ -3371,7 +3371,7 @@ app.post("/api/requests", async (req, res) => {
 
       res.json(result);
 
-    } catch (error) {
+    } catch (error:any) {
       console.error("Error fetching pending approvals:", error);
       res.status(400).json({ message: error.message });
     }
@@ -3894,7 +3894,7 @@ app.post("/api/requests", async (req, res) => {
         const transaction = await storage.getTransactionByByTransferAndItemIdTx(tx,transfer.id,rg.itemId)
         const item = await storage.getItem(rg.itemId);
 
-        const sourceWarehouseArray = await storage.getWarehouseTx(
+        const sourceWarehouseArray:any = await storage.getWarehouseTx(
           tx,
           transfer.sourceWarehouseId
         );
@@ -4199,7 +4199,7 @@ app.post("/api/requests", async (req, res) => {
         return res.status(400).json({ message: "Disposal reason is required" });
       }
 
-      const user = req.user;
+      const user:any = req.user;
       const updatedTransfer = await storage.approveDisposal(transferId, disposalReason, user.id);
       
       if (!updatedTransfer) {
@@ -4240,7 +4240,7 @@ app.post("/api/requests", async (req, res) => {
       const ReturnShippedDate = new Date(returnShippedDate);
 
       const user = req.user;
-      const transfer = await storage.getTransfer(transferId);
+      const transfer:any = await storage.getTransfer(transferId);
       if (!transfer) return res.status(404).json({ message: "Transfer not found" });
 
       // Permission check
@@ -4254,7 +4254,7 @@ app.post("/api/requests", async (req, res) => {
       }
 
       // Update transfer
-      const updatedTransfer = await storage.updateTransfer(transferId, {
+      const updatedTransfer:any = await storage.updateTransfer(transferId, {
         returnCourierName,
         returnTrackingNumber,
         returnShippedDate: ReturnShippedDate,
@@ -4392,7 +4392,7 @@ app.post("/api/requests", async (req, res) => {
       // Update transfer
       const updatedTransfer = await storage.updateTransfer(transferId, {
         status: "rejected",
-        rejectionReason,
+        returnReason:rejectionReason,
         rejectedDate: new Date(),
         updatedAt: new Date(),
         // ❗ We DO NOT save rejectedBy in audit diff (frontend already identifies updater)
@@ -5771,7 +5771,7 @@ app.get("/api/disposed-inventory", async (req: Request, res: Response) => {
             if (filteredData.status === 'returned') {
               // Handle rejected transfer - move items to rejected goods
               
-              const filteredTransferItems=transferItems.filter((item)=>item.itemStatus==='Returned')
+              const filteredTransferItems=transferItems.filter((item:any)=>item.itemStatus==='Returned')
               for (const item of filteredTransferItems) {
               
 
@@ -6815,121 +6815,121 @@ app.get("/api/disposed-inventory", async (req: Request, res: Response) => {
   });
 
   // Test email configuration (admin only)
-app.post("/api/email-settings/test", checkRole("admin"), async (req, res) => {
-  try {
-    console.log("=== EMAIL SETTINGS TEST REQUEST ===");
-    console.log("📨 Request body:", JSON.stringify(req.body, null, 2));
-    
-    const { testEmail, verificationTestEmail, settingsId, ...tempSettings } = req.body;
-    
-    // Use either testEmail or verificationTestEmail
-    const emailToTest = testEmail || verificationTestEmail;
-    console.log("🎯 Test email address:", emailToTest);
-    
-    if (!emailToTest) {
-      console.log("❌ No test email address provided");
-      return res.status(400).json({ message: "Test email address is required" });
-    }
-
-    let settings;
-    console.log("🔍 Looking for existing email settings...");
-    let existingSettings = await storage.getEmailSettings();
-    console.log("📋 Existing settings found:", existingSettings ? "Yes" : "No");
-    
-    if (settingsId || existingSettings) {
-      // Use existing settings if available
-      settings = existingSettings;
-      console.log("✅ Using existing email settings");
-      if (settings) {
-        console.log("   - ID:", settings.id);
-        console.log("   - Host:", settings.host);
-        console.log("   - Username:", settings.username);
-        console.log("   - Is Active:", settings.isActive);
-        console.log("   - Is Verified:", settings.isVerified);
-      }
-    } else {
-      // Test with provided settings without saving
-      console.log("🔄 Testing with temporary settings from request");
-      console.log("📝 Temporary settings:", tempSettings);
+  app.post("/api/email-settings/test", checkRole("admin"), async (req, res) => {
+    try {
+      console.log("=== EMAIL SETTINGS TEST REQUEST ===");
+      console.log("📨 Request body:", JSON.stringify(req.body, null, 2));
       
-      try {
-        const validatedSettings = insertEmailSettingsSchema.parse(tempSettings);
-        settings = { 
-          ...validatedSettings, 
-          id: 0, 
-          isActive: true, 
-          isVerified: false, 
-          lastTestedAt: null,
-          createdAt: new Date(), 
-          updatedAt: new Date() 
-        };
-        console.log("✅ Temporary settings validated successfully");
-      } catch (validationError) {
-        console.error("❌ Settings validation failed:", validationError);
-        throw validationError;
+      const { testEmail, verificationTestEmail, settingsId, ...tempSettings } = req.body;
+      
+      // Use either testEmail or verificationTestEmail
+      const emailToTest = testEmail || verificationTestEmail;
+      console.log("🎯 Test email address:", emailToTest);
+      
+      if (!emailToTest) {
+        console.log("❌ No test email address provided");
+        return res.status(400).json({ message: "Test email address is required" });
       }
-    }
 
-    if (!settings) {
-      console.log("❌ No email settings available for testing");
-      return res.status(404).json({ message: "Email settings not found" });
-    }
+      let settings;
+      console.log("🔍 Looking for existing email settings...");
+      let existingSettings = await storage.getEmailSettings();
+      console.log("📋 Existing settings found:", existingSettings ? "Yes" : "No");
+      
+      if (settingsId || existingSettings) {
+        // Use existing settings if available
+        settings = existingSettings;
+        console.log("✅ Using existing email settings");
+        if (settings) {
+          console.log("   - ID:", settings.id);
+          console.log("   - Host:", settings.host);
+          console.log("   - Username:", settings.username);
+          console.log("   - Is Active:", settings.isActive);
+          console.log("   - Is Verified:", settings.isVerified);
+        }
+      } else {
+        // Test with provided settings without saving
+        console.log("🔄 Testing with temporary settings from request");
+        console.log("📝 Temporary settings:", tempSettings);
+        
+        try {
+          const validatedSettings = insertEmailSettingsSchema.parse(tempSettings);
+          settings = { 
+            ...validatedSettings, 
+            id: 0, 
+            isActive: true, 
+            isVerified: false, 
+            lastTestedAt: null,
+            createdAt: new Date(), 
+            updatedAt: new Date() 
+          };
+          console.log("✅ Temporary settings validated successfully");
+        } catch (validationError) {
+          console.error("❌ Settings validation failed:", validationError);
+          throw validationError;
+        }
+      }
 
-    console.log("🚀 Initializing email service...");
-    // Import email service dynamically
-    const { EmailService } = await import('./email-service');
-    const emailService = new EmailService(settings);
-    console.log("✅ Email service initialized");
+      if (!settings) {
+        console.log("❌ No email settings available for testing");
+        return res.status(404).json({ message: "Email settings not found" });
+      }
 
-    // Test connection first
-    console.log("🔌 Testing email server connection...");
-    const connectionTest = await emailService.testConnection();
-    console.log("📡 Connection test result:", connectionTest ? "SUCCESS" : "FAILED");
-    
-    if (!connectionTest) {
-      console.log("❌ Failed to connect to email server");
-      return res.status(400).json({ 
-        message: "Failed to connect to email server. Please check your configuration." 
-      });
-    }
+      console.log("🚀 Initializing email service...");
+      // Import email service dynamically
+      const { EmailService } = await import('./email-service');
+      const emailService = new EmailService(settings);
+      console.log("✅ Email service initialized");
 
-    console.log("✅ Connection successful, sending test email...");
-    // Send test email
-    const testResult = await emailService.sendTestEmail(emailToTest);
-    console.log("📨 Test email send result:", testResult ? "SUCCESS" : "FAILED");
-    
-    if (testResult) {
-      // Mark as verified if this is an existing configuration
-      if (existingSettings && existingSettings.id) {
-        console.log("🏷️ Marking email settings as verified...");
-        await storage.markEmailSettingsAsVerified(existingSettings.id);
-        console.log("✅ Email settings verified status updated");
+      // Test connection first
+      console.log("🔌 Testing email server connection...");
+      const connectionTest = await emailService.testConnection();
+      console.log("📡 Connection test result:", connectionTest ? "SUCCESS" : "FAILED");
+      
+      if (!connectionTest) {
+        console.log("❌ Failed to connect to email server");
+        return res.status(400).json({ 
+          message: "Failed to connect to email server. Please check your configuration." 
+        });
+      }
+
+      console.log("✅ Connection successful, sending test email...");
+      // Send test email
+      const testResult = await emailService.sendTestEmail(emailToTest);
+      console.log("📨 Test email send result:", testResult ? "SUCCESS" : "FAILED");
+      
+      if (testResult) {
+        // Mark as verified if this is an existing configuration
+        if (existingSettings && existingSettings.id) {
+          console.log("🏷️ Marking email settings as verified...");
+          await storage.markEmailSettingsAsVerified(existingSettings.id);
+          console.log("✅ Email settings verified status updated");
+        }
+        
+        console.log("🎉 Email configuration test completed successfully!");
+        res.json({ 
+          success: true, 
+          message: "Test email sent successfully. Configuration verified!" 
+        });
+      } else {
+        console.log("❌ Failed to send test email");
+        res.status(400).json({ 
+          message: "Failed to send test email. Please check your configuration." 
+        });
       }
       
-      console.log("🎉 Email configuration test completed successfully!");
-      res.json({ 
-        success: true, 
-        message: "Test email sent successfully. Configuration verified!" 
+    } catch (error: any) {
+      console.error("💥 EMAIL SETTINGS TEST ERROR:", error);
+      console.error("Error details:", {
+        message: error.message,
+        stack: error.stack,
+        name: error.name
       });
-    } else {
-      console.log("❌ Failed to send test email");
-      res.status(400).json({ 
-        message: "Failed to send test email. Please check your configuration." 
-      });
+      res.status(400).json({ message: error.message });
+    } finally {
+      console.log("=== EMAIL SETTINGS TEST COMPLETED ===");
     }
-    
-  } catch (error: any) {
-    console.error("💥 EMAIL SETTINGS TEST ERROR:", error);
-    console.error("Error details:", {
-      message: error.message,
-      stack: error.stack,
-      name: error.name
-    });
-    res.status(400).json({ message: error.message });
-  } finally {
-    console.log("=== EMAIL SETTINGS TEST COMPLETED ===");
-  }
-});
+  });
 
   // Delete email settings (admin only)
   app.delete("/api/email-settings", checkRole("admin"), async (req, res) => {

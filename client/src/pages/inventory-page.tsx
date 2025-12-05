@@ -255,7 +255,6 @@ export default function InventoryPage() {
         </div>
         <div className="flex space-x-2">
           <Button
-            variant="outline"
             onClick={() => exportInventoryMutation.mutate()}
             disabled={exportInventoryMutation.isPending}
           >
@@ -266,12 +265,12 @@ export default function InventoryPage() {
             )}
             Export
           </Button>
-          {isManager && (
+          {/* {isManager && (
             <Button onClick={() => setIsDialogOpen(true)}>
               <Plus className="mr-2 h-4 w-4" />
               Update Inventory
             </Button>
-          )}
+          )} */}
         </div>
       </div>
 

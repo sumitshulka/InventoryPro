@@ -28,18 +28,6 @@ import {
   TransferNotification,
   InsertTransferNotification,
   Transfer,
-  Notification,
-  InsertNotification,
-  Issue,
-  InsertIssue,
-  IssueActivity,
-  InsertIssueActivity,
-  EmailSettings,
-  InsertEmailSettings,
-  TransferItem,
-  InsertTransferItem,
-  RejectedGoods,
-  InsertRejectedGoods,
   InsertTransfer,
   TransferItem,
   InsertTransferItem,
@@ -81,15 +69,12 @@ import {
   issueActivities,
   auditLogs,
   emailSettings,
-  InsertDisposedItem,
-  disposedItems,
-  DisposedItem
 } from "@shared/schema";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
 import createMemoryStore from "memorystore";
 import { db, pool } from "./db";
-import { eq, and, desc, or, ne, sql } from "drizzle-orm";
+import { eq, and, desc, or, ne, sql,lt } from "drizzle-orm";
 import {alias} from 'drizzle-orm/pg-core';
 import { TicketX } from "lucide-react";
 const MemoryStore = createMemoryStore(session);
@@ -781,7 +766,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteTransaction(id: number): Promise<boolean> {
-    const result = await db.delete.where(eq(transactions.id, id));
+    const result = await db.delete(transactions).where(eq(transactions.id, id));
     return result.rowCount ? result.rowCount > 0 : false;
   }
 
@@ -1071,63 +1056,6 @@ export class DatabaseStorage implements IStorage {
     const result = await db.delete(warehouseOperators).where(eq(warehouseOperators.id, id));
     return result.rowCount ? result.rowCount > 0 : false;
   }
-
-  async createDisposedItem(item: InsertDisposedItem): Promise<DisposedItem> {
-    const [newItem] = await db
-      .insert(disposedItems)
-      .values(item)
-      .returning();
-      
-    return newItem;
-  }
-  async getDisposedItem(id: number): Promise<DisposedItem | undefined> {
-    const [item] = await db
-      .select()
-      .from(disposedItems)
-      .where(eq(disposedItems.id, id));
-      
-    return item;
-  }
-  async getAllDisposedItem(): Promise<DisposedItem[] | undefined> {
-    return await db.select().from(disposedItems);
-    
-  }
-  async getAllDisposedItemsReport(): Promise<any[]> { 
-  // Alias the users table
-  const approvedByUser = alias(users, 'approvedByUser');
-
-  const results = await db
-    .select({
-      id: disposedItems.id,
-      quantity: disposedItems.quantity,
-      unitValue: disposedItems.unitValue,
-      totalValue: disposedItems.totalValue,
-      disposalDate: disposedItems.disposalDate,
-      disposalReason: disposedItems.disposalReason,
-      sourceType: disposedItems.sourceType,
-      sourceId: disposedItems.sourceId,
-      // We nest the joined data to match your original structure
-      item: {
-        id: items.id,
-        name: items.name,
-        sku: items.sku,
-      },
-      warehouse: {
-        id: warehouses.id,
-        name: warehouses.name,
-      },
-      approvedByUser: { 
-        id: approvedByUser.id,
-        name: approvedByUser.name,
-      },
-    })
-    .from(disposedItems)
-    .leftJoin(items, eq(disposedItems.itemId, items.id))
-    .leftJoin(warehouses, eq(disposedItems.warehouseId, warehouses.id))
-    .leftJoin(approvedByUser, eq(disposedItems.approvedBy, approvedByUser.id));
-
-  return results;
-}
 
   // Helper method for user hierarchy
   async getUserHierarchy(userId: number): Promise<User[]> {
