@@ -39,14 +39,14 @@ export default function Header({ user, onMenuClick }: HeaderProps) {
             <span className="material-icons">menu</span>
           </button>
           
-          <div className="relative">
+          {/* <div className="relative">
             <span className="material-icons absolute left-3 top-2 text-gray-400">search</span>
             <input 
               type="text" 
               placeholder="Search..." 
               className="pl-10 pr-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-gray-50 transition-colors text-sm w-64"
             />
-          </div>
+          </div> */}
         </div>
         
         <div className="flex items-center space-x-4">

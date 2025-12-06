@@ -1,11 +1,10 @@
 import { useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation,useQueryClient } from "@tanstack/react-query";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { getTransactionTypeColor, formatDateTime } from "@/lib/utils";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import AppLayout from "@/components/layout/app-layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -33,7 +32,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest } from "@/lib/queryClient";
 import { Loader2, Search, Plus, Download, RefreshCw, Trash2, AlertTriangle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
@@ -66,6 +65,7 @@ export default function InventoryPage() {
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [isDisposalDialogOpen, setIsDisposalDialogOpen] = useState(false);
   const [disposalItem, setDisposalItem] = useState<any>(null);
+  const queryClient=useQueryClient();
 
   const { data: inventory, isLoading: inventoryLoading } = useQuery({
     queryKey: ["/api/reports/inventory-stock", refreshKey],
@@ -77,7 +77,7 @@ export default function InventoryPage() {
   });
 
   const { data: warehouses, isLoading: warehousesLoading } = useQuery({
-    queryKey: ["/api/warehouses", refreshKey],
+    queryKey: ["/api/warehouses/stats", refreshKey],
   });
 
   // Fetch movement history for selected item
@@ -114,6 +114,8 @@ export default function InventoryPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/reports/inventory-stock"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/warehouses/stats"] });
+
       toast({
         title: "Inventory updated",
         description: "The inventory has been updated successfully.",
@@ -192,9 +194,14 @@ export default function InventoryPage() {
   const handleSubmit = (values: FormValues) => {
     updateInventoryMutation.mutate(values);
   };
+  const sortedInventory = (inventory ?? []).slice().sort(
+    (a, b) => new Date(b.lastUpdated).getTime() - new Date(a.lastUpdated).getTime()
+  );
 
-  const filteredInventory = inventory && Array.isArray(inventory)
-    ? inventory.filter((item: any) => {
+
+
+  const filteredInventory = sortedInventory && Array.isArray(sortedInventory)
+    ? sortedInventory.filter((item: any) => {
         const matchesSearch = 
           item.item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
           item.item.sku.toLowerCase().includes(searchTerm.toLowerCase());
@@ -206,21 +213,41 @@ export default function InventoryPage() {
         return matchesSearch && matchesWarehouse;
       })
     : [];
+  // Filter warehouses for the Update Inventory dropdown
+  const filteredWarehouses =
+    warehouses && Array.isArray(warehouses)
+      ? warehouses.filter((w: any) => {
+          if (user?.role === "admin") {
+            // 🟢 Admin: see all warehouses
+            return true;
+          }
+
+          if (user?.role === "manager") {
+            // 🟠 Manager: only their own warehouses
+            return w.managerId === user.id;
+          }
+
+          // 🔵 Manager of managers: warehouses managed by their sub-managers
+          const isSubManagerWarehouse =
+            w.manager?.managerId && w.manager.managerId === user.id;
+
+          return isSubManagerWarehouse;
+        })
+      : [];
+
 
   const isManager = user?.role === "admin" || user?.role === "manager";
 
   if (inventoryLoading || itemsLoading || warehousesLoading) {
     return (
-      <AppLayout>
         <div className="flex items-center justify-center h-[calc(100vh-200px)]">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
-      </AppLayout>
     );
   }
 
   return (
-    <AppLayout>
+    <>
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-medium text-gray-800">Inventory</h1>
@@ -228,7 +255,6 @@ export default function InventoryPage() {
         </div>
         <div className="flex space-x-2">
           <Button
-            variant="outline"
             onClick={() => exportInventoryMutation.mutate()}
             disabled={exportInventoryMutation.isPending}
           >
@@ -239,12 +265,12 @@ export default function InventoryPage() {
             )}
             Export
           </Button>
-          {isManager && (
+          {/* {isManager && (
             <Button onClick={() => setIsDialogOpen(true)}>
               <Plus className="mr-2 h-4 w-4" />
               Update Inventory
             </Button>
-          )}
+          )} */}
         </div>
       </div>
 
@@ -425,12 +451,28 @@ export default function InventoryPage() {
                     <SelectValue placeholder="Select a warehouse" />
                   </SelectTrigger>
                   <SelectContent>
-                    {warehouses && Array.isArray(warehouses) ? warehouses.map((warehouse: any) => (
-                      <SelectItem key={warehouse.id} value={warehouse.id.toString()}>
-                        {warehouse.name}
-                      </SelectItem>
-                    )) : null}
+                    {filteredWarehouses.length > 0 ? (
+                      filteredWarehouses.map((warehouse: any) => (
+                        <SelectItem key={warehouse.id} value={warehouse.id.toString()}>
+                          {warehouse.name}
+                          <span
+                            className={
+                              warehouse.capacity - warehouse.totalItems > 0
+                                ? "text-green-600 text-xs ml-1"
+                                : "text-red-600 text-xs ml-1"
+                            }
+                          >
+                            (Available Space: {warehouse.capacity - warehouse.totalItems})
+                          </span>
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <div className="p-2 text-sm text-gray-500">
+                        No accessible warehouses available
+                      </div>
+                    )}
                   </SelectContent>
+
                 </Select>
                 {form.formState.errors.warehouseId && (
                   <p className="text-sm text-red-500">{form.formState.errors.warehouseId.message}</p>
@@ -508,31 +550,37 @@ export default function InventoryPage() {
                   </TableRow>
                 ) : (
                   movementHistory && Array.isArray(movementHistory) 
-                    ? movementHistory
-                        .filter((transaction: any) => transaction.itemId === selectedItemId)
-                        .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-                        .map((transaction: any) => (
-                          <TableRow key={transaction.id}>
-                            <TableCell>{formatDateTime(transaction.createdAt)}</TableCell>
-                            <TableCell>
-                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${getTransactionTypeColor(transaction.transactionType)}`}>
-                                {transaction.transactionType === "check-in" ? "Check-in" : 
-                                 transaction.transactionType === "issue" ? "Issue" : "Transfer"}
-                              </span>
-                            </TableCell>
-                            <TableCell className={
-                              transaction.transactionType === "issue" ? 'text-red-600' : 'text-green-600'
-                            }>
-                              {transaction.transactionType === "issue" ? '-' : '+'}
-                              {transaction.quantity}
-                            </TableCell>
-                            <TableCell>
-                              {transaction.transactionType === "check-in" 
-                                ? transaction.destinationWarehouse?.name 
-                                : transaction.sourceWarehouse?.name || 'Unknown'}
-                            </TableCell>
-                          </TableRow>
-                        ))
+                  ? movementHistory
+                    .filter((transaction: any) => transaction.itemId === selectedItemId)
+                    .sort((a: any, b: any) => {
+                      const dateA = a.checkInDate || a.createdAt;
+                      const dateB = b.checkInDate || b.createdAt;
+                      return new Date(dateB).getTime() - new Date(dateA).getTime();
+                    })
+                    .map((transaction: any) => (
+                      <TableRow key={transaction.id}>
+                        <TableCell>
+                          {transaction.checkInDate ? formatDateTime(transaction.checkInDate) : formatDateTime(transaction.createdAt)}
+                        </TableCell>
+                        <TableCell>
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${getTransactionTypeColor(transaction.transactionType)}`}>
+                            {transaction.transactionType === "check-in" ? "Check-in" : 
+                            transaction.transactionType === "issue" ? "Issue" : "Transfer"}
+                          </span>
+                        </TableCell>
+                        <TableCell className=
+                           {transaction.transactionType === "issue" ? 'text-red-600' : transaction.transactionType === 'check-in' ? 'text-green-600': transaction.transactionType==='transfer' && transaction.status==='completed' ? 'text-black-500' : transaction.status==='restocked'?' text-black-500':'text-red-600'}
+                      >
+                          {transaction.transactionType === "issue" ? '-' : transaction.transactionType === 'check-in' ? '+': transaction.transactionType==='transfer' && transaction.status==='completed' ? '' : transaction.status==='restocked'?'':'-'}
+                          {transaction.quantity}
+                        </TableCell>
+                        <TableCell>
+                          {transaction.transactionType === "check-in" 
+                            ? transaction.destinationWarehouse?.name 
+                            : transaction.sourceWarehouse?.name || 'Unknown'}
+                        </TableCell>
+                      </TableRow>
+                    ))
                     : (
                       <TableRow>
                         <TableCell colSpan={4} className="text-center py-8 text-gray-500">
@@ -636,6 +684,6 @@ export default function InventoryPage() {
           </form>
         </DialogContent>
       </Dialog>
-    </AppLayout>
+    </>
   );
 }

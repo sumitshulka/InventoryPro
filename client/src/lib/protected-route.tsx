@@ -1,7 +1,6 @@
 import { useAuth } from "@/hooks/use-auth";
 import { Loader2, AlertCircle } from "lucide-react";
 import { Redirect, Route } from "wouter";
-import AppLayout from "@/components/layout/app-layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 // Define role-based access restrictions
@@ -18,7 +17,7 @@ const RESTRICTED_PATHS = {
 
 function AccessDeniedPage({ path }: { path: string }) {
   return (
-    <AppLayout>
+   
       <div className="flex items-center justify-center min-h-[60vh]">
         <Card className="max-w-md w-full">
           <CardHeader className="text-center">
@@ -35,7 +34,7 @@ function AccessDeniedPage({ path }: { path: string }) {
           </CardContent>
         </Card>
       </div>
-    </AppLayout>
+   
   );
 }
 

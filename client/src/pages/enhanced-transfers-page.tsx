@@ -1,9 +1,8 @@
 import { useState, useEffect } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation,useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import AppLayout from "@/components/layout/app-layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -39,7 +38,7 @@ import {
   TabsTrigger,
 } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest } from "@/lib/queryClient";
 import { 
   Loader2, 
   Plus, 
@@ -59,8 +58,119 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
-import { formatDateTime, getStatusColor } from "@/lib/utils";
+import { formatDateTime, formatDateTimeWithoutTimeZone, getStatusColor } from "@/lib/utils";
 import { DataTablePagination } from "@/components/ui/data-table-pagination";
+export interface TransferUpdate {
+  id: number;
+  transferId: number;
+  updatedBy: number;
+  status: string;
+  updateType: string;
+  description: string;
+  metadata?: any;
+  createdAt: string;
+}
+
+export interface User {
+  id: number;
+  name: string;
+  username: string;
+  email: string;
+}
+
+export interface Transfer {
+  id: number;
+  status: string;
+  createdAt: string;
+  approvedByUser?: User | null;
+  initiatedByUser?: User | null;
+  transferUpdates: TransferUpdate[];
+}
+export interface TimelineConfig {
+  title: string;
+  color: string;
+}
+
+export const statusConfig: Record<string, TimelineConfig> = {
+  pending: { title: "Transfer Created", color: "blue" },
+  approved: { title: "Transfer Approved", color: "green" },
+  "in-transit": { title: "Items Dispatched", color: "yellow" },
+  "partial-return-requested": { title: "Return Requested", color: "orange" },
+  "return-requested": { title: "Return Requested", color: "orange" },
+  "return-approved": { title: "Return Approved", color: "orange" },
+  "return_shipped": { title: "Return Shipment Initiated", color: "blue" },
+  returned: { title: "Return Completed", color: "green" },
+
+  "return-rejected": { title: "Return Rejected", color: "red" },
+  rejected: { title: "Transfer Rejected", color: "red" },
+  disposed: { title: "Items Disposed", color: "gray" },
+};
+export interface TimelineItem {
+  title: string;
+  color: string;
+  desc: string;
+  time: string;
+  by?: string;
+}
+export function buildTimeline(transfer: Transfer): TimelineItem[] {
+  if (!transfer.transferUpdates) return [];
+
+  return transfer.transferUpdates
+    .sort(
+      (a, b) =>
+        new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+    )
+    .map((update): TimelineItem => {
+      const conf = statusConfig[update.status] ?? {
+        title: update.status,
+        color: "gray",
+      };
+
+      // Determine who made this update
+      const user: User | undefined =
+        transfer.initiatedByUser?.id === update.updatedBy
+          ? transfer.initiatedByUser
+          : transfer.approvedByUser?.id === update.updatedBy
+          ? transfer.approvedByUser
+          : undefined;
+
+      return {
+        title: conf.title,
+        color: conf.color,
+        desc: update.description,
+        time: update.createdAt,
+        by: user?.name || `User #${update.updatedBy}`,
+      };
+    });
+}
+interface TimelineStepProps {
+  step: TimelineItem;
+}
+
+export function TimelineStep({ step }: TimelineStepProps) {
+  return (
+    <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
+      <div className={`w-2 h-2 rounded-full mt-2 bg-${step.color}-500`} />
+
+      <div className="flex-1">
+        <div className="font-medium text-sm">{step.title}</div>
+
+        <div className="text-xs text-gray-600">
+          {formatDateTime(step.time)}
+        </div>
+
+        <div className="text-xs text-gray-700">{step.desc}</div>
+
+        {step.by && (
+          <div className="text-xs text-gray-500 mt-1">
+            <span className="font-medium">By:</span> {step.by}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 
 const transferItemSchema = z.object({
   itemId: z.string().min(1, { message: "Item is required" }),
@@ -77,7 +187,28 @@ const formSchema = z.object({
   handoverPersonName: z.string().optional(),
   handoverPersonContact: z.string().optional(),
   notes: z.string().optional(),
-  items: z.array(transferItemSchema).min(1, { message: "At least one item is required" }),
+  items: z.array(transferItemSchema).min(1, { message: "At least one item is required" })
+  .superRefine((items, ctx) => {
+      const ids = items.map(i => i.itemId);
+      const dupes = ids.filter((v, i, a) => a.indexOf(v) !== i);
+      if (dupes.length > 0) {
+        // add an error on the items array
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Each item can only be selected once",
+        });
+        // also add an error on individual duplicate indices if possible
+        ids.forEach((id, idx) => {
+          if (dupes.includes(id)) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: "Duplicate item",
+              path: ["items", idx, "itemId"],
+            });
+          }
+        });
+        }
+    }),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -99,22 +230,30 @@ const receiptSchema = z.object({
   handoverDate: z.string().min(1, "Handover date is required"),
   notes: z.string().optional(),
 });
+const returnShippedSchema = z.object({
+  returnCourierName: z.string().min(1, "Return Courier Name is required"),
+  returnTrackingNumber: z.string().min(1, "Return Tracking Number is required"),
+  returnShippedDate: z.string().min(1, "Return Shipped Date is required"),
+});
 
 const acceptanceSchema = z.object({
   receivedDate: z.string().min(1, "Received date is required"),
-  overallCondition: z.string().min(1, "Overall condition is required"),
+  overallCondition: z.string().optional(),
   receiverNotes: z.string().optional(),
   items: z.array(z.object({
     itemId: z.number(),
+    transferItemId:z.number(),
     actualQuantity: z.number().min(0, "Quantity cannot be negative"),
     condition: z.string().min(1, "Condition is required"),
     notes: z.string().optional(),
+    itemStatus: z.string().min(1,"Status is required")
   })),
 });
 
 type ApprovalFormValues = z.infer<typeof approvalSchema>;
 type ReceiptFormValues = z.infer<typeof receiptSchema>;
 type AcceptanceFormValues = z.infer<typeof acceptanceSchema>;
+type ReturnShippedFormValues=z.infer<typeof returnShippedSchema>;
 
 export default function EnhancedTransfersPage() {
   const { toast } = useToast();
@@ -123,6 +262,7 @@ export default function EnhancedTransfersPage() {
   const [approvalDialogOpen, setApprovalDialogOpen] = useState(false);
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
   const [receiptDialogOpen, setReceiptDialogOpen] = useState(false);
+  const [returnShippedDialogOpen,setReturnShippedDialogOpen]= useState(false);
   const [acceptanceDialogOpen, setAcceptanceDialogOpen] = useState(false);
   const [auditDialogOpen, setAuditDialogOpen] = useState(false);
   const [rejectionDialogOpen, setRejectionDialogOpen] = useState(false);
@@ -130,6 +270,10 @@ export default function EnhancedTransfersPage() {
   const [activeTab, setActiveTab] = useState("all");
   const [refreshKey, setRefreshKey] = useState(0);
   const [rejectionReason, setRejectionReason] = useState("");
+  const [rejectReturnRequestDialog,setRejectReturnRequestDialog]=useState(false);
+  const [disposalReason,setDisposalReason]=useState("");
+  const queryClient=useQueryClient();
+  
 
   const { data: transfers, isLoading: transfersLoading } = useQuery({
     queryKey: ["/api/transfers", refreshKey],
@@ -145,8 +289,14 @@ export default function EnhancedTransfersPage() {
   });
 
   const { data: warehouses, isLoading: warehousesLoading } = useQuery({
-    queryKey: ["/api/warehouses", refreshKey],
+    queryKey: ["/api/warehouses/stats", refreshKey],
   });
+  const { data: users, isLoading: userLoading } = useQuery({
+    queryKey: ["/api/users", refreshKey],
+  });
+  const { data: usersName,isLoading:userNameLoading} = useQuery({
+    queryKey:["/api/usersName",refreshKey]
+  })
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -177,6 +327,15 @@ export default function EnhancedTransfersPage() {
       notes: "",
     },
   });
+  const return_shippmentForm = useForm<ReturnShippedFormValues>({
+    resolver: zodResolver(returnShippedSchema),
+    defaultValues: {
+      returnCourierName:"",
+      returnTrackingNumber:"",
+      returnShippedDate:""
+    },
+  });
+
 
   const approvalForm = useForm<ApprovalFormValues>({
     resolver: zodResolver(approvalSchema),
@@ -202,6 +361,15 @@ export default function EnhancedTransfersPage() {
       items: [],
     },
   });
+  const acceptanceItems = acceptanceForm.watch("items") || [];
+  const acceptanceButtonLabel = (() => {
+    if (!Array.isArray(acceptanceItems) || acceptanceItems.length === 0) return "Submit";
+    const statuses = acceptanceItems.map((it: any) => it?.itemStatus);
+    if (statuses.every(s => s === "Accepted")) return "Accept Transfer";
+    if (statuses.every(s => s === "Returned")) return "Return Transfer";
+    if (statuses.some(s => s === "Returned")) return "Partial Return";
+    return "Accept Transfer";
+  })();
 
   const createTransferMutation = useMutation({
     mutationFn: async (data: FormValues) => {
@@ -258,7 +426,8 @@ export default function EnhancedTransfersPage() {
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to update transfer: ${response.statusText}`);
+        const errorData= await response.json();
+        throw new Error( errorData.message || `Failed to update transfer: ${response.statusText}`);
       }
 
       return response.json();
@@ -283,6 +452,73 @@ export default function EnhancedTransfersPage() {
       });
     },
   });
+  const returnDeliveryMutation = useMutation({
+    mutationFn: async ({id,...data}: any)=>{
+      const response = await fetch(`/api/transfers/${id}`,{
+        method:"PATCH",
+        headers: {"Content-Type":"application/json"},
+        body: JSON.stringify(data),
+      });
+      if(!response.ok){
+        throw new Error(`Failed to update transfer: ${response.statusText}`)
+      }
+      return response.json();
+    },
+    onSuccess: async () => {
+      // Force immediate cache invalidation and refetch
+      await queryClient.invalidateQueries({ queryKey: ["/api/transfers"] });
+      await queryClient.invalidateQueries({ queryKey: ["/api/items"] });
+      await queryClient.invalidateQueries({ queryKey: ["/api/warehouses"] });
+      await queryClient.refetchQueries({ queryKey: ["/api/transfers"], type: 'active' });
+      toast({
+        title: "Success",
+        description: "Transfer updated successfully",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update transfer",
+        variant: "destructive",
+      });
+    },
+
+  })
+  const returnShippmentMutation = useMutation({
+    mutationFn: async ({ id, ...data }: any) => {
+      const response = await fetch(`/api/transfers/${id}/return-shipment`, {
+        method: "Post",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to update transfer: ${response.statusText}`);
+      }
+
+      return response.json();
+    },
+    onSuccess: async () => {
+      // Force immediate cache invalidation and refetch
+      await queryClient.invalidateQueries({ queryKey: ["/api/transfers"] });
+      await queryClient.invalidateQueries({ queryKey: ["/api/items"] });
+      await queryClient.invalidateQueries({ queryKey: ["/api/warehouses"] });
+      await queryClient.refetchQueries({ queryKey: ["/api/transfers"], type: 'active' });
+      setReturnShippedDialogOpen(false)
+      toast({
+        title: "Success",
+        description: "Transfer updated successfully",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update transfer",
+        variant: "destructive",
+      });
+    },
+  });
+
 
   const rejectTransferMutation = useMutation({
     mutationFn: async ({ id, rejectionReason }: { id: number; rejectionReason: string }) => {
@@ -318,6 +554,40 @@ export default function EnhancedTransfersPage() {
     },
   });
 
+  const rejectReturnRequestMutation = useMutation({
+    mutationFn: async ({ id, disposalReason,status }: { id: number; disposalReason: string,status:string }) => {
+      const response = await fetch(`/api/transfers/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ disposalReason,status }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to reject transfer: ${response.statusText}`);
+      }
+
+      return response.json();
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["/api/transfers"] });
+      setRejectReturnRequestDialog(false);
+      setDisposalReason("");
+      setSelectedTransfer(null);
+      
+      toast({
+        title: "Transfer Rejected",
+        description: "Transfer has been disposed successfully",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to dispose transfer",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleSubmit = (data: FormValues) => {
     createTransferMutation.mutate(data);
   };
@@ -331,6 +601,12 @@ export default function EnhancedTransfersPage() {
       ...updateData,
     });
   };
+  const handleReturnDeliver = (transferId:number) => {
+    returnDeliveryMutation.mutate({
+      id:transferId,
+      status:'returned'
+    })
+  }
 
   const handleReceiptSubmit = (data: ReceiptFormValues) => {
     if (!selectedTransfer) return;
@@ -347,6 +623,20 @@ export default function EnhancedTransfersPage() {
     
     setReceiptDialogOpen(false);
     receiptForm.reset();
+  };
+  const handleReturnShippedSubmit = (data: ReturnShippedFormValues) => {
+    if (!selectedTransfer) return;
+    
+    returnShippmentMutation.mutate({
+      id: selectedTransfer.id,
+      returnCourierName: data.returnCourierName,
+      returnShippedDate: new Date(data.returnShippedDate),
+      returnTrackingNumber: data.returnTrackingNumber,
+      status: 'returnShipment',
+    });
+    
+    setReceiptDialogOpen(false);
+    return_shippmentForm.reset();
   };
 
   const handleApprovalSubmit = (data: ApprovalFormValues) => {
@@ -379,20 +669,29 @@ export default function EnhancedTransfersPage() {
   };
 
   const handleAcceptanceSubmit = (data: AcceptanceFormValues) => {
+    console.log("✅ Form submitted with data:", data);
+
     if (!selectedTransfer) return;
+    let overallCondition;
+    if (data.items.every(item => item.itemStatus === "Accepted")) {
+      overallCondition = "completed";
+    } else if (data.items.every(item => item.itemStatus === "Returned")) {
+      overallCondition = "return-requested";
+    } else if (data.items.some(item => item.itemStatus === "Returned")) {
+      overallCondition = "partial-return-requested";
+    } 
     
-    const isAccepted = data.overallCondition !== 'rejected';
     
     updateTransferMutation.mutate({
       id: selectedTransfer.id,
       receivedBy: user?.id,
       receivedDate: new Date(data.receivedDate),
-      overallCondition: data.overallCondition,
+      overallCondition,
       receiverNotes: data.receiverNotes,
-      status: isAccepted ? 'completed' : 'return_requested',
-      returnReason: isAccepted ? undefined : data.receiverNotes,
+      status: overallCondition,
       updateType: 'receipt_confirmation',
-      updateDescription: isAccepted ? 'Transfer completed and accepted' : 'Return requested - awaiting admin approval',
+      updateDescription: `Transfer is ${overallCondition}`,
+      items: data.items
     });
     
     setAcceptanceDialogOpen(false);
@@ -404,12 +703,31 @@ export default function EnhancedTransfersPage() {
     const item = items.find((i: any) => i.id === itemId);
     return item ? item.name : `Item #${itemId}`;
   };
+  const getUserName = (userId: number) => {
+    if (!usersName) return "";
+    const user = usersName.find((u: any) => u.id === userId);
+    return user ? user.name : "";
+  };
 
   const getWarehouseName = (warehouseId: number) => {
     if (!warehouses || !Array.isArray(warehouses)) return `Warehouse #${warehouseId}`;
     const warehouse = warehouses.find((w: any) => w.id === warehouseId);
     return warehouse ? warehouse.name : `Warehouse #${warehouseId}`;
   };
+  const sourceWarehouseId = parseInt(form.watch("sourceWarehouseId") || "0");
+
+  // Filter inventories for the selected warehouse
+  const warehouseInventory = inventory?.filter(
+    (inv) => inv.warehouseId === sourceWarehouseId 
+  ) || [];
+
+  // Extract itemIds that exist in this warehouse
+  const availableItemIds = warehouseInventory.map(inv => inv.itemId);
+  const itemsAvailableInWarehouse = items?.filter(item =>
+    availableItemIds.includes(item.id)
+  ) || [];
+
+
 
   const getItemQuantity = (itemId: number, warehouseId: number) => {
     if (!inventory || !Array.isArray(inventory)) return 0;
@@ -451,37 +769,51 @@ export default function EnhancedTransfersPage() {
         return <Package className="w-4 h-4" />;
     }
   };
+  // 1️⃣ Start with all transfers
+let roleFilteredTransfers =
+  transfers && Array.isArray(transfers) ? transfers : [];
 
-  const filteredTransfers = (transfers && Array.isArray(transfers) ? transfers : [])
-    .filter((transfer: any) => {
-      switch (activeTab) {
-        case "pending":
-          return transfer.status === "pending" || transfer.status === "approved";
-        case "in-transit":
-          return transfer.status === "in-transit";
-        case "completed":
-          return transfer.status === "completed";
-        case "returned":
-          return transfer.status === "returned";
-        case "rejected":
-          return transfer.status === "rejected";
-        default:
-          return true;
-      }
-    })
-    .sort((a: any, b: any) => {
-      // Sort by creation date, latest first
-      const dateA = new Date(a.createdAt).getTime();
-      const dateB = new Date(b.createdAt).getTime();
-      return dateB - dateA;
-    });
+// 2️⃣ If user is warehouse operator (employee + isWarehouseOperator = true), filter transfers
+if (user?.role === "employee" && user?.isWarehouseOperator && user?.warehouseId) {
+  roleFilteredTransfers = roleFilteredTransfers?.filter((t: any) =>
+    t.sourceWarehouseId === user.warehouseId ||
+    t.destinationWarehouseId === user.warehouseId
+  )|| [];
+}
+// 3️⃣ Other roles: admin, managers → see all transfers (no change)
+
+
+  const filteredTransfers = (Array.isArray(roleFilteredTransfers) ? roleFilteredTransfers : []).filter((transfer: any) => {
+    switch (activeTab) {
+      case "pending":
+        return transfer.status === "pending" ;
+        // || transfer.status === "approved";
+      case "in-transit":
+        return transfer.status === "in-transit";
+      case "completed":
+        return transfer.status === "completed";
+      case "returned":
+        return transfer.status === "returned";
+      case "rejected":
+        return transfer.status === "rejected";
+      default:
+        return true;
+    }
+  });
+  const sortedTransfers = (filteredTransfers && Array.isArray(filteredTransfers) ? [...filteredTransfers] : [])
+  .sort((a: any, b: any) => {
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+  });
 
   // Check if there are enough warehouses for transfers
   const activeWarehouses = warehouses?.filter((w: any) => w.isActive) || [];
   const hasEnoughWarehouses = activeWarehouses.length >= 2;
+  const selectedItemIds = (form.watch("items") || []).map((it: any) => it?.itemId).filter(Boolean);
+  const acceptanceIsReturn = Array.isArray(acceptanceItems) && acceptanceItems.some((it: any) => it?.itemStatus === "Returned");
+  const acceptanceButtonVariant = acceptanceIsReturn ? "destructive" : undefined;
+
 
   return (
-    <AppLayout>
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <h1 className="text-3xl font-bold">Transfer Management</h1>
@@ -521,16 +853,10 @@ export default function EnhancedTransfersPage() {
                         // Clear all relevant query caches
                         await queryClient.invalidateQueries({ queryKey: ['/api/transfers'] });
                         await queryClient.invalidateQueries({ queryKey: ['/api/items'] });
-                        await queryClient.invalidateQueries({ queryKey: ['/api/warehouses'] });
+                        await queryClient.invalidateQueries({ queryKey: ['/api/warehouses/stats'] });
                         await queryClient.invalidateQueries({ queryKey: ['/api/users'] });
                         
-                        // Force fresh data fetch
-                        await Promise.all([
-                          queryClient.refetchQueries({ queryKey: ['/api/transfers'], type: 'active' }),
-                          queryClient.refetchQueries({ queryKey: ['/api/items'], type: 'active' }),
-                          queryClient.refetchQueries({ queryKey: ['/api/warehouses'], type: 'active' }),
-                          queryClient.refetchQueries({ queryKey: ['/api/users'], type: 'active' })
-                        ]);
+                        
                         
                         toast({
                           title: "Refreshed",
@@ -552,7 +878,7 @@ export default function EnhancedTransfersPage() {
                 </div>
               </CardHeader>
               <CardContent>
-                <DataTablePagination data={filteredTransfers}>
+                <DataTablePagination data={sortedTransfers}>
                   {(paginatedTransfers) => (
                     <div className="overflow-x-auto">
                       <Table>
@@ -656,7 +982,7 @@ export default function EnhancedTransfersPage() {
                                   <FileText className="h-4 w-4" />
                                 </Button>
                                 {transfer.status === "pending" && (
-                                  <>
+                                  <>{(user?.role === 'admin' || transfer.sourceWarehouse?.managerId === user?.id) && (
                                     <Button
                                       variant="ghost"
                                       size="sm"
@@ -669,7 +995,8 @@ export default function EnhancedTransfersPage() {
                                     >
                                       <CheckCircle className="h-4 w-4" />
                                     </Button>
-                                    {(user?.role === 'admin' || transfer.initiatedBy === user?.id) && (
+                                  )}
+                                    {(user?.role === 'admin' || transfer.sourceWarehouse?.managerId === user?.id) && (
                                       <Button
                                         variant="ghost"
                                         size="sm"
@@ -685,7 +1012,8 @@ export default function EnhancedTransfersPage() {
                                     )}
                                   </>
                                 )}
-                                {transfer.status === "approved" && (user?.role === 'admin' || transfer.sourceWarehouse?.managerId === user?.id) && (
+                                {transfer.status === "approved" && (transfer.sourceWarehouse?.managerId === user?.id|| user?.role === "admin") && (
+              
                                   <Button
                                     variant="ghost"
                                     size="sm"
@@ -699,7 +1027,7 @@ export default function EnhancedTransfersPage() {
                                     <FileText className="h-4 w-4" />
                                   </Button>
                                 )}
-                                {transfer.status === "in-transit" && (user?.role === 'admin' || transfer.destinationWarehouse?.managerId === user?.id) && (
+                                {transfer.status === "in-transit" && (transfer.destinationWarehouse?.managerId === user?.id || user?.role==='admin')&& (
                                   <Button
                                     variant="ghost"
                                     size="sm"
@@ -708,15 +1036,73 @@ export default function EnhancedTransfersPage() {
                                       setSelectedTransfer(transfer);
                                       acceptanceForm.setValue('items', transfer.items?.map((item: any) => ({
                                         itemId: item.itemId,
+                                        transferItemId: item.id,
                                         actualQuantity: item.requestedQuantity,
                                         condition: 'good',
-                                        notes: ''
+                                        notes: '',
+                                        itemStatus:'Accepted'
                                       })) || []);
                                       setAcceptanceDialogOpen(true);
                                     }}
                                     title="Accept or return transfer"
                                   >
                                     <Package className="h-4 w-4" />
+                                  </Button>
+                                )}
+                                {(transfer.status === "return-requested" || transfer.status ==='partial-return-requested'   )&& (transfer.sourceWarehouse?.managerId === user?.id || user?.role==='admin' ) && (
+                                  <>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="text-green-600"
+                                      onClick={() => handleUpdateStatus(transfer.id, "return-approved")}
+                                      title="Approve return transfer request"
+                                    >
+                                      <CheckCircle className="h-4 w-4" />
+                                    </Button>
+                                    {(user?.role === 'admin' || transfer.initiatedBy === user?.id) && (
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="text-red-600"
+                                        onClick={() => {
+                                          // handleUpdateStatus(transfer.id,'return-rejected')
+                                          setSelectedTransfer(transfer);
+                                          setRejectReturnRequestDialog(true);
+                                        }}
+                                        title="Reject or cancel transfer"
+                                      >
+                                        <X className="h-4 w-4" />
+                                      </Button>
+                                    )}
+                                  </>
+                                )}
+                                {transfer.status === "return-approved" && (transfer.destinationWarehouse?.managerId === user?.id || user.role==='admin')&& (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="text-blue-600"
+                                    onClick={() => {
+                                      setSelectedTransfer(transfer);
+                                      setReturnShippedDialogOpen(true);
+                                    }}
+                                    title="Add receipt and handover details"
+                                  >
+                                    <FileText className="h-4 w-4" />
+                                  </Button>
+                                )}
+                                {transfer.status === "return_shipped" && (transfer.sourceWarehouse?.managerId === user?.id || user.role==='admin' )&& (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="text-blue-600"
+                                    onClick={() => {
+
+                                      handleReturnDeliver(transfer.id)
+                                    }}
+                                    title="Accept the returned Goods"
+                                  >
+                                    <FileText className="h-4 w-4" />
                                   </Button>
                                 )}
                               </div>
@@ -841,12 +1227,13 @@ export default function EnhancedTransfersPage() {
                             
                             // Non-admin users can only select warehouses they manage or are assigned to
                             return user?.warehouseId === w.id || w.managerId === user?.id;
-                          });
+                          })|| [];
                           
                           return availableWarehouses?.length > 0 ? (
                             availableWarehouses.map((warehouse: any) => (
                               <SelectItem key={warehouse.id} value={warehouse.id.toString()}>
-                                {warehouse.name} - {warehouse.location}
+                                {warehouse.name} 
+                                {/* - {warehouse.location} */}
                                 {user?.role !== 'admin' && (
                                   <span className="ml-2 text-xs text-blue-600">
                                     {user?.warehouseId === warehouse.id && "(Assigned)"}
@@ -883,8 +1270,13 @@ export default function EnhancedTransfersPage() {
                       <SelectContent>
                         {warehouses?.filter((w: any) => w.isActive && w.id.toString() !== form.getValues("sourceWarehouseId")).length > 0 ? (
                           warehouses?.filter((w: any) => w.isActive && w.id.toString() !== form.getValues("sourceWarehouseId")).map((warehouse: any) => (
-                            <SelectItem key={warehouse.id} value={warehouse.id.toString()}>
-                              {warehouse.name} - {warehouse.location}
+                            // <SelectItem key={warehouse.id} value={warehouse.id.toString()}>
+                            //   {warehouse.name}
+                            //    {/* - {warehouse.location} */}
+                            //    {warehouse.}
+                            // </SelectItem>
+                             <SelectItem key={warehouse.id} value={warehouse.id.toString()}>
+                              {warehouse.name}  <span  className={warehouse.capacity-warehouse.totalItems>0?"text-green-600":"text-red-600"}>  Available space: {warehouse.capacity-warehouse.totalItems}</span>
                             </SelectItem>
                           ))
                         ) : (
@@ -1000,28 +1392,46 @@ export default function EnhancedTransfersPage() {
                             <SelectTrigger>
                               <SelectValue placeholder="Select an item" />
                             </SelectTrigger>
-                            <SelectContent>
-                              {(items && Array.isArray(items) ? items : []).length > 0 ? (
-                                (items && Array.isArray(items) ? items : []).map((item: any) => {
-                                  const sourceWarehouseId = parseInt(form.watch("sourceWarehouseId") || "0");
-                                  const availableQty = getItemQuantity(item.id, sourceWarehouseId);
-                                  return (
-                                    <SelectItem key={item.id} value={item.id.toString()}>
-                                      <div className="flex justify-between items-center w-full">
-                                        <span>{item.name} ({item.sku})</span>
-                                        <span className={`ml-2 text-sm ${availableQty > 0 ? 'text-green-600' : 'text-red-500'}`}>
-                                          Available: {availableQty}
-                                        </span>
-                                      </div>
-                                    </SelectItem>
-                                  );
-                                })
-                              ) : (
-                                <div className="p-2 text-sm text-gray-500">
-                                  No items available for transfer
-                                </div>
-                              )}
-                            </SelectContent>
+                              <SelectContent>
+                                {itemsAvailableInWarehouse.length > 0 ? (
+                                  itemsAvailableInWarehouse.map((item: any) => {
+                                    const availableQty = inventory?.find(
+                                      inv => inv.itemId === item.id && inv.warehouseId === sourceWarehouseId
+                                    )?.quantity || 0;
+
+                                    const valueStr = item.id.toString();
+                                    const isSelectedElsewhere =
+                                      selectedItemIds.includes(valueStr) &&
+                                      form.getValues(`items.${index}.itemId`) !== valueStr;
+
+                                    return (
+                                      <SelectItem
+                                        key={item.id}
+                                        value={valueStr}
+                                        disabled={isSelectedElsewhere}
+                                      >
+                                        <div className="flex justify-between items-center w-full">
+                                          <span>
+                                            {item.name} ({item.sku})
+                                          </span>
+                                          <span
+                                            className={`ml-2 text-sm ${
+                                              availableQty > 0 ? "text-green-600" : "text-red-500"
+                                            }`}
+                                          >
+                                            Available: {availableQty}
+                                          </span>
+                                        </div>
+                                      </SelectItem>
+                                    );
+                                  })
+                                ) : (
+                                  <div className="p-2 text-sm text-gray-500">
+                                    No inventory items available in this warehouse
+                                  </div>
+                                )}
+                              </SelectContent>
+
                           </Select>
                         </div>
                         <div className="w-32">
@@ -1093,7 +1503,7 @@ export default function EnhancedTransfersPage() {
               <DialogHeader>
                 <DialogTitle>Transfer Details</DialogTitle>
                 <DialogDescription>
-                  {selectedTransfer.transferCode} • {formatDateTime(selectedTransfer.createdAt)}
+                  {selectedTransfer.transferCode} • {formatDateTime(selectedTransfer?.createdAt)}
                 </DialogDescription>
               </DialogHeader>
 
@@ -1358,7 +1768,7 @@ export default function EnhancedTransfersPage() {
                     </p>
                   )}
                 </div>
-                <div>
+                {/* <div>
                   <Label htmlFor="overallCondition">Overall Condition</Label>
                   <Select
                     value={acceptanceForm.watch("overallCondition")}
@@ -1379,7 +1789,7 @@ export default function EnhancedTransfersPage() {
                       {acceptanceForm.formState.errors.overallCondition.message}
                     </p>
                   )}
-                </div>
+                </div> */}
               </div>
 
               {/* Item Details */}
@@ -1387,7 +1797,8 @@ export default function EnhancedTransfersPage() {
                 <Label>Item Details</Label>
                 <div className="mt-2 space-y-3 max-h-60 overflow-y-auto border rounded-md p-3">
                   {selectedTransfer?.items?.map((item: any, index: number) => (
-                    <div key={item.itemId} className="grid grid-cols-4 gap-3 items-center p-2 bg-gray-50 rounded">
+                    
+                    <div key={item.itemId} className="grid grid-cols-5 gap-3 items-center p-2 bg-gray-50 rounded">
                       <div>
                         <p className="font-medium text-sm">{getItemName(item.itemId)}</p>
                         <p className="text-xs text-gray-500">Qty: {item.requestedQuantity}</p>
@@ -1419,6 +1830,21 @@ export default function EnhancedTransfersPage() {
                         </Select>
                       </div>
                       <div>
+                        <Label className="text-xs">Status</Label>
+                        <Select
+                          defaultValue="Accepted"
+                          onValueChange={(value) => acceptanceForm.setValue(`items.${index}.itemStatus`, value)}
+                        >
+                          <SelectTrigger className="h-8">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Accepted">Accept</SelectItem>
+                            <SelectItem value="Returned">Return</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
                         <Label className="text-xs">Notes</Label>
                         <Input
                           {...acceptanceForm.register(`items.${index}.notes`)}
@@ -1445,7 +1871,7 @@ export default function EnhancedTransfersPage() {
                 <Button type="button" variant="outline" onClick={() => setAcceptanceDialogOpen(false)}>
                   Cancel
                 </Button>
-                <Button 
+                {/* <Button 
                   type="submit" 
                   disabled={updateTransferMutation.isPending}
                   className={acceptanceForm.watch("overallCondition") === "rejected" ? "bg-red-600 hover:bg-red-700" : ""}
@@ -1460,6 +1886,20 @@ export default function EnhancedTransfersPage() {
                   ) : (
                     "Accept Transfer"
                   )}
+                </Button> */}
+                <Button 
+                  type="submit" 
+                  disabled={updateTransferMutation.isPending}
+                  variant={acceptanceButtonVariant}
+                >
+                  {updateTransferMutation.isPending ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Processing...
+                    </>
+                  ) :
+                    acceptanceButtonLabel
+                 }
                 </Button>
               </DialogFooter>
             </form>
@@ -1494,7 +1934,7 @@ export default function EnhancedTransfersPage() {
                         {selectedTransfer.status}
                       </span>
                     </div>
-                    <div>
+                    {/* <div>
                       <span className="font-medium">Priority:</span>
                       <span className={`ml-2 px-2 py-1 rounded text-xs font-medium ${
                         selectedTransfer.priority === 'high' ? 'bg-red-100 text-red-800' :
@@ -1503,10 +1943,15 @@ export default function EnhancedTransfersPage() {
                       }`}>
                         {selectedTransfer.priority}
                       </span>
-                    </div>
+                    </div> */}
                     <div>
                       <span className="font-medium">Transport:</span>
-                      <span className="ml-2">{selectedTransfer.transportMethod}</span>
+                        <span className="ml-2 capitalize">
+                          {selectedTransfer.transferMode === 'courier' ? 'Courier Service' : 
+                            selectedTransfer.transferMode === 'handover' ? 'In-Person Handover' : 
+                            selectedTransfer.transferMode === 'pickup' ? 'Pickup' : 
+                            selectedTransfer.transferMode}
+                        </span> 
                     </div>
                     <div>
                       <span className="font-medium">From:</span>
@@ -1518,7 +1963,7 @@ export default function EnhancedTransfersPage() {
                     </div>
                     <div>
                       <span className="font-medium">Created:</span>
-                      <span className="ml-2">{formatDateTime(selectedTransfer.createdAt)}</span>
+                      <span className="ml-2">{formatDateTime(selectedTransfer?.createdAt)}</span>
                     </div>
                   </div>
                 </div>
@@ -1536,6 +1981,7 @@ export default function EnhancedTransfersPage() {
                           <TableHead>Actual Qty</TableHead>
                           <TableHead>Condition</TableHead>
                           <TableHead>Notes</TableHead>
+                          <TableHead>ItemStatus</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -1557,6 +2003,7 @@ export default function EnhancedTransfersPage() {
                               )}
                             </TableCell>
                             <TableCell className="text-sm">{item.notes || '-'}</TableCell>
+                            <TableCell>{item.itemStatus}</TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
@@ -1672,8 +2119,8 @@ export default function EnhancedTransfersPage() {
                       <div className="w-2 h-2 bg-blue-500 rounded-full mt-2"></div>
                       <div className="flex-1">
                         <div className="font-medium text-sm">Transfer Created</div>
-                        <div className="text-xs text-gray-600">{formatDateTime(selectedTransfer.createdAt)}</div>
-                        <div className="text-xs text-gray-700">Transfer request initiated</div>
+                        <div className="text-xs text-gray-600">{formatDateTime(selectedTransfer?.createdAt)}</div>
+                        <div className="text-xs text-gray-700">Transfer request initiated by: {selectedTransfer?.initiatedByUser.name}</div>
                       </div>
                     </div>
 
@@ -1682,7 +2129,7 @@ export default function EnhancedTransfersPage() {
                         <div className="w-2 h-2 bg-green-500 rounded-full mt-2"></div>
                         <div className="flex-1">
                           <div className="font-medium text-sm">Transfer Approved</div>
-                          <div className="text-xs text-gray-600">{formatDateTime(selectedTransfer.updatedAt)}</div>
+                          <div className="text-xs text-gray-600">{formatDateTime(selectedTransfer.approvedAt)}</div>
                           <div className="text-xs text-gray-700">
                             {selectedTransfer.approvedByUser ? (
                               <>Transfer approved by: {selectedTransfer.approvedByUser.name}</>
@@ -1702,12 +2149,12 @@ export default function EnhancedTransfersPage() {
                           <div className="text-xs text-gray-600">{formatDateTime(selectedTransfer.handoverDate)}</div>
                           <div className="text-xs text-gray-700">
                             {selectedTransfer.transferMode === 'courier' && selectedTransfer.courierName ? (
-                              <>Items handed over to courier: {selectedTransfer.courierName}</>
+                              <>Items handed over to courier: {selectedTransfer.courierName} by : {getUserName(selectedTransfer?.inTransit?.updatedBy)}</> 
                             ) : selectedTransfer.transferMode === 'handover' && selectedTransfer.handoverPersonName ? (
                               <>Items handed over to: {selectedTransfer.handoverPersonName}
-                                {selectedTransfer.handoverPersonContact && ` (${selectedTransfer.handoverPersonContact})`}</>
+                                {selectedTransfer.handoverPersonContact && ` (${selectedTransfer.handoverPersonContact})`} by : {getUserName(selectedTransfer?.inTransit?.updatedBy)}</>
                             ) : (
-                              'Items handed over to transport'
+                              `Items handed over to transport by : ${getUserName(selectedTransfer?.inTransit?.updatedBy)}`
                             )}
                           </div>
                           {selectedTransfer.trackingNumber && (
@@ -1732,7 +2179,7 @@ export default function EnhancedTransfersPage() {
                           <div className="text-xs text-gray-600">{formatDateTime(selectedTransfer.receivedDate)}</div>
                           <div className="text-xs text-gray-700">
                             {selectedTransfer.receivedBy ? (
-                              <>Items received and processed by: {selectedTransfer.receivedBy}</>
+                              <>Items received and processed by: {getUserName(selectedTransfer.receivedBy)}</>
                             ) : (
                               'Items received and processed'
                             )}
@@ -1747,9 +2194,24 @@ export default function EnhancedTransfersPage() {
                               Receiver Notes: {selectedTransfer.receiverNotes}
                             </div>
                           )}
+                          {/* <div className="mt-3">
+                             <div className="text-xs font-medium">Accepted Items</div>
+                             <div className="mt-2 space-y-0.5">
+                             {(selectedTransfer.items || []).filter((it: any) => it.itemStatus === 'Accepted').length === 0 ? (
+                                <div className="text-xs text-gray-500">No accepted items</div>
+                              ) : (
+                                (selectedTransfer.items || []).filter((it: any) => it.itemStatus === 'Accepted').map((item: any) => (
+                                  <div key={`Accepted-${item.id}`} className="text-xs text-gray-500">
+                                    {item.item?.name ?? `Item #${item.itemId}`} — {item.actualQuantity ?? item.requestedQuantity ?? '-'}
+                                  </div>
+                                ))
+                              )}
+                            </div>
+                          </div> */}
                         </div>
                       </div>
                     )}
+                   
 
                     {/* Return/Disposal Workflow States */}
                     {selectedTransfer.status === 'rejected' && (
@@ -1757,19 +2219,57 @@ export default function EnhancedTransfersPage() {
                         <div className="w-2 h-2 bg-red-500 rounded-full mt-2"></div>
                         <div className="flex-1">
                           <div className="font-medium text-sm">Transfer Rejected</div>
-                          <div className="text-xs text-gray-600">Jun 12, 2025 14:55:56</div>
+                          <div className="text-xs text-gray-600">{formatDateTime(selectedTransfer.rejectedAt)}</div>
                           <div className="text-xs text-gray-700">Quality issues detected at destination warehouse</div>
                         </div>
                       </div>
                     )}
+                    
+                    {(selectedTransfer.status==='return-requested' || selectedTransfer.status === 'return_shipped' || selectedTransfer.status === 'returned' || selectedTransfer.status==='return-approved' || selectedTransfer.status==='return-rejected') && (
+                      <div className="flex items-start gap-3 p-3 bg-orange-50 rounded-lg">
+                        <div className="w-2 h-2 bg-orange-500 rounded-full mt-2"></div>
+                        <div className="flex-1">
+                          <div className="font-medium text-sm">Return Requested</div>
+                          <div className="text-xs text-gray-600">{formatDateTime(selectedTransfer.returnRequested?.createdAt)}</div>
+                          <div className="text-xs text-gray-700">Return Requested by: {getUserName(selectedTransfer.returnRequested?.updatedBy) }</div>
+                        </div>
+                      </div>
+                    )}
+                     {/* Return/Disposal Workflow States */}
+                     {(selectedTransfer.status === 'return-rejected' )&& (
+                      <div className="flex items-start gap-3 p-3 bg-red-50 rounded-lg">
+                        <div className="w-2 h-2 bg-red-500 rounded-full mt-2"></div>
+                         <div className="flex-1">
+                          <div className="font-medium text-sm">Return Request Rejected</div>
+                          <div className="text-xs text-gray-500">{formatDateTime(selectedTransfer.returnRejected.createdAt)}</div>
+                          <div className="text-xs text-gray-700">Return Rejected by: {getUserName(selectedTransfer.returnRejected?.updatedBy) }</div>
 
-                    {(selectedTransfer.status === 'return_requested' || selectedTransfer.status === 'return_shipped' || selectedTransfer.status === 'returned') && (
+                          {/* Disposed / Returned items
+                           <div className="mt-3">
+                            <div className="text-xs font-medium">Disposed Items</div>
+                            <div className="mt-2 space-y-0.5">
+                              {(selectedTransfer.items || []).filter((it: any) => it.itemStatus === 'Dis').length === 0 ? (
+                                <div className="text-xs text-gray-500">No disposed items</div>
+                              ) : (
+                                (selectedTransfer.items || []).filter((it: any) => it.itemStatus === 'Returned').map((item: any) => (
+                                  <div key={`return-${item.id}`} className="text-xs text-gray-500">
+                                    {item.item?.name ?? `Item #${item.itemId}`} — {item.actualQuantity ?? item.requestedQuantity ?? '-'}
+                                  </div>
+                                ))
+                              )}
+                            </div>
+                          </div> */}
+                        </div>
+                      </div>
+                    )}
+
+                    {( selectedTransfer.status === 'return_shipped' || selectedTransfer.status === 'returned' || selectedTransfer.status==='return-approved') && (
                       <div className="flex items-start gap-3 p-3 bg-orange-50 rounded-lg">
                         <div className="w-2 h-2 bg-orange-500 rounded-full mt-2"></div>
                         <div className="flex-1">
                           <div className="font-medium text-sm">Return Approved</div>
-                          <div className="text-xs text-gray-600">Jun 12, 2025 15:00:00</div>
-                          <div className="text-xs text-gray-700">Return request approved by admin</div>
+                          <div className="text-xs text-gray-600">{formatDateTime(selectedTransfer.returnApproved?.createdAt)}</div>
+                          <div className="text-xs text-gray-700">Return Approved by: {getUserName(selectedTransfer.returnApproved.updatedBy) }</div>
                           {selectedTransfer.returnReason && (
                             <div className="text-xs text-gray-600 mt-1">
                               Return Reason: {selectedTransfer.returnReason}
@@ -1784,8 +2284,8 @@ export default function EnhancedTransfersPage() {
                         <div className="w-2 h-2 bg-blue-500 rounded-full mt-2"></div>
                         <div className="flex-1">
                           <div className="font-medium text-sm">Return Shipment Initiated</div>
-                          <div className="text-xs text-gray-600">Jun 13, 2025 10:30:00</div>
-                          <div className="text-xs text-gray-700">Return shipment initiated via courier</div>
+                          <div className="text-xs text-gray-600">{formatDateTime(selectedTransfer.returnShipped?.createdAt)}</div>
+                          <div className="text-xs text-gray-700"> Retrun Shipment Initiated by : {getUserName(selectedTransfer?.returnShipped?.updatedBy)}</div>
                           {selectedTransfer.returnCourierName && (
                             <div className="text-xs text-blue-600 mt-1">
                               Courier: {selectedTransfer.returnCourierName}
@@ -1805,8 +2305,8 @@ export default function EnhancedTransfersPage() {
                         <div className="w-2 h-2 bg-green-500 rounded-full mt-2"></div>
                         <div className="flex-1">
                           <div className="font-medium text-sm">Return Completed</div>
-                          <div className="text-xs text-gray-600">Jun 13, 2025 16:45:00</div>
-                          <div className="text-xs text-gray-700">Items returned to source warehouse and inventory updated</div>
+                          <div className="text-xs text-gray-600">{formatDateTime(selectedTransfer.returned?.createdAt)}</div>
+                          <div className="text-xs text-gray-700">Return Received by : {getUserName(selectedTransfer.returned?.updatedBy)}</div>
                           {selectedTransfer.returnDeliveredDate && (
                             <div className="text-xs text-gray-600 mt-1">
                               Delivered: {formatDateTime(selectedTransfer.returnDeliveredDate)}
@@ -1833,6 +2333,13 @@ export default function EnhancedTransfersPage() {
                     )}
                   </div>
                 </div>
+
+                {/* <div className="space-y-3">
+                  {buildTimeline(selectedTransfer).map((step, i) => (
+                    <TimelineStep key={i} step={step} />
+                  ))}
+                </div> */}
+
               </div>
             )}
 
@@ -2020,7 +2527,124 @@ export default function EnhancedTransfersPage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+        {/*Rejecturn Shipped Dialog*/}
+        <Dialog open={returnShippedDialogOpen} onOpenChange={setReturnShippedDialogOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Add Shipping Details</DialogTitle>
+              <DialogDescription>
+                Enter return courier name, return tracking number, and return shipped date for this transfer.
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={return_shippmentForm.handleSubmit(handleReturnShippedSubmit)} className="space-y-4">
+              <div>
+                <Label htmlFor="returnCourierName">Return Courier Name</Label>
+                <Input
+                  id="returnCourierName"
+                  {...return_shippmentForm.register("returnCourierName")}
+                  placeholder="Enter return courier name"
+                />
+                {return_shippmentForm.formState.errors.returnCourierName && (
+                  <p className="text-sm text-red-600 mt-1">
+                    {return_shippmentForm.formState.errors.returnCourierName.message}
+                  </p>
+                )}
+              </div>
+              <div>
+                <Label htmlFor="returnShippedDate">Return Shipped Date</Label>
+                <Input
+                  id="returnShippedDate"
+                  type="datetime-local"
+                  {...return_shippmentForm.register("returnShippedDate")}
+                />
+                {return_shippmentForm.formState.errors.returnShippedDate && (
+                  <p className="text-sm text-red-600 mt-1">
+                    {return_shippmentForm.formState.errors.returnShippedDate.message}
+                  </p>
+                )}
+              </div>
+              <div>
+                <Label htmlFor="returnTrackingNumber">Return Tracking Number</Label>
+                <Input
+                  id="returnTrackingNumber"
+                  {...return_shippmentForm.register("returnTrackingNumber")}
+                  placeholder="Enter tracking number"
+                />
+                {return_shippmentForm.formState.errors.returnTrackingNumber && (
+                  <p className="text-sm text-red-600 mt-1">
+                    {return_shippmentForm.formState.errors.returnTrackingNumber.message}
+                  </p>
+                )}
+              </div>
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setReturnShippedDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={returnShippmentMutation.isPending}>
+                  {updateTransferMutation.isPending ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Updating...
+                    </>
+                  ) : (
+                    "Submit Receipt"
+                  )}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+        {/* Return Request Reject Dialog */}
+
+        <Dialog open={rejectReturnRequestDialog} onOpenChange={setRejectReturnRequestDialog}>
+          <DialogContent className="sm:max-w-[500px]">
+            <DialogHeader>
+              <DialogTitle>Reject Return Request/Dispose</DialogTitle>
+              <DialogDescription>
+                Are you sure you want to reject return request {selectedTransfer?.transferCode}? It will dispose the Return Items.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="rejectionReason">Disposal Reason</Label>
+                <Textarea
+                  id="rejectionReason"
+                  placeholder="Enter reason for rejecting this transfer..."
+                  value={disposalReason}
+                  onChange={(e) => setDisposalReason(e.target.value)}
+                  className="mt-1"
+                  rows={3}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setRejectReturnRequestDialog(false);
+                  setDisposalReason("");
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={() => {
+                  if (selectedTransfer && disposalReason.trim()) {
+                    rejectReturnRequestMutation.mutate({
+                      id: selectedTransfer.id,
+                      disposalReason: disposalReason.trim(),
+                      status:'return-rejected'
+                    });
+                  }
+                }}
+                disabled={!disposalReason.trim() || rejectReturnRequestMutation.isPending}
+              >
+                {rejectReturnRequestMutation.isPending ? "Disposing..." : "Dispose Transfer"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
-    </AppLayout>
   );
 }

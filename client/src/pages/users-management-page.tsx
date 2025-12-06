@@ -1,9 +1,8 @@
 import { useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation,useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import AppLayout from "@/components/layout/app-layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -42,7 +41,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { apiRequest, queryClient, invalidateRelatedQueries } from "@/lib/queryClient";
+import { apiRequest,  invalidateRelatedQueries } from "@/lib/queryClient";
 import { Loader2, Plus, Edit, Users, Trash, RefreshCw, Power, PowerOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
@@ -58,7 +57,18 @@ const formSchema = z.object({
   warehouseId: z.string().optional(),
   departmentId: z.string().optional(),
   isWarehouseOperator: z.boolean().default(false),
+})
+.refine((data) => {
+  // Employee MUST have a warehouse
+  if (data.role === "employee" && (!data.warehouseId || data.warehouseId === "none")) {
+    return false;
+  }
+  return true;
+}, {
+  message: "Warehouse is required for employees",
+  path: ["warehouseId"],
 });
+
 
 type FormValues = z.infer<typeof formSchema>;
 
@@ -76,11 +86,12 @@ export default function UsersManagementPage() {
   const isAdmin = user?.role === "admin";
   const isManager = user?.role === "manager";
   const canEdit = isAdmin; // Only admins can edit users
-
+  const queryClient=useQueryClient()
   const { data: users, isLoading, refetch: refetchUsers } = useQuery({
     queryKey: ["/api/users"],
     staleTime: 0, // Always consider data stale
     refetchOnWindowFocus: true,
+
   });
 
   const { data: warehouses } = useQuery({
@@ -93,18 +104,21 @@ export default function UsersManagementPage() {
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
+    mode: "onChange",
+    reValidateMode: "onChange",
     defaultValues: {
       username: "",
       password: "",
       name: "",
       email: "",
-      role: "employee" as const,
+      role: "employee",
       managerId: "none",
-      warehouseId: "none", 
+      warehouseId: "none",
       departmentId: "none",
       isWarehouseOperator: false,
     },
   });
+
 
   const createUserMutation = useMutation({
     mutationFn: async (data: FormValues) => {
@@ -148,7 +162,8 @@ export default function UsersManagementPage() {
     },
     onSuccess: async () => {
       // Force immediate cache invalidation and refetch
-      await invalidateRelatedQueries('user', isEditMode ? 'update' : 'create');
+      await invalidateRelatedQueries(queryClient,'user', isEditMode ? 'update' : 'create');
+      await queryClient.invalidateQueries({ queryKey: ['/api/users'] });
       toast({
         title: isEditMode ? "User updated" : "User created",
         description: isEditMode
@@ -166,7 +181,7 @@ export default function UsersManagementPage() {
       } else if (error.message.includes("Cannot assign user as warehouse manager")) {
         userMessage = "This user cannot be assigned as a warehouse manager because they are not assigned to that warehouse.";
       } else if (error.message.includes("Username already exists")) {
-        userMessage = "This username is already taken. Please choose a different username.";
+        userMessage = "This username is already exist. Please choose a different username.";
       } else if (error.message.includes("Email already exists")) {
         userMessage = "This email address is already registered. Please use a different email.";
       }
@@ -185,7 +200,7 @@ export default function UsersManagementPage() {
       return res;
     },
     onSuccess: async () => {
-      await invalidateRelatedQueries('user', 'delete');
+      await invalidateRelatedQueries(queryClient,'user', 'delete');
       toast({
         title: "User deleted",
         description: "The user has been deleted successfully.",
@@ -259,16 +274,30 @@ export default function UsersManagementPage() {
     createUserMutation.mutate(values);
   };
 
-  const handleRefresh = () => {
-    queryClient.invalidateQueries({ queryKey: ["/api/users"] });
-    queryClient.invalidateQueries({ queryKey: ["/api/warehouses"] });
-    queryClient.invalidateQueries({ queryKey: ["/api/departments"] });
-    refetchUsers();
+  const handleRefresh = async () => {
+    try {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["/api/users"] }),
+        queryClient.invalidateQueries({ queryKey: ["/api/warehouses"] }),
+        queryClient.invalidateQueries({ queryKey: ["/api/departments"] }),
+        refetchUsers(),
+      ]);
+      toast({
+        title: "Refreshed",
+        description: "Users, warehouses and departments have been refreshed.",
+      });
+    } catch (err: any) {
+      toast({
+        title: "Refresh failed",
+        description: err?.message || "Failed to refresh data.",
+        variant: "destructive",
+      });
+    }
   };
 
-  const toggleUserStatusMutation = useMutation({
+   const toggleUserStatusMutation = useMutation({
     mutationFn: async ({ userId, isActive }: { userId: number; isActive: boolean }) => {
-      return apiRequest(`/api/users/${userId}/status`, "PATCH", { isActive });
+      return apiRequest("PATCH",`/api/users/${userId}/status`,  { isActive });
     },
     onSuccess: () => {
       toast({
@@ -299,16 +328,13 @@ export default function UsersManagementPage() {
 
   if (isLoading) {
     return (
-      <AppLayout>
         <div className="flex items-center justify-center h-64">
           <Loader2 className="h-8 w-8 animate-spin" />
         </div>
-      </AppLayout>
     );
   }
 
   return (
-    <AppLayout>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
@@ -338,8 +364,7 @@ export default function UsersManagementPage() {
               onClick={handleRefresh}
               disabled={isLoading}
             >
-              <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
-              Refresh
+              <RefreshCw className={`h-4 w-4  ${isLoading ? 'animate-spin' : ''}`} />
             </Button>
             {canEdit && (
               <Button 
@@ -529,13 +554,15 @@ export default function UsersManagementPage() {
               </DialogDescription>
             </DialogHeader>
 
-            <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+            <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4" autoComplete="off">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
+                  
                   <Label htmlFor="username">Username</Label>
                   <Input
                     id="username"
                     placeholder="Enter username"
+                    autoComplete="username"
                     {...form.register("username")}
                   />
                   {form.formState.errors.username && (
@@ -548,6 +575,7 @@ export default function UsersManagementPage() {
                   <Input
                     id="password"
                     type="password"
+                    autoComplete="new-password"
                     placeholder={isEditMode ? "Leave blank to keep current password" : "Enter password"}
                     {...form.register("password")}
                   />
@@ -589,7 +617,10 @@ export default function UsersManagementPage() {
                   <Label htmlFor="role">Role</Label>
                   <Select
                     value={form.watch("role")}
-                    onValueChange={(value) => form.setValue("role", value as "admin" | "manager" | "employee")}
+                      onValueChange={(value) => {
+                        form.setValue("role", value as "admin" | "manager" | "employee");
+                        form.trigger("warehouseId"); // revalidate warehouse
+                      }}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select role" />
@@ -639,7 +670,10 @@ export default function UsersManagementPage() {
                   <Label htmlFor="warehouseId">Default Warehouse</Label>
                   <Select
                     value={form.watch("warehouseId")?.toString() || "none"}
-                    onValueChange={(value) => form.setValue("warehouseId", value)}
+                    onValueChange={(value) => {
+                      form.setValue("warehouseId", value);
+                      form.trigger("warehouseId"); // revalidate immediately
+                    }}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select warehouse" />
@@ -659,6 +693,11 @@ export default function UsersManagementPage() {
                       )}
                     </SelectContent>
                   </Select>
+                  {form.formState.errors.warehouseId && (
+                    <p className="text-sm text-red-500">
+                      {form.formState.errors.warehouseId.message}
+                    </p>
+                  )}
                 </div>
 
                 <div className="space-y-2">
@@ -788,6 +827,5 @@ export default function UsersManagementPage() {
           </AlertDialogContent>
         </AlertDialog>
       </div>
-    </AppLayout>
   );
 }

@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useState,useEffect,useMemo } from "react";
+import { useQuery, useMutation,useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -38,7 +38,7 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest } from "@/lib/queryClient";
 import { Loader2, Plus, CheckCircle, X, Eye, Download, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
@@ -67,6 +67,16 @@ export default function RequestsPage() {
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState<any>(null);
   const [activeTab, setActiveTab] = useState("all");
+  const queryClient=useQueryClient();
+
+  useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    const filterParam = searchParams.get('filter');
+    console.log('Filter param:',filterParam);
+    if (filterParam === 'pending') {
+      setActiveTab('pending');
+    }
+  }, []);
 
   const { data: requests, isLoading: requestsLoading, refetch: refetchRequests } = useQuery({
     queryKey: ["/api/requests"],
@@ -92,6 +102,9 @@ export default function RequestsPage() {
   const { data: inventory, isLoading: inventoryLoading, refetch: refetchInventory } = useQuery({
     queryKey: ["/api/reports/inventory-stock"],
   });
+  const {data:Inventories} = useQuery({
+    queryKey: ["/api/inventory"],
+  });
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -113,6 +126,7 @@ export default function RequestsPage() {
       const payload = {
         warehouseId: parseInt(data.warehouseId),
         notes: data.notes,
+        priority:data.priority,
         items: data.items.map(item => ({
           itemId: parseInt(item.itemId),
           quantity: item.quantity,
@@ -211,19 +225,44 @@ export default function RequestsPage() {
   // Filter requests based on user permissions
   const isWarehouseOperator = userOperatedWarehouses.length > 0;
   const canViewAllRequests = user?.role === 'admin' || user?.role === 'manager' || isWarehouseOperator;
+  const sortedRequests = (requests && Array.isArray(requests) ? [...requests] : [])
+    .sort((a: any, b: any) => {
+      // Sort by createdAt in descending order (newest first)
+      // Note: Your prompt mentioned 'createdAtDate', but your code uses 'createdAt'.
+      // I've used 'createdAt' as it appears in your code.
+      // If the field name is different, just change 'b.createdAt' and 'a.createdAt'.
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
 
-  const filteredRequests = (requests as any[])
-    ? (requests as any[]).filter((request: any) => {
+  const filteredRequests = (sortedRequests as any[])
+    ? (sortedRequests as any[]).filter((sortedRequest: any) => {
         // Role-based filtering: employees can only see their own requests unless they're warehouse operators
-        if (!canViewAllRequests && request.userId !== user?.id) {
+        if (!canViewAllRequests && sortedRequest.userId !== user?.id) {
           return false;
         }
         
         if (activeTab === "all") return true;
-        return request.status === activeTab;
+        return sortedRequest.status === activeTab;
       })
     : [];
-
+  const getFilteredWarehouses = () => {
+    if (!warehouses) return [];
+    
+    // Admin, managers, and warehouse operators can see all active warehouses
+    if (user?.role === 'admin' || user?.role === 'manager' || isWarehouseOperator) {
+      return warehouses.filter((w: any) => w.isActive);
+    }
+    
+    // Employees can only see their assigned warehouse (if any)
+    if (user?.role === 'employee' && user?.warehouseId) {
+      return warehouses.filter((w: any) => 
+        w.isActive && w.id === user.warehouseId
+      );
+    }
+    
+    // Fallback: return empty array if no permissions
+    return [];
+  };
   const getUserName = (userId: number, request?: any) => {
     // If request object is provided and has userName, use it
     if (request?.userName) return request.userName;
@@ -248,37 +287,68 @@ export default function RequestsPage() {
 
   // Function to check if current user can approve a specific request
   const canApproveRequest = (request: any) => {
-    if (!user) return false;
-    
-    // Admin can approve any request, including their own
+    if (!user || !warehouses) return false;
+
+    // Admin can approve everything
     if (user.role === "admin") return true;
-    
-    // Non-admin users cannot approve their own requests
-    if (request.userId === user.id) return false;
-    
-    // For managers, they can only approve requests from their subordinates
-    // This requires checking if the requester reports to this manager
-    if (user.role === "manager") {
-      // Check if the request is from a user who reports to this manager
-      const requester = users?.find((u: any) => u.id === request.userId);
-      return requester?.managerId === user.id;
+
+    // Find the warehouse of this request
+    const warehouse = warehouses.find((w: any) => w.id === request.warehouseId);
+    if (!warehouse) return false;
+
+    // warehouse.managerId might be a single number or array
+    let managers = warehouse.managerId;
+    if (!managers) return false;
+
+    if (!Array.isArray(managers)) {
+      managers = [managers];
     }
-    
+
+    // If current user is one of the managers → approve allowed (even their own request)
+    if (managers.includes(user.id)) {
+      return true;
+    }
+
     return false;
   };
 
+
+  const selectedWarehouseId = form.watch("warehouseId");
+
+  const availableItems = useMemo(() => {
+    if (!selectedWarehouseId) return [];
+
+    // Filter inventory records for this warehouse
+    const warehouseInventory = inventory?.filter(
+      (inv: any) => inv.warehouseId === Number(selectedWarehouseId)
+    ) || [];
+
+    // Join with items table
+    return warehouseInventory
+      .map((inv: any) => {
+        const item = items?.find((i: any) => i.id === inv.itemId);
+        if (!item || item.status !== "active") return null;
+        return {
+          ...item,
+          quantity: inv.quantity, // add quantity to display
+        };
+      })
+      .filter(Boolean); // remove nulls
+  }, [inventory, items, selectedWarehouseId]);
+  
+
+
+
   if (requestsLoading || itemsLoading || warehousesLoading || usersLoading) {
     return (
-      <AppLayout>
         <div className="flex items-center justify-center h-[calc(100vh-200px)]">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
-      </AppLayout>
     );
   }
 
   return (
-    <AppLayout>
+    <>
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Inventory Check Out Requests</h1>
@@ -298,11 +368,25 @@ export default function RequestsPage() {
               variant="outline"
               size="sm"
               onClick={async () => {
-                await refetchRequests();
-                await refetchInventory();
-                await refetchUsers();
-                await refetchWarehouses();
-                await refetchItems();
+                try {
+                  await Promise.all([
+                    refetchRequests(),
+                    refetchInventory(),
+                    refetchUsers(),
+                    refetchWarehouses(),
+                    refetchItems(),
+                  ]);
+                  toast({
+                    title: "Refreshed",
+                    description: "Requests data have been refreshed.",
+                  });
+                } catch (err: any) {
+                  toast({
+                    title: "Refresh failed",
+                    description: err?.message || "Failed to refresh data.",
+                    variant: "destructive",
+                  });
+                }
               }}
               className="ml-2"
             >
@@ -364,12 +448,13 @@ export default function RequestsPage() {
                               >
                                 <Eye className="h-4 w-4" />
                               </Button>
-                              {canApproveRequest(request) && request.status === "pending" && (
+                              { canApproveRequest(request) && request.status === "pending" && (
                                 <>
                                   <Button
                                     variant="ghost"
                                     size="sm"
                                     className="text-green-600"
+                                    title="Approve Request"
                                     onClick={() => handleUpdateStatus(request.id, "approved")}
                                   >
                                     <CheckCircle className="h-4 w-4" />
@@ -378,6 +463,7 @@ export default function RequestsPage() {
                                     variant="ghost"
                                     size="sm"
                                     className="text-red-600"
+                                    title="Reject Request"
                                     onClick={() => handleUpdateStatus(request.id, "rejected")}
                                   >
                                     <X className="h-4 w-4" />
@@ -401,7 +487,7 @@ export default function RequestsPage() {
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Create New Inventory Request</DialogTitle>
+            <DialogTitle>Create New Inventory CheckOut Request</DialogTitle>
             <DialogDescription>
               Fill in the details to request items for your location
             </DialogDescription>
@@ -410,20 +496,26 @@ export default function RequestsPage() {
           <form onSubmit={form.handleSubmit(handleSubmit)}>
             <div className="space-y-4 py-4">
               <div className="space-y-2">
-                <Label htmlFor="warehouseId">Destination Warehouse</Label>
+                <Label htmlFor="warehouseId">Source Warehouse</Label>
                 <Select
                   onValueChange={(value) => form.setValue("warehouseId", value)}
                   defaultValue={form.getValues("warehouseId")}
+                  disabled={user?.role==='employee' && user.isWarehouseOperator===false}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select a warehouse" />
                   </SelectTrigger>
                   <SelectContent>
-                    {warehouses?.filter((w: any) => w.isActive).map((warehouse: any) => (
+                    {getFilteredWarehouses().map((warehouse: any) => (
                       <SelectItem key={warehouse.id} value={warehouse.id.toString()}>
                         {warehouse.name}
                       </SelectItem>
                     ))}
+                    {getFilteredWarehouses().length === 0 && (
+                      <div className="p-2 text-sm text-gray-500">
+                        No warehouses available for your account.
+                      </div>
+                    )}
                   </SelectContent>
                 </Select>
                 {form.formState.errors.warehouseId && (
@@ -477,63 +569,90 @@ export default function RequestsPage() {
                   <p className="text-sm text-red-500">{form.formState.errors.items.root?.message}</p>
                 )}
                 
-                {fields.map((field, index) => (
-                  <div key={field.id} className="flex items-start space-x-3">
-                    <div className="flex-1 space-y-2">
-                      <Label htmlFor={`items.${index}.itemId`}>Item</Label>
-                      <Select
-                        onValueChange={(value) => form.setValue(`items.${index}.itemId`, value)}
-                        defaultValue={form.getValues(`items.${index}.itemId`)}
+                {fields.map((field, index) => {
+                  const selectedItemId = form.watch(`items.${index}.itemId`);
+
+                  const selectedItem = availableItems.find(
+                    (i: any) => i.id === Number(selectedItemId)
+                  );
+
+                  const maxQty = selectedItem?.quantity ?? 0;
+
+                  return (
+                    <div key={field.id} className="flex items-start space-x-3">
+                      <div className="flex-1 space-y-2">
+                        <Label>Item</Label>
+                        <Select
+                          disabled={!selectedWarehouseId}
+                          onValueChange={(value) => {
+                            form.setValue(`items.${index}.itemId`, value);
+                            form.setValue(`items.${index}.quantity`, "");
+                          }}
+                          defaultValue={form.getValues(`items.${index}.itemId`)}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select an item" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {availableItems.length > 0 ? (
+                              availableItems.map((item: any) => (
+                                <SelectItem key={item.id} value={item.id.toString()}>
+                                  {item.name} ({item.sku}){" "}
+                                  <span
+                                    className={item.quantity > 0 ? "text-green-600" : "text-red-600"}
+                                  >
+                                    Available: {item.quantity}
+                                  </span>
+                                </SelectItem>
+                              ))
+                            ) : (
+                              <div className="p-2 text-sm text-gray-500">
+                                No items available
+                              </div>
+                            )}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {/* ✔ CLEAN QUANTITY FIELD — NO EXTRA MESSAGES */}
+                      <div className="w-24 space-y-2">
+                        <Label>Quantity</Label>
+
+                        <Input
+                          type="number"
+                          min={1}
+                          max={maxQty}
+                          placeholder="Qty"
+                          value={form.watch(`items.${index}.quantity`) || ""}
+                          onChange={(e) => {
+                            let val = Number(e.target.value);
+
+                            // Clamp the value
+                            if (val > maxQty) val = maxQty;
+                            if (val < 1) val = 1;
+
+                            form.setValue(`items.${index}.quantity`, val.toString(), {
+                              shouldValidate: true,
+                              shouldDirty: true,
+                            });
+                          }}
+                          disabled={maxQty === 0} // Disable if no stock
+                        />
+                      </div>
+
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="mt-8"
+                        onClick={() => fields.length > 1 && remove(index)}
                       >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select an item" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {items?.filter((item: any) => item.status === "active").length > 0 ? (
-                            items.filter((item: any) => item.status === "active").map((item: any) => (
-                              <SelectItem key={item.id} value={item.id.toString()}>
-                                {item.name} ({item.sku})
-                              </SelectItem>
-                            ))
-                          ) : (
-                            <div className="p-2 text-sm text-gray-500">
-                              No active items available. Create items in Item Master first.
-                            </div>
-                          )}
-                        </SelectContent>
-                      </Select>
-                      {form.formState.errors.items?.[index]?.itemId && (
-                        <p className="text-sm text-red-500">
-                          {form.formState.errors.items[index]?.itemId?.message}
-                        </p>
-                      )}
+                        <X className="h-4 w-4" />
+                      </Button>
                     </div>
-                    <div className="w-24 space-y-2">
-                      <Label htmlFor={`items.${index}.quantity`}>Quantity</Label>
-                      <Input
-                        id={`items.${index}.quantity`}
-                        type="number"
-                        min="1"
-                        placeholder="Qty"
-                        {...form.register(`items.${index}.quantity`)}
-                      />
-                      {form.formState.errors.items?.[index]?.quantity && (
-                        <p className="text-sm text-red-500">
-                          {form.formState.errors.items[index]?.quantity?.message}
-                        </p>
-                      )}
-                    </div>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="mt-8"
-                      onClick={() => fields.length > 1 && remove(index)}
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ))}
+                  );
+                })}
+
               </div>
             </div>
 
@@ -628,7 +747,7 @@ export default function RequestsPage() {
                     <TableBody>
                       {selectedRequest.items?.map((item: any) => (
                         <TableRow key={item.id}>
-                          <TableCell>{getItemName(item.itemId)}</TableCell>
+                          <TableCell>{getItemName(item.itemId)} {` (${item.sku})`}</TableCell>
                           <TableCell className="text-right">{item.quantity}</TableCell>
                         </TableRow>
                       ))}
@@ -639,7 +758,7 @@ export default function RequestsPage() {
             </div>
 
             <DialogFooter>
-              {selectedRequest && canApproveRequest(selectedRequest) && (
+              {selectedRequest &&  canApproveRequest(selectedRequest) && (
                 <div className="flex space-x-2 mr-auto">
                   {selectedRequest.status === "pending" && (
                     <>
@@ -698,6 +817,6 @@ export default function RequestsPage() {
           </DialogContent>
         </Dialog>
       )}
-    </AppLayout>
+    </>
   );
 }

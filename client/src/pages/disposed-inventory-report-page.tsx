@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "../hooks/use-auth";
-import AppLayout from "../components/layout/app-layout";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -135,8 +134,8 @@ export default function DisposedInventoryReportPage() {
         item.item?.sku || "",
         `"${item.warehouse?.name || ''}"`,
         item.quantity,
-        item.item?.rate || 0,
-        (item.quantity * (item.item?.rate || 0)),
+        item.unitValue || 0,
+        (item.quantity * (item.unitValue || 0)),
         item.disposalDate ? new Date(item.disposalDate).toLocaleDateString() : "",
         `"${item.disposalReason || ''}"`
       ].join(","))
@@ -152,7 +151,6 @@ export default function DisposedInventoryReportPage() {
   };
 
   return (
-    <AppLayout>
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <h1 className="text-3xl font-bold">Disposed Inventory Report</h1>
@@ -163,8 +161,7 @@ export default function DisposedInventoryReportPage() {
               onClick={handleRefresh}
               disabled={disposedLoading}
             >
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Refresh
+              <RefreshCw className="h-4 w-4 " />
             </Button>
             <Button
               variant="outline"
@@ -477,6 +474,5 @@ export default function DisposedInventoryReportPage() {
           </TabsContent>
         </Tabs>
       </div>
-    </AppLayout>
   );
 }

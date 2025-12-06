@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, unique, numeric, index } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, unique, numeric, index,varchar,json } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -40,6 +40,7 @@ export const users = pgTable("users", {
   resetToken: text("reset_token"),
   resetTokenExpiry: text("reset_token_expiry"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
   usersRoleIdx: index("users_role_idx").on(table.role),
   usersManagerIdx: index("users_manager_idx").on(table.managerId),
@@ -78,12 +79,14 @@ export const locations = pgTable("locations", {
   country: text("country").notNull().default("India"),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
   locationsCityIdx: index("locations_city_idx").on(table.city),
   locationsStateIdx: index("locations_state_idx").on(table.state),
   locationsCountryIdx: index("locations_country_idx").on(table.country),
   locationsActiveIdx: index("locations_active_idx").on(table.isActive),
   locationsCreatedAtIdx: index("locations_created_at_idx").on(table.createdAt),
+  locationsUpdatedAtIdx: index("locations_updated_at_idx").on(table.updatedAt),
 }));
 
 export const insertLocationSchema = createInsertSchema(locations).pick({
@@ -252,6 +255,7 @@ export const transactions = pgTable("transactions", {
   id: serial("id").primaryKey(),
   transactionCode: text("transaction_code").notNull().unique(),
   itemId: integer("item_id").notNull(),
+  transferId: integer("transfer_id"),
   quantity: integer("quantity").notNull(),
   transactionType: text("transaction_type").notNull(),
   sourceWarehouseId: integer("source_warehouse_id"),
@@ -288,7 +292,6 @@ export const insertTransactionSchema = createInsertSchema(transactions)
   .omit({
     id: true,
     createdAt: true,
-    completedAt: true,
   })
   .extend({
     cost: z.preprocess((arg) => {
@@ -299,10 +302,14 @@ export const insertTransactionSchema = createInsertSchema(transactions)
       if (typeof arg === 'number') return arg.toString();
       return arg;
     }, z.string().optional()),
-    supplierName: z.string().optional(),
-    poNumber: z.string().optional(),
+    supplierName: z.string().nullable().optional(),
+    poNumber: z.string().nullable().optional(),
     checkInDate: z.preprocess((arg) => {
       if (typeof arg === 'string' || arg instanceof Date) return new Date(arg);
+      return arg;
+    }, z.date().optional()),
+    completedAt: z.preprocess((arg) => {
+      if (arg instanceof Date || typeof arg === "string") return new Date(arg);
       return arg;
     }, z.date().optional())
   })
@@ -473,6 +480,23 @@ export const transfers = pgTable("transfers", {
   updatedAt: timestamp("updated_at"),
 });
 
+export const session = pgTable("session", {
+  // sid: [PK] character varying
+  sid: varchar("sid", ).primaryKey(),
+  
+  // sess: json
+  sess: json("sess").notNull(),
+  
+  // expire: timestamp without time zone (6)
+  expire: timestamp("expire", { 
+    precision: 6, 
+    withTimezone: false 
+  }).notNull(),
+  
+}, (table) => ({
+  // This adds the "IDX_session_expire" index
+  expireIdx: index("IDX_session_expire").on(table.expire),
+}));
 export const insertTransferSchema = createInsertSchema(transfers).omit({
   id: true,
   createdAt: true,
@@ -498,6 +522,10 @@ export const transferItems = pgTable("transfer_items", {
   actualQuantity: integer("actual_quantity"), // quantity actually received
   condition: text("condition").default("good"), // good, damaged, missing
   notes: text("notes"),
+  itemStatus: text("item_status"),
+  isDisposed: boolean('is_disposed').default(false),
+  disposalDate: timestamp("disposal_date", { mode: 'string' }),
+  disposalReason: text("disposal_reason"),
 });
 
 export const insertTransferItemSchema = createInsertSchema(transferItems).omit({
@@ -567,6 +595,7 @@ export type InsertTransferItem = z.infer<typeof insertTransferItemSchema>;
 export type TransferUpdate = typeof transferUpdates.$inferSelect;
 export type InsertTransferUpdate = z.infer<typeof insertTransferUpdateSchema>;
 
+
 // Rejected Goods table for tracking rejected transfer items
 export const rejectedGoods = pgTable("rejected_goods", {
   id: serial("id").primaryKey(),
@@ -578,7 +607,10 @@ export const rejectedGoods = pgTable("rejected_goods", {
   rejectedAt: timestamp("rejected_at").defaultNow().notNull(),
   warehouseId: integer("warehouse_id").notNull(), // Where the rejected goods are stored
   status: text("status").notNull().default("rejected"), // rejected, disposed, returned
+  approver: integer("approver"),
+  isApproved: boolean("is_approved").default(false),   
   notes: text("notes"),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
 export const insertRejectedGoodsSchema = createInsertSchema(rejectedGoods).pick({
@@ -590,6 +622,8 @@ export const insertRejectedGoodsSchema = createInsertSchema(rejectedGoods).pick(
   warehouseId: true,
   status: true,
   notes: true,
+  isApproved:true,
+  approver:true,
 });
 
 export type RejectedGoods = typeof rejectedGoods.$inferSelect;
@@ -677,6 +711,7 @@ export const issueActivities = pgTable("issue_activities", {
   userId: integer("user_id").notNull().references(() => users.id),
   action: text("action").notNull(), // created, assigned, status_changed, resolved, closed, reopened, commented
   previousValue: text("previous_value"), // Previous status, assignee, etc.
+  description: text("description"),
   newValue: text("new_value"), // New status, assignee, etc.
   comment: text("comment"), // User comment or resolution notes
   createdAt: timestamp("created_at").defaultNow().notNull(),

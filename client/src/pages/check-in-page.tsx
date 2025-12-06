@@ -1,10 +1,9 @@
-import { useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useState,useMemo } from "react";
+import { useQuery, useMutation,useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { format } from "date-fns";
-import AppLayout from "@/components/layout/app-layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -16,7 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest } from "@/lib/queryClient";
 import { Loader2, CalendarIcon, Plus, Trash2, Package } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
@@ -48,16 +47,16 @@ const itemSchema = z.object({
   quantity: z.string().min(1, { message: "Quantity is required" }).refine(val => !isNaN(Number(val)) && Number(val) > 0, {
     message: "Quantity must be a positive number"
   }),
-  cost: z.string().optional().refine(val => !val || (!isNaN(Number(val)) && Number(val) >= 0), {
+  cost: z.string().min(1,{message:"Cost is required"}).refine(val => !val || (!isNaN(Number(val)) && Number(val) >= 0), {
     message: "Cost must be a valid number"
   }),
 });
 
 const multiCheckInSchema = z.object({
   destinationWarehouseId: z.string().min(1, { message: "Destination warehouse is required" }),
-  purchaseOrderNumber: z.string().optional(),
+  purchaseOrderNumber: z.string().min(1,{message:'Purchase Order Number is required'}),
   deliveryChallanNumber: z.string().optional(),
-  supplierName: z.string().optional(),
+  supplierName: z.string().min(1,{message:'Supplier name is required'}),
   notes: z.string().optional(),
   checkInDate: z.date(),
   items: z.array(itemSchema).min(1, { message: "At least one item is required" }),
@@ -69,6 +68,9 @@ export default function CheckInPage() {
   const { toast } = useToast();
   const { user } = useAuth();
   const { currencySymbol, formatCurrencyFull } = useCurrency();
+  const [refreshKey, setRefreshKey] = useState(0);
+  const queryClient = useQueryClient();
+  
 
   const { data: items = [], isLoading: itemsLoading } = useQuery<Array<{
     id: number;
@@ -86,8 +88,11 @@ export default function CheckInPage() {
     name: string;
     location: string;
     managerId?: number;
+    isActive:boolean;
+    capacity:number;
+    totalItems:number
   }>>({
-    queryKey: ["/api/warehouses"],
+    queryKey: ["/api/warehouses/stats"],
   });
 
   const { data: userOperatedWarehouses = [], isLoading: operatedWarehousesLoading } = useQuery<number[]>({
@@ -118,6 +123,14 @@ export default function CheckInPage() {
     refetchInterval: 5000,
     refetchIntervalInBackground: true,
   });
+    const sortedCheckInTransactions = useMemo(() => {
+    return [...(checkInTransactions || [])].sort((a, b) => {
+      const da = new Date(a.checkInDate || a.createdAt).getTime();
+      const db = new Date(b.checkInDate || b.createdAt).getTime();
+      return db - da;
+    });
+  }, [checkInTransactions]);
+   warehouses.filter(id=>id.isActive===true);
 
   const { data: users = [], isLoading: usersLoading } = useQuery<Array<{
     id: number;
@@ -198,15 +211,19 @@ export default function CheckInPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/reports/inventory-stock"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard/summary"] });
       queryClient.invalidateQueries({ queryKey: ["/api/warehouses/stats"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/warehouses"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
+      setRefreshKey(prev => prev + 1);
       toast({
         title: "Success",
         description: `Successfully checked in ${variables.items.length} item(s)`,
       });
     },
     onError: (error: Error) => {
+      
       toast({
         title: "Error",
-        description: `Failed to check in items: ${error.message}`,
+        description: `${error.message}`,
         variant: "destructive",
       });
     },
@@ -234,17 +251,14 @@ export default function CheckInPage() {
 
   if (itemsLoading || warehousesLoading || transactionsLoading || usersLoading || operatedWarehousesLoading) {
     return (
-      <AppLayout>
         <div className="flex justify-center items-center h-64">
           <Loader2 className="h-8 w-8 animate-spin" />
         </div>
-      </AppLayout>
     );
   }
 
   if (!hasCheckInPermission) {
     return (
-      <AppLayout>
         <div className="flex justify-center items-center h-64">
           <Card className="w-full max-w-md">
             <CardHeader>
@@ -258,12 +272,10 @@ export default function CheckInPage() {
             </CardContent>
           </Card>
         </div>
-      </AppLayout>
     );
   }
 
   return (
-    <AppLayout>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <h1 className="text-3xl font-bold">Check In Items</h1>
@@ -291,7 +303,7 @@ export default function CheckInPage() {
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel>Destination Warehouse *</FormLabel>
-                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <Select key={refreshKey} onValueChange={field.onChange} value={field.value}>
                               <FormControl>
                                 <SelectTrigger>
                                   <SelectValue placeholder="Select warehouse" />
@@ -301,7 +313,7 @@ export default function CheckInPage() {
                                 {availableWarehouses.length > 0 ? (
                                   availableWarehouses.map((warehouse) => (
                                     <SelectItem key={warehouse.id} value={warehouse.id.toString()}>
-                                      {warehouse.name}
+                                      {warehouse.name}  <span  className={warehouse.capacity-warehouse.totalItems>0?"text-green-600":"text-red-600"}>  Available space: {warehouse.capacity-warehouse.totalItems}</span>
                                     </SelectItem>
                                   ))
                                 ) : (
@@ -470,7 +482,7 @@ export default function CheckInPage() {
                               name={`items.${index}.cost`}
                               render={({ field }) => (
                                 <FormItem>
-                                  <FormLabel>Cost ({currencySymbol})</FormLabel>
+                                  <FormLabel>Unit Cost ({currencySymbol})</FormLabel>
                                   <FormControl>
                                     <Input type="number" step="0.01" placeholder="Enter cost" {...field} />
                                   </FormControl>
@@ -557,7 +569,7 @@ export default function CheckInPage() {
                         <TableHead>Transaction Code</TableHead>
                         <TableHead>Item</TableHead>
                         <TableHead>Quantity</TableHead>
-                        <TableHead>Price ({currencySymbol})</TableHead>
+                        <TableHead>Unit Price ({currencySymbol})</TableHead>
                         <TableHead>Warehouse</TableHead>
                         <TableHead>Date</TableHead>
                         <TableHead>Status</TableHead>
@@ -567,8 +579,8 @@ export default function CheckInPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {checkInTransactions && checkInTransactions.length > 0 ? (
-                        checkInTransactions.map((transaction) => {
+                      {sortedCheckInTransactions && sortedCheckInTransactions.length > 0 ? (
+                        sortedCheckInTransactions.map((transaction) => {
                           const item = items?.find(i => i.id === transaction.itemId);
                           const warehouse = warehouses?.find(w => w.id === transaction.destinationWarehouseId);
                           const requester = users?.find(u => u.id === transaction.requesterId);
@@ -628,6 +640,5 @@ export default function CheckInPage() {
           </TabsContent>
         </Tabs>
       </div>
-    </AppLayout>
   );
 }

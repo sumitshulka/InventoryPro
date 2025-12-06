@@ -1,6 +1,5 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import AppLayout from "@/components/layout/app-layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -126,7 +125,11 @@ export default function InventoryValuationReportPage() {
       group.totalValue += item.totalValue;
     });
     
-    return Array.from(itemGroups.values()).sort((a, b) => a.name.localeCompare(b.name));
+    return Array.from(itemGroups.values()).sort((a, b) => {
+      const nameA = a.name || "";
+      const nameB = b.name || "";
+      return nameA.localeCompare(nameB);
+    });
   }, [filteredAndSortedData]);
 
   const handleSort = (column: string) => {
@@ -170,16 +173,13 @@ export default function InventoryValuationReportPage() {
 
   if (isLoading) {
     return (
-      <AppLayout>
         <div className="flex items-center justify-center h-64">
           <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full"></div>
         </div>
-      </AppLayout>
     );
   }
 
   return (
-    <AppLayout>
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <div>
@@ -529,6 +529,5 @@ export default function InventoryValuationReportPage() {
           </TabsContent>
         </Tabs>
       </div>
-    </AppLayout>
   );
 }

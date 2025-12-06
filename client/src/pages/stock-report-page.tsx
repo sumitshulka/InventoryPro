@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useState, useEffect } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import AppLayout from "@/components/layout/app-layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/select";
 import { Loader2, Search, Download, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useLocation } from "wouter";
 
 export default function StockReportPage() {
   const { toast } = useToast();
@@ -28,6 +29,18 @@ export default function StockReportPage() {
   const [warehouseFilter, setWarehouseFilter] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [stockFilter, setStockFilter] = useState("all");
+  const [location] = useLocation();
+  const queryClient=useQueryClient();
+  // Check for filter query parameter on mount
+  useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    const filterParam = searchParams.get('filter');
+    console.log('Filter param:',filterParam);
+    if (filterParam === 'low') {
+      setStockFilter('low');
+    }
+  }, []);
+  
 
   const { data: inventoryReport, isLoading: inventoryLoading, refetch } = useQuery({
     queryKey: ["/api/reports/inventory-stock"],
@@ -75,11 +88,11 @@ export default function StockReportPage() {
   });
 
   // Apply filters to inventory data
-  const filteredInventory = inventoryReport
+  const filteredInventory = Array.isArray(inventoryReport)
     ? inventoryReport.filter((item: any) => {
         const matchesSearch = 
-          item.item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          item.item.sku.toLowerCase().includes(searchTerm.toLowerCase());
+          (item.item?.name || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+          (item.item?.sku || "").toLowerCase().includes(searchTerm.toLowerCase());
         
         const matchesWarehouse = 
           warehouseFilter === "all" || 
@@ -87,7 +100,7 @@ export default function StockReportPage() {
         
         const matchesCategory = 
           categoryFilter === "all" || 
-          item.item.categoryId?.toString() === categoryFilter;
+          item.item?.categoryId?.toString() === categoryFilter;
         
         const matchesStock = 
           stockFilter === "all" || 
@@ -97,11 +110,12 @@ export default function StockReportPage() {
         return matchesSearch && matchesWarehouse && matchesCategory && matchesStock;
       })
     : [];
+  const LowStockInventories = Array.isArray(inventoryReport) ? inventoryReport.filter((item:any)=>item.isLowStock===true):[];
 
   // Calculate totals for each item across all warehouses
   const calculateTotals = () => {
-    if (!inventoryReport) return [];
-    
+    if (!Array.isArray(inventoryReport)) return [];
+
     const totals = new Map();
     
     inventoryReport.forEach((item: any) => {
@@ -132,28 +146,52 @@ export default function StockReportPage() {
   };
   
   const itemTotals = calculateTotals();
+  console.log('itemTotalsribhu',itemTotals)
 
   if (inventoryLoading || warehousesLoading || categoriesLoading) {
     return (
-      <AppLayout>
         <div className="flex items-center justify-center h-[calc(100vh-200px)]">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
-      </AppLayout>
     );
   }
 
   return (
-    <AppLayout>
+    <>
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-medium text-gray-800">Inventory Stock Report</h1>
           <p className="text-gray-600">View and analyze current inventory levels</p>
         </div>
         <div className="flex space-x-2">
-          <Button variant="outline" onClick={() => refetch()}>
-            <RefreshCw className="mr-2 h-4 w-4" />
-            Refresh
+          <Button variant="outline" onClick={async () => {
+                      try {
+                        // Clear all relevant query caches
+                        await queryClient.invalidateQueries({ queryKey: ["/api/reports/inventory-stock"] });
+                        await queryClient.invalidateQueries({ queryKey: ["/api/warehouses"] });
+                        await queryClient.invalidateQueries({ queryKey: ["/api/categories"] });
+                        
+                        // Force fresh data fetch
+                        // await Promise.all([
+                        //   queryClient.refetchQueries({ queryKey: ["/api/reports/inventory-stock"], type: 'active' }),
+                        //   queryClient.refetchQueries({ queryKey: ["/api/warehouses"], type: 'active' }),
+                        //   queryClient.refetchQueries({ queryKey: ["/api/categories"], type: 'active' }),
+                        // ]);
+                        
+                        toast({
+                          title: "Refreshed",
+                          description: "Stock Report has been refreshed with latest data",
+                        });
+                      } catch (error) {
+                        console.error('Refresh error:', error);
+                        toast({
+                          title: "Refresh Failed",
+                          description: "Unable to refresh data. Please try again.",
+                          variant: "destructive",
+                        });
+                      }
+                    }}>
+            <RefreshCw className={`h-4 w-4 `} />
           </Button>
           <Button 
             onClick={() => exportMutation.mutate()}
@@ -178,8 +216,8 @@ export default function StockReportPage() {
                 <p className="text-sm font-medium text-gray-500">Total Items</p>
                 <h2 className="text-3xl font-bold">{itemTotals.length}</h2>
               </div>
-              <div className="bg-primary bg-opacity-10 p-3 rounded-full">
-                <span className="material-icons text-primary">inventory_2</span>
+              <div className="bg-white bg-opacity-10 p-3 rounded-full">
+                <span className="material-icons text-primary">category</span>
               </div>
             </div>
           </CardContent>
@@ -189,8 +227,8 @@ export default function StockReportPage() {
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-500">Low Stock Items</p>
-                <h2 className="text-3xl font-bold">{itemTotals.filter(item => item.isLowStock).length}</h2>
+                <p className="text-sm font-medium text-gray-500">Low Stock Items (Inventory)</p>
+                <h2 className="text-3xl font-bold">{LowStockInventories?.length || 0}</h2>
               </div>
               <div className="bg-warning bg-opacity-10 p-3 rounded-full">
                 <span className="material-icons text-warning">warning</span>
@@ -241,11 +279,11 @@ export default function StockReportPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Warehouses</SelectItem>
-                  {warehouses?.map((warehouse: any) => (
+                  {warehouses && Array.isArray(warehouses) ? warehouses?.map((warehouse: any) => (
                     <SelectItem key={warehouse.id} value={warehouse.id.toString()}>
                       {warehouse.name}
                     </SelectItem>
-                  ))}
+                  )) : null}
                 </SelectContent>
               </Select>
             </div>
@@ -260,11 +298,11 @@ export default function StockReportPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Categories</SelectItem>
-                  {categories?.map((category: any) => (
+                  {categories && Array.isArray(categories) ?categories?.map((category: any) => (
                     <SelectItem key={category.id} value={category.id.toString()}>
                       {category.name}
                     </SelectItem>
-                  ))}
+                  )):null}
                 </SelectContent>
               </Select>
             </div>
@@ -316,11 +354,11 @@ export default function StockReportPage() {
                 ) : (
                   filteredInventory.map((inv: any) => (
                     <TableRow key={`${inv.itemId}-${inv.warehouseId}`}>
-                      <TableCell className="font-medium">{inv.item.sku}</TableCell>
-                      <TableCell>{inv.item.name}</TableCell>
-                      <TableCell>{inv.warehouse.name}</TableCell>
+                      <TableCell className="font-medium">{inv.item?.sku}</TableCell>
+                      <TableCell>{inv.item?.name}</TableCell>
+                      <TableCell>{inv.warehouse?.name || 'Unknown Warehouse'}</TableCell>
                       <TableCell className="text-right">{inv.quantity}</TableCell>
-                      <TableCell className="text-right">{inv.item.minStockLevel}</TableCell>
+                      <TableCell className="text-right">{inv.item?.minStockLevel}</TableCell>
                       <TableCell>
                         {inv.isLowStock ? (
                           <span className="px-2 py-1 bg-red-100 text-red-800 rounded-full text-xs font-medium">
@@ -340,6 +378,6 @@ export default function StockReportPage() {
           </div>
         </CardContent>
       </Card>
-    </AppLayout>
+    </>
   );
 }

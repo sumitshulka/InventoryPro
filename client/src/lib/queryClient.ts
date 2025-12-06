@@ -1,9 +1,19 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
-async function throwIfResNotOk(res: Response) {
+// in queryClient.ts
+async function throwIfResNotOk(res) {
   if (!res.ok) {
-    const text = (await res.text()) || res.statusText;
-    throw new Error(`${res.status}: ${text}`);
+    let errorData;
+    try {
+      // Try to get the clean message from the JSON
+      errorData = await res.json(); 
+    } catch (e) {
+      // If the error isn't JSON, just use the raw text
+      errorData = { message: (await res.text()) || "An unknown error occurred" };
+    }
+    
+    // This now throws an error with a CLEAN message
+    throw new Error(errorData.message); 
   }
 }
 
@@ -29,6 +39,7 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
+    console.log('Fetching:',queryKey[0]);
     const res = await fetch(queryKey[0] as string, {
       credentials: "include",
     });
@@ -58,9 +69,14 @@ export const queryClient = new QueryClient({
 });
 
 // Utility function to invalidate related queries after mutations
-export async function invalidateRelatedQueries(entityType: string, action: 'create' | 'update' | 'delete' = 'create') {
+export async function invalidateRelatedQueries(queryClient: QueryClient, entityType: string, action: 'create' | 'update' | 'delete' = 'create') {
   const queryKeysToInvalidate: string[] = [];
-  
+   console.log("---- Full Query Cache in invalidateRelatedQueries ----");
+queryClient.getQueryCache().getAll().forEach((query) => {
+  console.log("queryKey:", query.queryKey, "stale:", query.isStale(), "data:", query.state.data);
+});
+console.log("--------------------------");
+
   switch (entityType) {
     case 'user':
       queryKeysToInvalidate.push('/api/users');

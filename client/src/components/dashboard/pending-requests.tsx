@@ -77,7 +77,7 @@ export default function PendingRequests({ requests }: PendingRequestsProps) {
         <Button 
           variant="ghost" 
           className="text-primary text-sm hover:bg-primary/5"
-          onClick={() => navigate("/requests")}
+          onClick={() => navigate("/requests?filter=pending")}
         >
           View All
           <span className="material-icons text-sm ml-1">chevron_right</span>

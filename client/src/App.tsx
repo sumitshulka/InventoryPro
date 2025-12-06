@@ -24,7 +24,7 @@ import CategoriesPage from "@/pages/categories-page";
 import DepartmentsPage from "@/pages/departments-page";
 import ApprovalManagementPage from "@/pages/approval-management-page";
 import SettingsPage from "@/pages/settings-page";
-
+import AppLayout from "./components/layout/app-layout";
 import AuditTrailPage from "@/pages/audit-trail-page";
 import IssuesPage from "@/pages/issues-page";
 import MyProfilePage from "@/pages/my-profile-page";
@@ -47,6 +47,7 @@ function Router() {
   // If user is authenticated, wrap protected routes with license guard
   if (user) {
     return (
+      <AppLayout>
       <LicenseGuard>
         <Switch>
           <ProtectedRoute path="/my-profile" component={MyProfilePage} />
@@ -77,6 +78,7 @@ function Router() {
           <Route component={NotFound} />
         </Switch>
       </LicenseGuard>
+      </AppLayout>
     );
   }
   

@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo,useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, AlertTriangle } from "lucide-react";
@@ -18,6 +18,9 @@ export function DataTablePagination({ data, children, className }: DataTablePagi
   const totalPages = Math.ceil(totalItems / pageSize);
   const startIndex = (currentPage - 1) * pageSize;
   const endIndex = Math.min(startIndex + pageSize, totalItems);
+  useEffect(() => {
+    setCurrentPage(1);   // Reset page when data changes
+  }, [data]);
   
   const paginatedData = useMemo(() => {
     return data.slice(startIndex, endIndex);

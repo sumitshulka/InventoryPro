@@ -27,6 +27,7 @@ interface RejectedGoods {
   warehouseId: number;
   status: string;
   notes?: string;
+  updatedAt: string;
   item?: {
     id: number;
     name: string;
@@ -52,7 +53,7 @@ export default function RejectedGoodsPage() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  const { data: rejectedGoods = [], isLoading } = useQuery({
+  const { data: UnSortedRejectedGoods = [], isLoading } = useQuery({
     queryKey: ['/api/rejected-goods'],
   });
 
@@ -128,15 +129,24 @@ export default function RejectedGoodsPage() {
     if (!selectedItem || !actionNotes.trim()) return;
 
     if (actionType === 'return') {
-      approveReturnMutation.mutate({
-        transferId: selectedItem.transferId,
-        returnReason: actionNotes.trim()
+      updateStatusMutation.mutate({
+        id: selectedItem.id,
+        status:'restocked',
+        notes: actionNotes.trim()
       });
-    } else if (actionType === 'dispose') {
-      approveDisposalMutation.mutate({
-        transferId: selectedItem.transferId,
-        disposalReason: actionNotes.trim()
-      });
+    } 
+    // else if (actionType === 'dispose') {
+    //   approveDisposalMutation.mutate({
+    //     transferId: selectedItem.transferId,
+    //     disposalReason: actionNotes.trim()
+    //   });
+    // }
+    else if(actionType==='dispose'){
+      updateStatusMutation.mutate({
+        id:selectedItem.id,
+        status:'dispose',
+        notes:actionNotes.trim()
+      })
     }
   };
 
@@ -202,6 +212,12 @@ export default function RejectedGoodsPage() {
     setActionType(action);
     setActionDialogOpen(true);
   };
+  const rejectedGoods = UnSortedRejectedGoods
+  ? [...(UnSortedRejectedGoods as RejectedGoods[])].sort(
+      (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+    )
+  : [];
+
 
   const filteredGoods = (rejectedGoods as RejectedGoods[]).filter(item => item.status === 'rejected');
   const processedGoods = (rejectedGoods as RejectedGoods[]).filter(item => item.status !== 'rejected');
@@ -223,7 +239,6 @@ export default function RejectedGoodsPage() {
   };
 
   return (
-    <AppLayout>
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <h1 className="text-3xl font-bold">Rejected Goods Management</h1>
@@ -306,7 +321,7 @@ export default function RejectedGoodsPage() {
                                   className="text-blue-600"
                                 >
                                   <RefreshCw className="h-3 w-3 mr-1" />
-                                  Return
+                                  Restock
                                 </Button>
                                 <Button
                                   variant="outline"
@@ -468,6 +483,5 @@ export default function RejectedGoodsPage() {
           </DialogContent>
         </Dialog>
       </div>
-    </AppLayout>
   );
 }
