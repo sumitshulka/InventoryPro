@@ -4929,6 +4929,10 @@ app.get("/api/disposed-inventory", async (req: Request, res: Response) => {
       const randomSuffix = Math.floor(Math.random() * 1000);
       const transferCode = `TRF-${timestamp}-${randomSuffix}`;
 
+      // Generate unique transfer code
+      const allTransfers = await storage.getAllTransfers();
+      const transferCode = `TRF-${String(allTransfers.length + 1).padStart(4, '0')}`;
+      
       const transferData = insertTransferSchema.parse({
         ...req.body,
         transferCode,
@@ -5511,12 +5515,25 @@ app.get("/api/disposed-inventory", async (req: Request, res: Response) => {
         if (newStatus === 'rejected' && transfer.status === 'pending') {
           return user.role === 'admin' || managesSourceWarehouse ;
         }
+        // Source warehouse marks as in-transit
         if (newStatus === 'in-transit' && transfer.status === 'approved') {
           return managesSourceWarehouse || user.role === 'admin';
         }
         if (newStatus === 'completed'  && transfer.status === 'in-transit') {
           console.log('managesDestination warehouse ',managesDestinationWarehouse)
           return managesDestinationWarehouse || user.role==='admin';
+        }
+        // Admin approves return or disposal
+        if ((newStatus === 'return_approved' || newStatus === 'disposed') && transfer.status === 'return_requested') {
+          return user.role === 'admin';
+        }
+        // Destination warehouse ships return back
+        if (newStatus === 'return_shipped' && transfer.status === 'return_approved') {
+          return managesDestinationWarehouse;
+        }
+        // Source warehouse confirms return delivery
+        if (newStatus === 'returned' && transfer.status === 'return_shipped') {
+          return managesSourceWarehouse;
         }
         // Allow admins or relevant warehouse managers to reject pending transfers
         
@@ -5574,8 +5591,8 @@ app.get("/api/disposed-inventory", async (req: Request, res: Response) => {
               message: `Only destination warehouse managers can update ${field}` 
             });
           }
-        } else if (['items', 'rejectionReason'].includes(field)) {
-          // Items and rejection reason can be updated by destination warehouse managers
+        } else if (['items', 'rejectionReason', 'returnReason'].includes(field)) {
+          // Items, rejection reason, and return reason can be updated by destination warehouse managers
           if (managesDestinationWarehouse) {
             filteredData[field] = value;
           } else {
