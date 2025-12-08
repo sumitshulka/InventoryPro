@@ -86,8 +86,9 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { useCurrency } from "@/hooks/use-currency";
+import { ProductPicker } from "@/components/product-picker";
 import { format } from "date-fns";
-import { Client, Warehouse, Item } from "@shared/schema";
+import { Client, Warehouse, Item, Category } from "@shared/schema";
 
 const CURRENCY_SYMBOLS: Record<string, string> = {
   USD: "$",
@@ -115,6 +116,7 @@ interface EnrichedInventory {
   warehouseId: number;
   quantity: number;
   item?: Item;
+  category?: Category;
 }
 
 interface OrderItem {
@@ -283,6 +285,8 @@ export default function SalesOrderDetailPage() {
   const [showEmailDialog, setShowEmailDialog] = useState(false);
   const [selectedDispatchId, setSelectedDispatchId] = useState<number | null>(null);
   const [downloadingChallan, setDownloadingChallan] = useState<number | null>(null);
+  const [showProductPicker, setShowProductPicker] = useState(false);
+  const [itemDetailsCache, setItemDetailsCache] = useState<Record<number, Item>>({});
 
   const canEdit = user?.role === "admin" || user?.role === "manager";
   const canApprove = user?.role === "admin" || user?.role === "manager";
@@ -701,6 +705,13 @@ export default function SalesOrderDetailPage() {
       return;
     }
 
+    if (inventoryItem.item) {
+      setItemDetailsCache(prev => ({
+        ...prev,
+        [inventoryItem.itemId]: inventoryItem.item!
+      }));
+    }
+
     append({
       itemId: inventoryItem.itemId,
       quantity: 1,
@@ -709,6 +720,11 @@ export default function SalesOrderDetailPage() {
       taxAmount: "0",
       lineTotal: "0",
       notes: "",
+    });
+
+    toast({
+      title: "Item added",
+      description: `${inventoryItem.item?.name || "Item"} has been added to the order.`,
     });
   };
 
@@ -1105,54 +1121,44 @@ export default function SalesOrderDetailPage() {
 
               {/* Line Items Section */}
               <div className="space-y-4">
-                {isDraft && selectedWarehouseId && (
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-lg flex items-center gap-2">
-                        <Package className="h-5 w-5" />
-                        Available Inventory
-                      </CardTitle>
-                      <CardDescription>
-                        Click on an item to add it to the order
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2">
-                        {availableInventory.map((inv) => (
-                          <Button
-                            key={inv.id}
-                            type="button"
-                            variant="outline"
-                            className="flex flex-col h-auto p-3 text-left"
-                            onClick={() => addLineItem(inv)}
-                            data-testid={`button-add-item-${inv.itemId}`}
-                          >
-                            <span className="font-medium text-sm truncate w-full">
-                              {inv.item?.name || `Item #${inv.itemId}`}
-                            </span>
-                            <span className="text-xs text-gray-500">
-                              Qty: {inv.quantity}
-                            </span>
-                          </Button>
-                        ))}
-                        {availableInventory.length === 0 && (
-                          <div className="col-span-full text-center text-gray-500 py-4">
-                            No inventory available in selected warehouse
-                          </div>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
-
                 <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg">Order Line Items</CardTitle>
+                  <CardHeader className="flex flex-row items-center justify-between">
+                    <div>
+                      <CardTitle className="text-lg">Order Line Items</CardTitle>
+                      <CardDescription>
+                        {fields.length} item{fields.length !== 1 ? "s" : ""} in this order
+                      </CardDescription>
+                    </div>
+                    {isDraft && selectedWarehouseId && (
+                      <Button
+                        type="button"
+                        onClick={() => setShowProductPicker(true)}
+                        data-testid="button-add-products"
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Products
+                      </Button>
+                    )}
                   </CardHeader>
                   <CardContent>
                     {fields.length === 0 ? (
                       <div className="text-center py-8 text-gray-500">
-                        No items added yet. Select a warehouse and add items from available inventory.
+                        <Package className="h-10 w-10 mx-auto mb-3 text-gray-300" />
+                        <p>No items added yet.</p>
+                        {selectedWarehouseId && isDraft ? (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="mt-4"
+                            onClick={() => setShowProductPicker(true)}
+                            data-testid="button-add-products-empty"
+                          >
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add Products
+                          </Button>
+                        ) : (
+                          <p className="text-sm mt-2">Select a warehouse first to add products.</p>
+                        )}
                       </div>
                     ) : (
                       <Table>
@@ -1170,17 +1176,22 @@ export default function SalesOrderDetailPage() {
                         </TableHeader>
                         <TableBody>
                           {fields.map((field, index) => {
+                            const cachedItem = itemDetailsCache[field.itemId];
                             const inventoryItem = availableInventory.find(i => i.itemId === field.itemId);
                             const orderItem = order?.items.find(i => i.itemId === field.itemId);
+                            const itemName = cachedItem?.name || inventoryItem?.item?.name || orderItem?.item?.name || `Item #${field.itemId}`;
+                            const itemSku = cachedItem?.sku || inventoryItem?.item?.sku || orderItem?.item?.sku;
                             return (
                               <TableRow key={field.id}>
                                 <TableCell>
                                   <div className="font-medium">
-                                    {inventoryItem?.item?.name || orderItem?.item?.name || `Item #${field.itemId}`}
+                                    {itemName}
                                   </div>
-                                  <div className="text-xs text-gray-500">
-                                    {inventoryItem?.item?.sku || orderItem?.item?.sku}
-                                  </div>
+                                  {itemSku && (
+                                    <div className="text-xs text-gray-500">
+                                      {itemSku}
+                                    </div>
+                                  )}
                                 </TableCell>
                                 <TableCell>
                                   <Input
@@ -1706,6 +1717,15 @@ export default function SalesOrderDetailPage() {
             </Form>
           </DialogContent>
         </Dialog>
+
+        {/* Product Picker Modal */}
+        <ProductPicker
+          open={showProductPicker}
+          onOpenChange={setShowProductPicker}
+          warehouseId={selectedWarehouseId}
+          onSelectItem={addLineItem}
+          selectedItemIds={watchItems.map(item => item.itemId)}
+        />
       </div>
     </AppLayout>
   );
