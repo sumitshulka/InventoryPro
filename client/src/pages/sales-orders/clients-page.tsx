@@ -164,6 +164,7 @@ export default function ClientsPage() {
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
+      await queryClient.refetchQueries({ queryKey: ["/api/clients"] });
       toast({
         title: isEditMode ? "Client updated" : "Client created",
         description: isEditMode
@@ -188,6 +189,7 @@ export default function ClientsPage() {
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
+      await queryClient.refetchQueries({ queryKey: ["/api/clients"] });
       toast({
         title: "Client status updated",
         description: "The client status has been updated.",
@@ -209,6 +211,7 @@ export default function ClientsPage() {
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
+      await queryClient.refetchQueries({ queryKey: ["/api/clients"] });
       toast({
         title: "Client deleted",
         description: "The client has been deleted successfully.",
