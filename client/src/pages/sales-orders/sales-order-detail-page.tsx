@@ -202,7 +202,10 @@ const orderFormSchema = z.object({
   clientId: z.string().min(1, "Client is required"),
   warehouseId: z.string().min(1, "Warehouse is required"),
   orderDate: z.string(),
-  shippingAddress: z.string().optional(),
+  shippingAddressLine: z.string().optional(),
+  shippingCity: z.string().optional(),
+  shippingState: z.string().optional(),
+  shippingCountry: z.string().optional(),
   notes: z.string().optional(),
   items: z.array(z.object({
     itemId: z.number(),
@@ -216,6 +219,24 @@ const orderFormSchema = z.object({
 });
 
 type OrderFormValues = z.infer<typeof orderFormSchema>;
+
+function parseShippingAddress(address?: string): { line: string; city: string; state: string; country: string } {
+  if (!address) return { line: "", city: "", state: "", country: "" };
+  const parts = address.split(", ");
+  if (parts.length >= 4) {
+    return { line: parts[0], city: parts[1], state: parts[2], country: parts.slice(3).join(", ") };
+  } else if (parts.length === 3) {
+    return { line: parts[0], city: parts[1], state: parts[2], country: "" };
+  } else if (parts.length === 2) {
+    return { line: parts[0], city: parts[1], state: "", country: "" };
+  }
+  return { line: address, city: "", state: "", country: "" };
+}
+
+function formatShippingAddress(line?: string, city?: string, state?: string, country?: string): string {
+  const parts = [line, city, state, country].filter(Boolean);
+  return parts.join(", ");
+}
 
 const dispatchFormSchema = z.object({
   courierName: z.string().min(1, "Courier name is required"),
@@ -262,11 +283,19 @@ export default function SalesOrderDetailPage() {
   });
 
   const { data: warehouses = [] } = useQuery<Warehouse[]>({
-    queryKey: ["/api/warehouses"],
+    queryKey: ["/api/warehouses/accessible"],
   });
 
   const { data: availableInventory = [] } = useQuery<EnrichedInventory[]>({
     queryKey: ["/api/warehouses", selectedWarehouseId, "available-inventory"],
+    queryFn: async () => {
+      if (!selectedWarehouseId) return [];
+      const res = await fetch(`/api/warehouses/${selectedWarehouseId}/available-inventory`, {
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to fetch inventory");
+      return res.json();
+    },
     enabled: !!selectedWarehouseId,
   });
 
@@ -276,7 +305,10 @@ export default function SalesOrderDetailPage() {
       clientId: "",
       warehouseId: "",
       orderDate: format(new Date(), "yyyy-MM-dd"),
-      shippingAddress: "",
+      shippingAddressLine: "",
+      shippingCity: "",
+      shippingState: "",
+      shippingCountry: "",
       notes: "",
       items: [],
     },
@@ -304,12 +336,16 @@ export default function SalesOrderDetailPage() {
     if (order) {
       const clientId = order.clientId?.toString() || "";
       const warehouseId = order.warehouseId?.toString() || "";
+      const parsedAddress = parseShippingAddress(order.shippingAddress);
       
       form.reset({
         clientId,
         warehouseId,
         orderDate: order.orderDate ? format(new Date(order.orderDate), "yyyy-MM-dd") : "",
-        shippingAddress: order.shippingAddress || "",
+        shippingAddressLine: parsedAddress.line,
+        shippingCity: parsedAddress.city,
+        shippingState: parsedAddress.state,
+        shippingCountry: parsedAddress.country,
         notes: order.notes || "",
         items: order.items.map(item => ({
           itemId: item.itemId,
@@ -327,6 +363,20 @@ export default function SalesOrderDetailPage() {
       }
     }
   }, [order, form]);
+
+  // Auto-populate shipping address when client is selected (for new orders only)
+  const watchClientId = form.watch("clientId");
+  useEffect(() => {
+    if (watchClientId && isNew) {
+      const selectedClient = clients.find(c => c.id.toString() === watchClientId);
+      if (selectedClient) {
+        form.setValue("shippingAddressLine", selectedClient.shippingAddress || "");
+        form.setValue("shippingCity", selectedClient.shippingCity || "");
+        form.setValue("shippingState", selectedClient.shippingState || "");
+        form.setValue("shippingCountry", selectedClient.shippingCountry || "");
+      }
+    }
+  }, [watchClientId, clients, isNew, form]);
 
   const watchWarehouseId = form.watch("warehouseId");
   useEffect(() => {
@@ -365,11 +415,17 @@ export default function SalesOrderDetailPage() {
   const saveMutation = useMutation({
     mutationFn: async (data: OrderFormValues) => {
       const totals = calculateTotals();
+      const formattedAddress = formatShippingAddress(
+        data.shippingAddressLine,
+        data.shippingCity,
+        data.shippingState,
+        data.shippingCountry
+      );
       const payload = {
         clientId: parseInt(data.clientId),
         warehouseId: parseInt(data.warehouseId),
         orderDate: data.orderDate,
-        shippingAddress: data.shippingAddress,
+        shippingAddress: formattedAddress,
         notes: data.notes,
         subtotal: totals.subtotal,
         taxAmount: totals.taxAmount,
@@ -749,21 +805,77 @@ export default function SalesOrderDetailPage() {
 
                   <Card>
                     <CardHeader>
-                      <CardTitle className="text-lg">Shipping & Notes</CardTitle>
+                      <CardTitle className="text-lg">Shipping Address</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
                       <FormField
                         control={form.control}
-                        name="shippingAddress"
+                        name="shippingAddressLine"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Shipping Address</FormLabel>
+                            <FormLabel>Street Address</FormLabel>
                             <FormControl>
-                              <Textarea
-                                placeholder="Enter shipping address (defaults from client if empty)"
+                              <Input
+                                placeholder="Street address, building, floor"
                                 {...field}
                                 disabled={!isDraft}
-                                data-testid="input-shipping-address"
+                                data-testid="input-shipping-address-line"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <div className="grid grid-cols-2 gap-3">
+                        <FormField
+                          control={form.control}
+                          name="shippingCity"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>City</FormLabel>
+                              <FormControl>
+                                <Input
+                                  placeholder="City"
+                                  {...field}
+                                  disabled={!isDraft}
+                                  data-testid="input-shipping-city"
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="shippingState"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>State</FormLabel>
+                              <FormControl>
+                                <Input
+                                  placeholder="State/Province"
+                                  {...field}
+                                  disabled={!isDraft}
+                                  data-testid="input-shipping-state"
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                      <FormField
+                        control={form.control}
+                        name="shippingCountry"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Country</FormLabel>
+                            <FormControl>
+                              <Input
+                                placeholder="Country"
+                                {...field}
+                                disabled={!isDraft}
+                                data-testid="input-shipping-country"
                               />
                             </FormControl>
                             <FormMessage />

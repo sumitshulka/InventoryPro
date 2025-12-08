@@ -631,6 +631,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get accessible warehouses for current user (filtered by role)
+  app.get("/api/warehouses/accessible", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as any;
+      let accessibleWarehouses: any[] = [];
+      
+      if (user.role === "admin") {
+        // Admin can access all warehouses
+        accessibleWarehouses = await storage.getAllWarehouses();
+      } else if (user.role === "manager") {
+        // Manager can access warehouses they manage
+        accessibleWarehouses = await storage.getWarehousesByManager(user.id);
+      } else if (user.isWarehouseOperator || user.warehouseId) {
+        // Warehouse operators can access warehouses from warehouseOperators table
+        const operatorAssignments = await storage.getWarehouseOperatorsByUserId(user.id);
+        const operatorWarehouseIds = operatorAssignments.map((op: any) => op.warehouseId);
+        
+        // Also include user's directly assigned warehouse
+        if (user.warehouseId && !operatorWarehouseIds.includes(user.warehouseId)) {
+          operatorWarehouseIds.push(user.warehouseId);
+        }
+        
+        if (operatorWarehouseIds.length > 0) {
+          const allWarehouses = await storage.getAllWarehouses();
+          accessibleWarehouses = allWarehouses.filter((wh: any) => operatorWarehouseIds.includes(wh.id));
+        }
+      } else if (user.warehouseId) {
+        // Regular employees with assigned warehouse
+        const warehouse = await storage.getWarehouse(user.warehouseId);
+        if (warehouse) {
+          accessibleWarehouses = [warehouse];
+        }
+      }
+      
+      // Filter to only active warehouses
+      accessibleWarehouses = accessibleWarehouses.filter((wh: any) => !wh.isArchived);
+      
+      // Enrich with manager info
+      const enrichedWarehouses = await Promise.all(accessibleWarehouses.map(async (warehouse: any) => {
+        let manager = null;
+        if (warehouse.managerId) {
+          manager = await storage.getUser(warehouse.managerId);
+        }
+        return {
+          ...warehouse,
+          manager: manager ? { id: manager.id, name: manager.name, email: manager.email, role: manager.role } : null
+        };
+      }));
+      
+      res.json(enrichedWarehouses);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Create warehouse (admin only)
   app.post("/api/warehouses", checkRole("admin"), async (req, res) => {
     try {
