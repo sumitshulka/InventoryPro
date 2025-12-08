@@ -400,6 +400,7 @@ export default function Sidebar({ user, isOpen, onClose }: SidebarProps) {
                           ? "bg-primary/10 border-l-4 border-primary text-primary" 
                           : "text-gray-700 hover:text-primary hover:bg-primary/5"
                       )}
+                      data-testid="link-client-sales-report"
                     >
                       <span className="material-icons mr-3">storefront</span>
                       <span className="whitespace-nowrap">Client Sales Report</span>
