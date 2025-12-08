@@ -41,23 +41,23 @@ import {
   RejectedGoods,
   InsertRejectedGoods,
   InsertTransfer,
-  TransferItem,
-  InsertTransferItem,
   TransferUpdate,
   InsertTransferUpdate,
   TransactionType,
-  RejectedGoods,
-  InsertRejectedGoods,
-  Notification,
-  InsertNotification,
-  Issue,
-  InsertIssue,
-  IssueActivity,
-  InsertIssueActivity,
   AuditLog,
   InsertAuditLog,
-  EmailSettings,
-  InsertEmailSettings,
+  Client,
+  InsertClient,
+  SalesOrder,
+  InsertSalesOrder,
+  SalesOrderItem,
+  InsertSalesOrderItem,
+  SalesOrderApproval,
+  InsertSalesOrderApproval,
+  SalesOrderDispatch,
+  InsertSalesOrderDispatch,
+  SalesOrderDispatchItem,
+  InsertSalesOrderDispatchItem,
   users,
   departments,
   locations,
@@ -80,7 +80,13 @@ import {
   issues,
   issueActivities,
   auditLogs,
-  emailSettings
+  emailSettings,
+  clients,
+  salesOrders,
+  salesOrderItems,
+  salesOrderApprovals,
+  salesOrderDispatches,
+  salesOrderDispatchItems
 } from "@shared/schema";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
@@ -180,6 +186,54 @@ export interface IStorage {
   // Transfer operations extensions
   updateTransferItem(id: number, data: any): Promise<any>;
   createRejectedGoods(data: any): Promise<any>;
+
+  // Client operations
+  getClient(id: number): Promise<Client | undefined>;
+  getClientByCode(code: string): Promise<Client | undefined>;
+  createClient(client: InsertClient): Promise<Client>;
+  getAllClients(): Promise<Client[]>;
+  getActiveClients(): Promise<Client[]>;
+  updateClient(id: number, clientData: Partial<InsertClient>): Promise<Client | undefined>;
+  deleteClient(id: number): Promise<boolean>;
+  getNextClientCode(): Promise<string>;
+
+  // Sales Order operations
+  getSalesOrder(id: number): Promise<SalesOrder | undefined>;
+  getSalesOrderByCode(code: string): Promise<SalesOrder | undefined>;
+  createSalesOrder(order: InsertSalesOrder): Promise<SalesOrder>;
+  getAllSalesOrders(): Promise<SalesOrder[]>;
+  getSalesOrdersByWarehouse(warehouseId: number): Promise<SalesOrder[]>;
+  getSalesOrdersByUser(userId: number): Promise<SalesOrder[]>;
+  getSalesOrdersByStatus(status: string): Promise<SalesOrder[]>;
+  updateSalesOrder(id: number, orderData: Partial<InsertSalesOrder>): Promise<SalesOrder | undefined>;
+  deleteSalesOrder(id: number): Promise<boolean>;
+  getNextSalesOrderCode(): Promise<string>;
+
+  // Sales Order Items operations
+  getSalesOrderItem(id: number): Promise<SalesOrderItem | undefined>;
+  getSalesOrderItemsByOrder(orderId: number): Promise<SalesOrderItem[]>;
+  createSalesOrderItem(item: InsertSalesOrderItem): Promise<SalesOrderItem>;
+  updateSalesOrderItem(id: number, itemData: Partial<InsertSalesOrderItem>): Promise<SalesOrderItem | undefined>;
+  deleteSalesOrderItem(id: number): Promise<boolean>;
+  deleteSalesOrderItemsByOrder(orderId: number): Promise<boolean>;
+
+  // Sales Order Approval operations
+  getSalesOrderApproval(id: number): Promise<SalesOrderApproval | undefined>;
+  getSalesOrderApprovalsByOrder(orderId: number): Promise<SalesOrderApproval[]>;
+  getPendingSalesOrderApprovals(approverId: number): Promise<SalesOrderApproval[]>;
+  createSalesOrderApproval(approval: InsertSalesOrderApproval): Promise<SalesOrderApproval>;
+  updateSalesOrderApproval(id: number, approvalData: Partial<InsertSalesOrderApproval>): Promise<SalesOrderApproval | undefined>;
+
+  // Sales Order Dispatch operations
+  getSalesOrderDispatch(id: number): Promise<SalesOrderDispatch | undefined>;
+  getSalesOrderDispatchesByOrder(orderId: number): Promise<SalesOrderDispatch[]>;
+  createSalesOrderDispatch(dispatch: InsertSalesOrderDispatch): Promise<SalesOrderDispatch>;
+  updateSalesOrderDispatch(id: number, dispatchData: Partial<InsertSalesOrderDispatch>): Promise<SalesOrderDispatch | undefined>;
+  getNextDispatchCode(): Promise<string>;
+
+  // Dispatch Items operations
+  getDispatchItemsByDispatch(dispatchId: number): Promise<SalesOrderDispatchItem[]>;
+  createDispatchItem(item: InsertSalesOrderDispatchItem): Promise<SalesOrderDispatchItem>;
 
   // Session store
   sessionStore: session.Store;
@@ -1240,6 +1294,227 @@ export class DatabaseStorage implements IStorage {
       console.error('Error creating rejected goods:', error);
       throw error;
     }
+  }
+
+  // ==================== CLIENT OPERATIONS ====================
+
+  async getClient(id: number): Promise<Client | undefined> {
+    const [client] = await db.select().from(clients).where(eq(clients.id, id));
+    return client;
+  }
+
+  async getClientByCode(code: string): Promise<Client | undefined> {
+    const [client] = await db.select().from(clients).where(eq(clients.clientCode, code));
+    return client;
+  }
+
+  async createClient(client: InsertClient): Promise<Client> {
+    const [newClient] = await db.insert(clients).values(client).returning();
+    return newClient;
+  }
+
+  async getAllClients(): Promise<Client[]> {
+    return await db.select().from(clients).orderBy(desc(clients.createdAt));
+  }
+
+  async getActiveClients(): Promise<Client[]> {
+    return await db.select().from(clients).where(eq(clients.isActive, true)).orderBy(clients.companyName);
+  }
+
+  async updateClient(id: number, clientData: Partial<InsertClient>): Promise<Client | undefined> {
+    const [updatedClient] = await db.update(clients)
+      .set({ ...clientData, updatedAt: new Date() })
+      .where(eq(clients.id, id))
+      .returning();
+    return updatedClient;
+  }
+
+  async deleteClient(id: number): Promise<boolean> {
+    const result = await db.delete(clients).where(eq(clients.id, id));
+    return result.rowCount ? result.rowCount > 0 : false;
+  }
+
+  async getNextClientCode(): Promise<string> {
+    const result = await db.select({ maxId: sql<number>`COALESCE(MAX(id), 0)` }).from(clients);
+    const nextNum = (result[0]?.maxId || 0) + 1;
+    return `CLI-${nextNum.toString().padStart(4, '0')}`;
+  }
+
+  // ==================== SALES ORDER OPERATIONS ====================
+
+  async getSalesOrder(id: number): Promise<SalesOrder | undefined> {
+    const [order] = await db.select().from(salesOrders).where(eq(salesOrders.id, id));
+    return order;
+  }
+
+  async getSalesOrderByCode(code: string): Promise<SalesOrder | undefined> {
+    const [order] = await db.select().from(salesOrders).where(eq(salesOrders.orderCode, code));
+    return order;
+  }
+
+  async createSalesOrder(order: InsertSalesOrder): Promise<SalesOrder> {
+    const [newOrder] = await db.insert(salesOrders).values(order).returning();
+    return newOrder;
+  }
+
+  async getAllSalesOrders(): Promise<SalesOrder[]> {
+    return await db.select().from(salesOrders).orderBy(desc(salesOrders.createdAt));
+  }
+
+  async getSalesOrdersByWarehouse(warehouseId: number): Promise<SalesOrder[]> {
+    return await db.select().from(salesOrders)
+      .where(eq(salesOrders.warehouseId, warehouseId))
+      .orderBy(desc(salesOrders.createdAt));
+  }
+
+  async getSalesOrdersByUser(userId: number): Promise<SalesOrder[]> {
+    return await db.select().from(salesOrders)
+      .where(eq(salesOrders.createdBy, userId))
+      .orderBy(desc(salesOrders.createdAt));
+  }
+
+  async getSalesOrdersByStatus(status: string): Promise<SalesOrder[]> {
+    return await db.select().from(salesOrders)
+      .where(eq(salesOrders.status, status))
+      .orderBy(desc(salesOrders.createdAt));
+  }
+
+  async updateSalesOrder(id: number, orderData: Partial<InsertSalesOrder>): Promise<SalesOrder | undefined> {
+    const [updatedOrder] = await db.update(salesOrders)
+      .set({ ...orderData, updatedAt: new Date() })
+      .where(eq(salesOrders.id, id))
+      .returning();
+    return updatedOrder;
+  }
+
+  async deleteSalesOrder(id: number): Promise<boolean> {
+    // First delete related items, approvals, dispatches
+    await db.delete(salesOrderItems).where(eq(salesOrderItems.salesOrderId, id));
+    await db.delete(salesOrderApprovals).where(eq(salesOrderApprovals.salesOrderId, id));
+    // Get dispatches and delete dispatch items first
+    const dispatchesToDelete = await db.select().from(salesOrderDispatches).where(eq(salesOrderDispatches.salesOrderId, id));
+    for (const dispatch of dispatchesToDelete) {
+      await db.delete(salesOrderDispatchItems).where(eq(salesOrderDispatchItems.dispatchId, dispatch.id));
+    }
+    await db.delete(salesOrderDispatches).where(eq(salesOrderDispatches.salesOrderId, id));
+    // Now delete the order
+    const result = await db.delete(salesOrders).where(eq(salesOrders.id, id));
+    return result.rowCount ? result.rowCount > 0 : false;
+  }
+
+  async getNextSalesOrderCode(): Promise<string> {
+    const result = await db.select({ maxId: sql<number>`COALESCE(MAX(id), 0)` }).from(salesOrders);
+    const nextNum = (result[0]?.maxId || 0) + 1;
+    return `SO-${nextNum.toString().padStart(4, '0')}`;
+  }
+
+  // ==================== SALES ORDER ITEMS OPERATIONS ====================
+
+  async getSalesOrderItem(id: number): Promise<SalesOrderItem | undefined> {
+    const [item] = await db.select().from(salesOrderItems).where(eq(salesOrderItems.id, id));
+    return item;
+  }
+
+  async getSalesOrderItemsByOrder(orderId: number): Promise<SalesOrderItem[]> {
+    return await db.select().from(salesOrderItems).where(eq(salesOrderItems.salesOrderId, orderId));
+  }
+
+  async createSalesOrderItem(item: InsertSalesOrderItem): Promise<SalesOrderItem> {
+    const [newItem] = await db.insert(salesOrderItems).values(item).returning();
+    return newItem;
+  }
+
+  async updateSalesOrderItem(id: number, itemData: Partial<InsertSalesOrderItem>): Promise<SalesOrderItem | undefined> {
+    const [updatedItem] = await db.update(salesOrderItems)
+      .set(itemData)
+      .where(eq(salesOrderItems.id, id))
+      .returning();
+    return updatedItem;
+  }
+
+  async deleteSalesOrderItem(id: number): Promise<boolean> {
+    const result = await db.delete(salesOrderItems).where(eq(salesOrderItems.id, id));
+    return result.rowCount ? result.rowCount > 0 : false;
+  }
+
+  async deleteSalesOrderItemsByOrder(orderId: number): Promise<boolean> {
+    const result = await db.delete(salesOrderItems).where(eq(salesOrderItems.salesOrderId, orderId));
+    return result.rowCount ? result.rowCount > 0 : false;
+  }
+
+  // ==================== SALES ORDER APPROVAL OPERATIONS ====================
+
+  async getSalesOrderApproval(id: number): Promise<SalesOrderApproval | undefined> {
+    const [approval] = await db.select().from(salesOrderApprovals).where(eq(salesOrderApprovals.id, id));
+    return approval;
+  }
+
+  async getSalesOrderApprovalsByOrder(orderId: number): Promise<SalesOrderApproval[]> {
+    return await db.select().from(salesOrderApprovals).where(eq(salesOrderApprovals.salesOrderId, orderId));
+  }
+
+  async getPendingSalesOrderApprovals(approverId: number): Promise<SalesOrderApproval[]> {
+    return await db.select().from(salesOrderApprovals)
+      .where(and(
+        eq(salesOrderApprovals.approverId, approverId),
+        eq(salesOrderApprovals.status, 'pending')
+      ));
+  }
+
+  async createSalesOrderApproval(approval: InsertSalesOrderApproval): Promise<SalesOrderApproval> {
+    const [newApproval] = await db.insert(salesOrderApprovals).values(approval).returning();
+    return newApproval;
+  }
+
+  async updateSalesOrderApproval(id: number, approvalData: Partial<InsertSalesOrderApproval>): Promise<SalesOrderApproval | undefined> {
+    const [updatedApproval] = await db.update(salesOrderApprovals)
+      .set(approvalData)
+      .where(eq(salesOrderApprovals.id, id))
+      .returning();
+    return updatedApproval;
+  }
+
+  // ==================== SALES ORDER DISPATCH OPERATIONS ====================
+
+  async getSalesOrderDispatch(id: number): Promise<SalesOrderDispatch | undefined> {
+    const [dispatch] = await db.select().from(salesOrderDispatches).where(eq(salesOrderDispatches.id, id));
+    return dispatch;
+  }
+
+  async getSalesOrderDispatchesByOrder(orderId: number): Promise<SalesOrderDispatch[]> {
+    return await db.select().from(salesOrderDispatches)
+      .where(eq(salesOrderDispatches.salesOrderId, orderId))
+      .orderBy(desc(salesOrderDispatches.dispatchDate));
+  }
+
+  async createSalesOrderDispatch(dispatch: InsertSalesOrderDispatch): Promise<SalesOrderDispatch> {
+    const [newDispatch] = await db.insert(salesOrderDispatches).values(dispatch).returning();
+    return newDispatch;
+  }
+
+  async updateSalesOrderDispatch(id: number, dispatchData: Partial<InsertSalesOrderDispatch>): Promise<SalesOrderDispatch | undefined> {
+    const [updatedDispatch] = await db.update(salesOrderDispatches)
+      .set(dispatchData)
+      .where(eq(salesOrderDispatches.id, id))
+      .returning();
+    return updatedDispatch;
+  }
+
+  async getNextDispatchCode(): Promise<string> {
+    const result = await db.select({ maxId: sql<number>`COALESCE(MAX(id), 0)` }).from(salesOrderDispatches);
+    const nextNum = (result[0]?.maxId || 0) + 1;
+    return `DIS-${nextNum.toString().padStart(4, '0')}`;
+  }
+
+  // ==================== DISPATCH ITEMS OPERATIONS ====================
+
+  async getDispatchItemsByDispatch(dispatchId: number): Promise<SalesOrderDispatchItem[]> {
+    return await db.select().from(salesOrderDispatchItems).where(eq(salesOrderDispatchItems.dispatchId, dispatchId));
+  }
+
+  async createDispatchItem(item: InsertSalesOrderDispatchItem): Promise<SalesOrderDispatchItem> {
+    const [newItem] = await db.insert(salesOrderDispatchItems).values(item).returning();
+    return newItem;
   }
 }
 
