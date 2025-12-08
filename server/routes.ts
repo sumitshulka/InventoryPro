@@ -5359,10 +5359,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Generate order code
       const orderCode = await storage.getNextSalesOrderCode();
       
+      // Get client to determine currency
+      const client = await storage.getClient(orderData.clientId);
+      if (!client) {
+        return res.status(400).json({ message: "Client not found" });
+      }
+      
+      // Get organization settings for default currency
+      const orgSettings = await storage.getOrganizationSettings();
+      const orgCurrency = orgSettings?.currency || 'USD';
+      
+      // Determine order currency (client currency or org default)
+      const currencyCode = client.currencyCode || orgCurrency;
+      const conversionRate = orderData.conversionRate || '1';
+      
+      // Calculate base currency amounts (divide by conversion rate to get org currency)
+      const rate = parseFloat(conversionRate) || 1;
+      const subtotal = parseFloat(orderData.subtotal || '0');
+      const totalTax = parseFloat(orderData.totalTax || '0');
+      const grandTotal = parseFloat(orderData.grandTotal || '0');
+      
+      const subtotalBase = (subtotal / rate).toFixed(2);
+      const totalTaxBase = (totalTax / rate).toFixed(2);
+      const grandTotalBase = (grandTotal / rate).toFixed(2);
+      
       // Create order
       const newOrder = await storage.createSalesOrder({
         ...orderData,
         orderCode,
+        currencyCode,
+        conversionRate,
+        subtotalBase,
+        totalTaxBase,
+        grandTotalBase,
         status: 'draft',
         createdBy: user.id
       });
@@ -5419,6 +5448,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const { items: orderItems, ...orderData } = req.body;
+      
+      // Recalculate base currency amounts if totals or conversion rate changed
+      if (orderData.subtotal || orderData.totalTax || orderData.grandTotal || orderData.conversionRate) {
+        const rate = parseFloat(orderData.conversionRate || existingOrder.conversionRate) || 1;
+        const subtotal = parseFloat(orderData.subtotal || existingOrder.subtotal) || 0;
+        const totalTax = parseFloat(orderData.totalTax || existingOrder.totalTax) || 0;
+        const grandTotal = parseFloat(orderData.grandTotal || existingOrder.grandTotal) || 0;
+        
+        orderData.subtotalBase = (subtotal / rate).toFixed(2);
+        orderData.totalTaxBase = (totalTax / rate).toFixed(2);
+        orderData.grandTotalBase = (grandTotal / rate).toFixed(2);
+      }
       
       const updatedOrder = await storage.updateSalesOrder(id, orderData);
       
