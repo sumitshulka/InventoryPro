@@ -30,6 +30,7 @@ import IssuesPage from "@/pages/issues-page";
 import MyProfilePage from "@/pages/my-profile-page";
 import DisposedInventoryReportPage from "@/pages/disposed-inventory-report-page";
 import AnalyticsReportPage from "@/pages/analytics-report-page";
+import ClientSalesOrderReportPage from "@/pages/client-sales-order-report-page";
 import ClientsPage from "@/pages/sales-orders/clients-page";
 import SalesOrdersListPage from "@/pages/sales-orders/sales-orders-list-page";
 import SalesOrderDetailPage from "@/pages/sales-orders/sales-order-detail-page";
@@ -76,6 +77,7 @@ function Router() {
           <ProtectedRoute path="/approvals" component={ApprovalManagementPage} />
           <ProtectedRoute path="/audit-trail" component={AuditTrailPage} />
           <ProtectedRoute path="/analytics" component={AnalyticsReportPage} />
+          <ProtectedRoute path="/reports/client-sales-orders" component={ClientSalesOrderReportPage} />
           <ProtectedRoute path="/settings" component={SettingsPage} />
           <ProtectedRoute path="/clients" component={ClientsPage} />
           <ProtectedRoute path="/sales-orders" component={SalesOrdersListPage} />
