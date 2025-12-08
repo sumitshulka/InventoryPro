@@ -78,8 +78,27 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
+import { useCurrency } from "@/hooks/use-currency";
 import { format } from "date-fns";
 import { Client, Warehouse, Item } from "@shared/schema";
+
+const CURRENCY_SYMBOLS: Record<string, string> = {
+  USD: "$",
+  EUR: "€",
+  GBP: "£",
+  INR: "₹",
+  JPY: "¥",
+  CAD: "C$",
+  AUD: "A$",
+  CHF: "CHF",
+  CNY: "¥",
+  SGD: "S$",
+};
+
+const getCurrencySymbol = (currencyCode: string | undefined | null): string => {
+  if (!currencyCode) return "$";
+  return CURRENCY_SYMBOLS[currencyCode] || currencyCode + " ";
+};
 
 interface EnrichedInventory {
   id: number;
@@ -139,6 +158,11 @@ interface SalesOrderDetail {
   subtotal: string;
   taxAmount: string;
   totalAmount: string;
+  currencyCode?: string;
+  conversionRate?: string;
+  subtotalBase?: string;
+  totalTaxBase?: string;
+  totalAmountBase?: string;
   shippingAddress?: string;
   notes?: string;
   createdBy: number;
@@ -205,6 +229,7 @@ type DispatchFormValues = z.infer<typeof dispatchFormSchema>;
 export default function SalesOrderDetailPage() {
   const { toast } = useToast();
   const { user } = useAuth();
+  const { currency: orgCurrency, currencySymbol: orgCurrencySymbol } = useCurrency();
   const [, setLocation] = useLocation();
   const [match, params] = useRoute("/sales-orders/:id");
   const isNew = params?.id === "new";
@@ -773,20 +798,58 @@ export default function SalesOrderDetailPage() {
                     <CardTitle className="text-lg">Order Summary</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="grid grid-cols-3 gap-4 text-center">
-                      <div>
-                        <div className="text-2xl font-bold">${totals.subtotal}</div>
-                        <div className="text-sm text-gray-500">Subtotal</div>
-                      </div>
-                      <div>
-                        <div className="text-2xl font-bold">${totals.taxAmount}</div>
-                        <div className="text-sm text-gray-500">Tax</div>
-                      </div>
-                      <div>
-                        <div className="text-2xl font-bold text-primary">${totals.totalAmount}</div>
-                        <div className="text-sm text-gray-500">Total</div>
-                      </div>
-                    </div>
+                    {(() => {
+                      const orderCurrency = order?.currencyCode || orgCurrency;
+                      const orderCurrencySymbol = getCurrencySymbol(orderCurrency);
+                      const showConversion = order?.currencyCode && order.currencyCode !== orgCurrency && order.conversionRate;
+                      const conversionRate = parseFloat(order?.conversionRate || "1");
+                      
+                      return (
+                        <>
+                          {order?.currencyCode && order.currencyCode !== orgCurrency && (
+                            <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                              <div className="flex items-center justify-between text-sm">
+                                <span className="text-blue-700 font-medium">
+                                  Order Currency: {order.currencyCode}
+                                </span>
+                                <span className="text-blue-600">
+                                  Conversion Rate: 1 {order.currencyCode} = {conversionRate.toFixed(4)} {orgCurrency}
+                                </span>
+                              </div>
+                            </div>
+                          )}
+                          <div className="grid grid-cols-3 gap-4 text-center">
+                            <div>
+                              <div className="text-2xl font-bold">{orderCurrencySymbol}{totals.subtotal}</div>
+                              <div className="text-sm text-gray-500">Subtotal</div>
+                              {showConversion && order.subtotalBase && (
+                                <div className="text-xs text-gray-400 mt-1">
+                                  ({orgCurrencySymbol}{parseFloat(order.subtotalBase).toFixed(2)} {orgCurrency})
+                                </div>
+                              )}
+                            </div>
+                            <div>
+                              <div className="text-2xl font-bold">{orderCurrencySymbol}{totals.taxAmount}</div>
+                              <div className="text-sm text-gray-500">Tax</div>
+                              {showConversion && order.totalTaxBase && (
+                                <div className="text-xs text-gray-400 mt-1">
+                                  ({orgCurrencySymbol}{parseFloat(order.totalTaxBase).toFixed(2)} {orgCurrency})
+                                </div>
+                              )}
+                            </div>
+                            <div>
+                              <div className="text-2xl font-bold text-primary">{orderCurrencySymbol}{totals.totalAmount}</div>
+                              <div className="text-sm text-gray-500">Total</div>
+                              {showConversion && order.totalAmountBase && (
+                                <div className="text-xs text-gray-400 mt-1">
+                                  ({orgCurrencySymbol}{parseFloat(order.totalAmountBase).toFixed(2)} {orgCurrency})
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </>
+                      );
+                    })()}
                   </CardContent>
                 </Card>
               </TabsContent>

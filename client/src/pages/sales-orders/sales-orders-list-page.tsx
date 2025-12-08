@@ -33,6 +33,7 @@ import {
   Package,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
+import { useCurrency } from "@/hooks/use-currency";
 import { format } from "date-fns";
 
 interface EnrichedSalesOrder {
@@ -45,6 +46,9 @@ interface EnrichedSalesOrder {
   subtotal: string;
   taxAmount: string;
   totalAmount: string;
+  currencyCode?: string;
+  conversionRate?: string;
+  totalAmountBase?: string;
   shippingAddress: string | null;
   notes: string | null;
   createdBy: number;
@@ -65,6 +69,24 @@ interface EnrichedSalesOrder {
   itemCount: number;
 }
 
+const CURRENCY_SYMBOLS: Record<string, string> = {
+  USD: "$",
+  EUR: "€",
+  GBP: "£",
+  INR: "₹",
+  JPY: "¥",
+  CAD: "C$",
+  AUD: "A$",
+  CHF: "CHF",
+  CNY: "¥",
+  SGD: "S$",
+};
+
+const getCurrencySymbol = (currencyCode: string | undefined | null): string => {
+  if (!currencyCode) return "$";
+  return CURRENCY_SYMBOLS[currencyCode] || currencyCode + " ";
+};
+
 const statusColors: Record<string, string> = {
   draft: "bg-gray-100 text-gray-800",
   waiting_approval: "bg-yellow-100 text-yellow-800",
@@ -83,6 +105,7 @@ const statusLabels: Record<string, string> = {
 
 export default function SalesOrdersListPage() {
   const { user } = useAuth();
+  const { currency: orgCurrency, currencySymbol: orgCurrencySymbol } = useCurrency();
   const [, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -285,11 +308,30 @@ export default function SalesOrdersListPage() {
                             {order.itemCount}
                           </div>
                         </TableCell>
-                        <TableCell className="text-right font-medium">
-                          ${parseFloat(order.totalAmount).toLocaleString("en-US", {
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 2,
-                          })}
+                        <TableCell className="text-right">
+                          {(() => {
+                            const orderCurrency = order.currencyCode || orgCurrency;
+                            const orderCurrencySymbol = getCurrencySymbol(orderCurrency);
+                            const showBase = order.currencyCode && order.currencyCode !== orgCurrency && order.totalAmountBase;
+                            return (
+                              <div>
+                                <div className="font-medium">
+                                  {orderCurrencySymbol}{parseFloat(order.totalAmount).toLocaleString("en-US", {
+                                    minimumFractionDigits: 2,
+                                    maximumFractionDigits: 2,
+                                  })}
+                                </div>
+                                {showBase && (
+                                  <div className="text-xs text-gray-400">
+                                    ({orgCurrencySymbol}{parseFloat(order.totalAmountBase!).toLocaleString("en-US", {
+                                      minimumFractionDigits: 2,
+                                      maximumFractionDigits: 2,
+                                    })} {orgCurrency})
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })()}
                         </TableCell>
                         <TableCell>
                           <Badge
