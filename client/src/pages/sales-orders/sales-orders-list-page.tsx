@@ -39,6 +39,7 @@ import { format } from "date-fns";
 interface EnrichedSalesOrder {
   id: number;
   orderCode: string;
+  clientPoReference?: string;
   clientId: number;
   warehouseId: number;
   status: string;
@@ -276,8 +277,15 @@ export default function SalesOrdersListPage() {
                   <TableBody>
                     {filteredOrders.map((order) => (
                       <TableRow key={order.id} data-testid={`row-order-${order.id}`}>
-                        <TableCell className="font-mono text-sm font-medium">
-                          {order.orderCode}
+                        <TableCell>
+                          <div className="font-mono text-sm font-medium">
+                            {order.orderCode}
+                          </div>
+                          {order.clientPoReference && (
+                            <div className="text-xs text-gray-500" data-testid={`text-po-ref-${order.id}`}>
+                              PO: {order.clientPoReference}
+                            </div>
+                          )}
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">

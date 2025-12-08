@@ -742,7 +742,7 @@ export default function SalesOrderDetailPage() {
                 {isNew ? "New Sales Order" : order?.orderCode || "Sales Order"}
               </h1>
               {order && (
-                <div className="flex items-center gap-2 mt-1">
+                <div className="flex items-center gap-2 mt-1 flex-wrap">
                   <Badge className={statusColors[order.status] || "bg-gray-100"}>
                     {statusLabels[order.status] || order.status}
                   </Badge>
@@ -750,6 +750,12 @@ export default function SalesOrderDetailPage() {
                     <span className="text-sm text-gray-500">
                       <Building2 className="h-3 w-3 inline mr-1" />
                       {order.client.companyName}
+                    </span>
+                  )}
+                  {order.clientPoReference && (
+                    <span className="text-sm text-gray-500" data-testid="text-po-reference">
+                      <FileText className="h-3 w-3 inline mr-1" />
+                      PO: {order.clientPoReference}
                     </span>
                   )}
                 </div>
