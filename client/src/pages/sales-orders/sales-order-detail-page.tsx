@@ -160,6 +160,7 @@ interface Approval {
 interface SalesOrderDetail {
   id: number;
   orderCode: string;
+  clientPoReference?: string;
   clientId: number;
   warehouseId: number;
   status: string;
@@ -204,6 +205,7 @@ const orderFormSchema = z.object({
   clientId: z.string().min(1, "Client is required"),
   warehouseId: z.string().min(1, "Warehouse is required"),
   orderDate: z.string(),
+  clientPoReference: z.string().optional(),
   shippingAddressLine: z.string().optional(),
   shippingCity: z.string().optional(),
   shippingState: z.string().optional(),
@@ -317,6 +319,7 @@ export default function SalesOrderDetailPage() {
       clientId: "",
       warehouseId: "",
       orderDate: format(new Date(), "yyyy-MM-dd"),
+      clientPoReference: "",
       shippingAddressLine: "",
       shippingCity: "",
       shippingState: "",
@@ -354,6 +357,7 @@ export default function SalesOrderDetailPage() {
         clientId,
         warehouseId,
         orderDate: order.orderDate ? format(new Date(order.orderDate), "yyyy-MM-dd") : "",
+        clientPoReference: order.clientPoReference || "",
         shippingAddressLine: parsedAddress.line,
         shippingCity: parsedAddress.city,
         shippingState: parsedAddress.state,
@@ -442,6 +446,7 @@ export default function SalesOrderDetailPage() {
         clientId: parseInt(data.clientId),
         warehouseId: parseInt(data.warehouseId),
         orderDate: data.orderDate,
+        clientPoReference: data.clientPoReference || null,
         shippingAddress: formattedAddress,
         notes: data.notes,
         subtotal: totals.subtotal,
@@ -894,6 +899,24 @@ export default function SalesOrderDetailPage() {
                             <FormLabel>Order Date</FormLabel>
                             <FormControl>
                               <Input type="date" {...field} disabled={!isDraft} data-testid="input-order-date" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="clientPoReference"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Client PO Reference</FormLabel>
+                            <FormControl>
+                              <Input 
+                                placeholder="Enter client's purchase order number"
+                                {...field}
+                                disabled={!isDraft}
+                                data-testid="input-client-po-reference"
+                              />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
