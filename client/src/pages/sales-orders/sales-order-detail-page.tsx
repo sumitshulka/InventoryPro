@@ -398,6 +398,11 @@ export default function SalesOrderDetailPage() {
   }, [watchWarehouseId]);
 
   const watchItems = form.watch("items");
+  
+  const selectedClient = clients.find(c => c.id.toString() === watchClientId);
+  const clientCurrency = selectedClient?.currencyCode;
+  const orderCurrencySymbol = getCurrencySymbol(order?.currencyCode || clientCurrency || orgCurrency);
+  
   const calculateTotals = () => {
     const subtotal = watchItems.reduce((sum, item) => sum + parseFloat(item.lineTotal || "0"), 0);
     const taxAmount = watchItems.reduce((sum, item) => sum + parseFloat(item.taxAmount || "0"), 0);
@@ -1004,11 +1009,7 @@ export default function SalesOrderDetailPage() {
                   </CardHeader>
                   <CardContent>
                     {(() => {
-                      const selectedClientId = form.watch("clientId");
-                      const selectedClient = clients.find(c => c.id.toString() === selectedClientId);
-                      const clientCurrency = selectedClient?.currencyCode;
                       const orderCurrency = order?.currencyCode || clientCurrency || orgCurrency;
-                      const orderCurrencySymbol = getCurrencySymbol(orderCurrency);
                       const showConversion = order?.currencyCode && order.currencyCode !== orgCurrency && order.conversionRate;
                       const conversionRate = parseFloat(order?.conversionRate || "1");
                       
@@ -1208,10 +1209,10 @@ export default function SalesOrderDetailPage() {
                                   />
                                 </TableCell>
                                 <TableCell className="font-medium">
-                                  ${watchItems[index]?.taxAmount || "0.00"}
+                                  {orderCurrencySymbol}{watchItems[index]?.taxAmount || "0.00"}
                                 </TableCell>
                                 <TableCell className="font-medium">
-                                  ${watchItems[index]?.lineTotal || "0.00"}
+                                  {orderCurrencySymbol}{watchItems[index]?.lineTotal || "0.00"}
                                 </TableCell>
                                 {!isNew && (
                                   <TableCell>
