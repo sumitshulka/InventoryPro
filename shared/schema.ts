@@ -819,6 +819,9 @@ export const clients = pgTable("clients", {
   // Business details
   taxId: text("tax_id"), // GST number or Tax ID
   paymentTerms: text("payment_terms").default("Net 30"), // Net 30, Net 60, etc.
+  // Currency - if set, sales orders for this client will use this currency
+  // If null, defaults to organization currency
+  currencyCode: text("currency_code"), // ISO 4217 code: USD, EUR, INR, etc.
   isActive: boolean("is_active").notNull().default(true),
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -863,10 +866,17 @@ export const salesOrders = pgTable("sales_orders", {
   billingState: text("billing_state").notNull(),
   billingZipCode: text("billing_zip_code").notNull(),
   billingCountry: text("billing_country").notNull().default("India"),
-  // Totals (calculated from line items)
+  // Currency handling
+  currencyCode: text("currency_code").notNull(), // ISO 4217 code from client or org default
+  conversionRate: numeric("conversion_rate", { precision: 12, scale: 6 }).notNull().default("1"), // Rate to convert to org base currency
+  // Totals (calculated from line items) - in order currency
   subtotal: numeric("subtotal", { precision: 12, scale: 2 }).notNull().default("0"),
   totalTax: numeric("total_tax", { precision: 12, scale: 2 }).notNull().default("0"),
   grandTotal: numeric("grand_total", { precision: 12, scale: 2 }).notNull().default("0"),
+  // Base currency totals (in organization currency) for reporting
+  subtotalBase: numeric("subtotal_base", { precision: 12, scale: 2 }).notNull().default("0"),
+  totalTaxBase: numeric("total_tax_base", { precision: 12, scale: 2 }).notNull().default("0"),
+  grandTotalBase: numeric("grand_total_base", { precision: 12, scale: 2 }).notNull().default("0"),
   // Notes
   notes: text("notes"),
   internalNotes: text("internal_notes"),
