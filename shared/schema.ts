@@ -793,3 +793,240 @@ export const insertEmailSettingsSchema = createInsertSchema(emailSettings).pick(
 
 export type EmailSettings = typeof emailSettings.$inferSelect;
 export type InsertEmailSettings = z.infer<typeof insertEmailSettingsSchema>;
+
+// ==================== SALES ORDER MANAGEMENT ====================
+
+// Clients table - stores customer information for sales orders
+export const clients = pgTable("clients", {
+  id: serial("id").primaryKey(),
+  clientCode: text("client_code").notNull().unique(), // Auto-generated: CLI-0001
+  companyName: text("company_name").notNull(),
+  contactPerson: text("contact_person").notNull(),
+  email: text("email").notNull(),
+  phone: text("phone").notNull(),
+  // Billing address
+  billingAddress: text("billing_address").notNull(),
+  billingCity: text("billing_city").notNull(),
+  billingState: text("billing_state").notNull(),
+  billingZipCode: text("billing_zip_code").notNull(),
+  billingCountry: text("billing_country").notNull().default("India"),
+  // Shipping address (can be different from billing)
+  shippingAddress: text("shipping_address").notNull(),
+  shippingCity: text("shipping_city").notNull(),
+  shippingState: text("shipping_state").notNull(),
+  shippingZipCode: text("shipping_zip_code").notNull(),
+  shippingCountry: text("shipping_country").notNull().default("India"),
+  // Business details
+  taxId: text("tax_id"), // GST number or Tax ID
+  paymentTerms: text("payment_terms").default("Net 30"), // Net 30, Net 60, etc.
+  isActive: boolean("is_active").notNull().default(true),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at"),
+}, (table) => ({
+  clientsCompanyNameIdx: index("clients_company_name_idx").on(table.companyName),
+  clientsEmailIdx: index("clients_email_idx").on(table.email),
+  clientsActiveIdx: index("clients_active_idx").on(table.isActive),
+  clientsCreatedAtIdx: index("clients_created_at_idx").on(table.createdAt),
+}));
+
+export const insertClientSchema = createInsertSchema(clients).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type Client = typeof clients.$inferSelect;
+export type InsertClient = z.infer<typeof insertClientSchema>;
+
+// Sales Orders table
+export const salesOrders = pgTable("sales_orders", {
+  id: serial("id").primaryKey(),
+  orderCode: text("order_code").notNull().unique(), // Auto-generated: SO-0001
+  clientId: integer("client_id").notNull().references(() => clients.id),
+  warehouseId: integer("warehouse_id").notNull().references(() => warehouses.id), // User's warehouse
+  createdBy: integer("created_by").notNull().references(() => users.id),
+  // Status: draft, waiting_for_approval, approved, partial_shipped, closed
+  status: text("status").notNull().default("draft"),
+  // Order dates
+  orderDate: timestamp("order_date").defaultNow().notNull(),
+  expectedDeliveryDate: timestamp("expected_delivery_date"),
+  // Shipping details (editable, defaults from client)
+  shippingAddress: text("shipping_address").notNull(),
+  shippingCity: text("shipping_city").notNull(),
+  shippingState: text("shipping_state").notNull(),
+  shippingZipCode: text("shipping_zip_code").notNull(),
+  shippingCountry: text("shipping_country").notNull().default("India"),
+  // Billing details (from client)
+  billingAddress: text("billing_address").notNull(),
+  billingCity: text("billing_city").notNull(),
+  billingState: text("billing_state").notNull(),
+  billingZipCode: text("billing_zip_code").notNull(),
+  billingCountry: text("billing_country").notNull().default("India"),
+  // Totals (calculated from line items)
+  subtotal: numeric("subtotal", { precision: 12, scale: 2 }).notNull().default("0"),
+  totalTax: numeric("total_tax", { precision: 12, scale: 2 }).notNull().default("0"),
+  grandTotal: numeric("grand_total", { precision: 12, scale: 2 }).notNull().default("0"),
+  // Notes
+  notes: text("notes"),
+  internalNotes: text("internal_notes"),
+  // Approval tracking
+  approvedBy: integer("approved_by").references(() => users.id),
+  approvedAt: timestamp("approved_at"),
+  rejectionReason: text("rejection_reason"),
+  // Timestamps
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at"),
+}, (table) => ({
+  salesOrdersClientIdx: index("sales_orders_client_idx").on(table.clientId),
+  salesOrdersWarehouseIdx: index("sales_orders_warehouse_idx").on(table.warehouseId),
+  salesOrdersStatusIdx: index("sales_orders_status_idx").on(table.status),
+  salesOrdersCreatedByIdx: index("sales_orders_created_by_idx").on(table.createdBy),
+  salesOrdersOrderDateIdx: index("sales_orders_order_date_idx").on(table.orderDate),
+  salesOrdersCreatedAtIdx: index("sales_orders_created_at_idx").on(table.createdAt),
+}));
+
+export const insertSalesOrderSchema = createInsertSchema(salesOrders).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  orderDate: z.preprocess((arg) => {
+    if (typeof arg === 'string' || arg instanceof Date) return new Date(arg);
+    return arg;
+  }, z.date().optional()),
+  expectedDeliveryDate: z.preprocess((arg) => {
+    if (typeof arg === 'string' || arg instanceof Date) return new Date(arg);
+    return arg;
+  }, z.date().optional().nullable()),
+});
+
+export type SalesOrder = typeof salesOrders.$inferSelect;
+export type InsertSalesOrder = z.infer<typeof insertSalesOrderSchema>;
+
+// Sales Order Items (line items)
+export const salesOrderItems = pgTable("sales_order_items", {
+  id: serial("id").primaryKey(),
+  salesOrderId: integer("sales_order_id").notNull().references(() => salesOrders.id),
+  itemId: integer("item_id").notNull().references(() => items.id),
+  quantity: integer("quantity").notNull(),
+  unitPrice: numeric("unit_price", { precision: 12, scale: 2 }).notNull(),
+  taxPercent: numeric("tax_percent", { precision: 5, scale: 2 }).notNull().default("0"),
+  taxAmount: numeric("tax_amount", { precision: 12, scale: 2 }).notNull().default("0"),
+  lineTotal: numeric("line_total", { precision: 12, scale: 2 }).notNull(),
+  // Dispatch tracking
+  dispatchedQuantity: integer("dispatched_quantity").notNull().default(0),
+  notes: text("notes"),
+}, (table) => ({
+  salesOrderItemsOrderIdx: index("sales_order_items_order_idx").on(table.salesOrderId),
+  salesOrderItemsItemIdx: index("sales_order_items_item_idx").on(table.itemId),
+}));
+
+export const insertSalesOrderItemSchema = createInsertSchema(salesOrderItems).omit({
+  id: true,
+}).extend({
+  unitPrice: z.preprocess((arg) => {
+    if (typeof arg === 'number') return arg.toString();
+    return arg;
+  }, z.string()),
+  taxPercent: z.preprocess((arg) => {
+    if (typeof arg === 'number') return arg.toString();
+    return arg;
+  }, z.string().optional()),
+  taxAmount: z.preprocess((arg) => {
+    if (typeof arg === 'number') return arg.toString();
+    return arg;
+  }, z.string().optional()),
+  lineTotal: z.preprocess((arg) => {
+    if (typeof arg === 'number') return arg.toString();
+    return arg;
+  }, z.string()),
+});
+
+export type SalesOrderItem = typeof salesOrderItems.$inferSelect;
+export type InsertSalesOrderItem = z.infer<typeof insertSalesOrderItemSchema>;
+
+// Sales Order Approvals (follows requestApprovals pattern)
+export const salesOrderApprovals = pgTable("sales_order_approvals", {
+  id: serial("id").primaryKey(),
+  salesOrderId: integer("sales_order_id").notNull().references(() => salesOrders.id),
+  approverId: integer("approver_id").notNull().references(() => users.id),
+  approvalLevel: text("approval_level").notNull(), // manager, admin
+  status: text("status").notNull().default("pending"), // pending, approved, rejected
+  comments: text("comments"),
+  approvedAt: timestamp("approved_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  salesOrderApprovalsOrderIdx: index("sales_order_approvals_order_idx").on(table.salesOrderId),
+  salesOrderApprovalsApproverIdx: index("sales_order_approvals_approver_idx").on(table.approverId),
+  salesOrderApprovalsStatusIdx: index("sales_order_approvals_status_idx").on(table.status),
+}));
+
+export const insertSalesOrderApprovalSchema = createInsertSchema(salesOrderApprovals).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type SalesOrderApproval = typeof salesOrderApprovals.$inferSelect;
+export type InsertSalesOrderApproval = z.infer<typeof insertSalesOrderApprovalSchema>;
+
+// Sales Order Dispatches (shipment records)
+export const salesOrderDispatches = pgTable("sales_order_dispatches", {
+  id: serial("id").primaryKey(),
+  dispatchCode: text("dispatch_code").notNull().unique(), // Auto-generated: DIS-0001
+  salesOrderId: integer("sales_order_id").notNull().references(() => salesOrders.id),
+  dispatchedBy: integer("dispatched_by").notNull().references(() => users.id),
+  dispatchDate: timestamp("dispatch_date").defaultNow().notNull(),
+  // Courier details
+  courierName: text("courier_name").notNull(),
+  trackingNumber: text("tracking_number"),
+  vehicleNumber: text("vehicle_number"),
+  driverName: text("driver_name"),
+  driverContact: text("driver_contact"),
+  // Status
+  status: text("status").notNull().default("dispatched"), // dispatched, in-transit, delivered
+  deliveredAt: timestamp("delivered_at"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  salesOrderDispatchesOrderIdx: index("sales_order_dispatches_order_idx").on(table.salesOrderId),
+  salesOrderDispatchesDispatchedByIdx: index("sales_order_dispatches_dispatched_by_idx").on(table.dispatchedBy),
+  salesOrderDispatchesDateIdx: index("sales_order_dispatches_date_idx").on(table.dispatchDate),
+  salesOrderDispatchesStatusIdx: index("sales_order_dispatches_status_idx").on(table.status),
+}));
+
+export const insertSalesOrderDispatchSchema = createInsertSchema(salesOrderDispatches).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  dispatchDate: z.preprocess((arg) => {
+    if (typeof arg === 'string' || arg instanceof Date) return new Date(arg);
+    return arg;
+  }, z.date().optional()),
+});
+
+export type SalesOrderDispatch = typeof salesOrderDispatches.$inferSelect;
+export type InsertSalesOrderDispatch = z.infer<typeof insertSalesOrderDispatchSchema>;
+
+// Dispatch Items (items included in each dispatch)
+export const salesOrderDispatchItems = pgTable("sales_order_dispatch_items", {
+  id: serial("id").primaryKey(),
+  dispatchId: integer("dispatch_id").notNull().references(() => salesOrderDispatches.id),
+  salesOrderItemId: integer("sales_order_item_id").notNull().references(() => salesOrderItems.id),
+  itemId: integer("item_id").notNull().references(() => items.id),
+  quantity: integer("quantity").notNull(),
+  transactionId: integer("transaction_id").references(() => transactions.id), // Links to inventory issue transaction
+  notes: text("notes"),
+}, (table) => ({
+  dispatchItemsDispatchIdx: index("dispatch_items_dispatch_idx").on(table.dispatchId),
+  dispatchItemsOrderItemIdx: index("dispatch_items_order_item_idx").on(table.salesOrderItemId),
+  dispatchItemsItemIdx: index("dispatch_items_item_idx").on(table.itemId),
+  dispatchItemsTransactionIdx: index("dispatch_items_transaction_idx").on(table.transactionId),
+}));
+
+export const insertSalesOrderDispatchItemSchema = createInsertSchema(salesOrderDispatchItems).omit({
+  id: true,
+});
+
+export type SalesOrderDispatchItem = typeof salesOrderDispatchItems.$inferSelect;
+export type InsertSalesOrderDispatchItem = z.infer<typeof insertSalesOrderDispatchItemSchema>;

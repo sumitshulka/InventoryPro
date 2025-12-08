@@ -15,6 +15,13 @@
       "when": 1749708476474,
       "tag": "0001_massive_power_man",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1765196698916,
+      "tag": "0002_common_hydra",
+      "breakpoints": true
     }
   ]
 }
