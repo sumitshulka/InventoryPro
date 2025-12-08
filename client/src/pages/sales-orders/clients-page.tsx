@@ -111,8 +111,10 @@ export default function ClientsPage() {
 
   const canManage = user?.role === "admin" || user?.role === "manager";
 
-  const { data: clients = [], isLoading } = useQuery<Client[]>({
+  const { data: clients = [], isLoading, refetch: refetchClients } = useQuery<Client[]>({
     queryKey: ["/api/clients"],
+    staleTime: 0,
+    refetchOnWindowFocus: true,
   });
 
   const form = useForm<ClientFormValues>({
@@ -164,6 +166,7 @@ export default function ClientsPage() {
     },
     onSuccess: async () => {
       await invalidateRelatedQueries('client', isEditMode ? 'update' : 'create');
+      await refetchClients();
       toast({
         title: isEditMode ? "Client updated" : "Client created",
         description: isEditMode
@@ -188,6 +191,7 @@ export default function ClientsPage() {
     },
     onSuccess: async () => {
       await invalidateRelatedQueries('client', 'update');
+      await refetchClients();
       toast({
         title: "Client status updated",
         description: "The client status has been updated.",
@@ -209,6 +213,7 @@ export default function ClientsPage() {
     },
     onSuccess: async () => {
       await invalidateRelatedQueries('client', 'delete');
+      await refetchClients();
       toast({
         title: "Client deleted",
         description: "The client has been deleted successfully.",
