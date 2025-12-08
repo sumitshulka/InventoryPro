@@ -52,7 +52,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest, queryClient, invalidateRelatedQueries } from "@/lib/queryClient";
 import { Loader2, Plus, Edit, Trash, Building2, Phone, Mail, MapPin, Search, ToggleLeft, ToggleRight, Copy } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
@@ -163,8 +163,7 @@ export default function ClientsPage() {
       }
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
-      await queryClient.refetchQueries({ queryKey: ["/api/clients"] });
+      await invalidateRelatedQueries('client', isEditMode ? 'update' : 'create');
       toast({
         title: isEditMode ? "Client updated" : "Client created",
         description: isEditMode
@@ -188,8 +187,7 @@ export default function ClientsPage() {
       return res.json();
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
-      await queryClient.refetchQueries({ queryKey: ["/api/clients"] });
+      await invalidateRelatedQueries('client', 'update');
       toast({
         title: "Client status updated",
         description: "The client status has been updated.",
@@ -210,8 +208,7 @@ export default function ClientsPage() {
       return res.json();
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
-      await queryClient.refetchQueries({ queryKey: ["/api/clients"] });
+      await invalidateRelatedQueries('client', 'delete');
       toast({
         title: "Client deleted",
         description: "The client has been deleted successfully.",
