@@ -53,7 +53,11 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
   Loader2,
@@ -75,6 +79,7 @@ import {
   CheckCircle,
   XCircle,
   AlertCircle,
+  ChevronDown,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
@@ -663,15 +668,7 @@ export default function SalesOrderDetailPage() {
         </div>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)}>
-            <Tabs defaultValue="details" className="w-full">
-              <TabsList>
-                <TabsTrigger value="details">Order Details</TabsTrigger>
-                <TabsTrigger value="items">Line Items ({watchItems.length})</TabsTrigger>
-                {!isNew && <TabsTrigger value="history">History & Dispatches</TabsTrigger>}
-              </TabsList>
-
-              <TabsContent value="details" className="space-y-4 mt-4">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <Card>
                     <CardHeader>
@@ -869,9 +866,9 @@ export default function SalesOrderDetailPage() {
                     })()}
                   </CardContent>
                 </Card>
-              </TabsContent>
 
-              <TabsContent value="items" className="space-y-4 mt-4">
+              {/* Line Items Section */}
+              <div className="space-y-4">
                 {isDraft && selectedWarehouseId && (
                   <Card>
                     <CardHeader>
@@ -1037,18 +1034,29 @@ export default function SalesOrderDetailPage() {
                     )}
                   </CardContent>
                 </Card>
-              </TabsContent>
+              </div>
 
+              {/* History Section - Collapsible for existing orders */}
               {!isNew && (
-                <TabsContent value="history" className="space-y-4 mt-4">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-lg flex items-center gap-2">
-                        <History className="h-5 w-5" />
-                        Approval History
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
+                <Collapsible defaultOpen={false} className="space-y-4">
+                  <CollapsibleTrigger asChild>
+                    <Button variant="outline" className="w-full justify-between">
+                      <span className="flex items-center gap-2">
+                        <History className="h-4 w-4" />
+                        History & Dispatches
+                      </span>
+                      <ChevronDown className="h-4 w-4" />
+                    </Button>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="space-y-4">
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-lg flex items-center gap-2">
+                          <History className="h-5 w-5" />
+                          Approval History
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
                       {order?.approvals && order.approvals.length > 0 ? (
                         <div className="space-y-3">
                           {order.approvals.map((approval) => (
@@ -1165,9 +1173,9 @@ export default function SalesOrderDetailPage() {
                       )}
                     </CardContent>
                   </Card>
-                </TabsContent>
+                  </CollapsibleContent>
+                </Collapsible>
               )}
-            </Tabs>
           </form>
         </Form>
 
