@@ -45,11 +45,34 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Loader2, Plus, Edit, Trash, Building2, Phone, Mail, MapPin, Search, ToggleLeft, ToggleRight, Copy } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { Client } from "@shared/schema";
+
+const CURRENCY_OPTIONS = [
+  { code: "", label: "Use Organization Default" },
+  { code: "USD", label: "USD - US Dollar" },
+  { code: "EUR", label: "EUR - Euro" },
+  { code: "GBP", label: "GBP - British Pound" },
+  { code: "INR", label: "INR - Indian Rupee" },
+  { code: "AED", label: "AED - UAE Dirham" },
+  { code: "SAR", label: "SAR - Saudi Riyal" },
+  { code: "JPY", label: "JPY - Japanese Yen" },
+  { code: "CNY", label: "CNY - Chinese Yuan" },
+  { code: "AUD", label: "AUD - Australian Dollar" },
+  { code: "CAD", label: "CAD - Canadian Dollar" },
+  { code: "SGD", label: "SGD - Singapore Dollar" },
+  { code: "CHF", label: "CHF - Swiss Franc" },
+];
 
 const clientFormSchema = z.object({
   companyName: z.string().min(2, { message: "Company name must be at least 2 characters" }),
@@ -68,6 +91,7 @@ const clientFormSchema = z.object({
   shippingCountry: z.string().min(2, { message: "Country is required" }),
   taxId: z.string().optional(),
   paymentTerms: z.string().optional(),
+  currencyCode: z.string().optional(),
   notes: z.string().optional(),
 });
 
@@ -110,6 +134,7 @@ export default function ClientsPage() {
       shippingCountry: "India",
       taxId: "",
       paymentTerms: "Net 30",
+      currencyCode: "",
       notes: "",
     },
   });
@@ -125,11 +150,15 @@ export default function ClientsPage() {
 
   const createClientMutation = useMutation({
     mutationFn: async (data: ClientFormValues) => {
+      const payload = {
+        ...data,
+        currencyCode: data.currencyCode === "none" || !data.currencyCode ? null : data.currencyCode,
+      };
       if (isEditMode && editClientId) {
-        const res = await apiRequest("PATCH", `/api/clients/${editClientId}`, data);
+        const res = await apiRequest("PATCH", `/api/clients/${editClientId}`, payload);
         return res.json();
       } else {
-        const res = await apiRequest("POST", "/api/clients", data);
+        const res = await apiRequest("POST", "/api/clients", payload);
         return res.json();
       }
     },
@@ -224,6 +253,7 @@ export default function ClientsPage() {
       shippingCountry: client.shippingCountry,
       taxId: client.taxId || "",
       paymentTerms: client.paymentTerms || "Net 30",
+      currencyCode: client.currencyCode || "",
       notes: client.notes || "",
     });
     setIsDialogOpen(true);
@@ -549,6 +579,33 @@ export default function ClientsPage() {
                             <FormControl>
                               <Input placeholder="e.g., Net 30" {...field} data-testid="input-payment-terms" />
                             </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="currencyCode"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Currency</FormLabel>
+                            <Select
+                              value={field.value || ""}
+                              onValueChange={field.onChange}
+                            >
+                              <FormControl>
+                                <SelectTrigger data-testid="select-currency">
+                                  <SelectValue placeholder="Select currency" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {CURRENCY_OPTIONS.map((currency) => (
+                                  <SelectItem key={currency.code || "default"} value={currency.code || "none"}>
+                                    {currency.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
                             <FormMessage />
                           </FormItem>
                         )}
