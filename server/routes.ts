@@ -6131,6 +6131,74 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Search inventory with pagination and filtering (for large catalogs)
+  app.get("/api/warehouses/:id/inventory-search", requireAuth, async (req, res) => {
+    try {
+      const warehouseId = parseInt(req.params.id);
+      const search = (req.query.search as string) || "";
+      const categoryId = req.query.categoryId ? parseInt(req.query.categoryId as string) : null;
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 20;
+      const offset = (page - 1) * limit;
+      
+      // Get warehouse inventory with item details
+      const warehouseInventory = await storage.getInventoryByWarehouse(warehouseId);
+      
+      // Enrich with item and category details
+      const enrichedInventory = await Promise.all(warehouseInventory.map(async (inv) => {
+        const item = await storage.getItem(inv.itemId);
+        let category = null;
+        if (item?.categoryId) {
+          category = await storage.getCategory(item.categoryId);
+        }
+        return {
+          ...inv,
+          item,
+          category
+        };
+      }));
+      
+      // Filter to only items with available quantity
+      let filteredInventory = enrichedInventory.filter(inv => inv.quantity > 0);
+      
+      // Apply text search filter
+      if (search) {
+        const searchLower = search.toLowerCase();
+        filteredInventory = filteredInventory.filter(inv => 
+          inv.item?.name?.toLowerCase().includes(searchLower) ||
+          inv.item?.sku?.toLowerCase().includes(searchLower) ||
+          inv.item?.description?.toLowerCase().includes(searchLower)
+        );
+      }
+      
+      // Apply category filter
+      if (categoryId) {
+        filteredInventory = filteredInventory.filter(inv => inv.item?.categoryId === categoryId);
+      }
+      
+      // Sort by item name
+      filteredInventory.sort((a, b) => (a.item?.name || "").localeCompare(b.item?.name || ""));
+      
+      // Paginate results
+      const total = filteredInventory.length;
+      const paginatedInventory = filteredInventory.slice(offset, offset + limit);
+      
+      res.json({
+        data: paginatedInventory,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit),
+          hasMore: offset + limit < total
+        }
+      });
+    } catch (error: any) {
+      console.error("Error searching warehouse inventory:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
