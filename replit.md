@@ -133,12 +133,19 @@ A comprehensive inventory management system built with React (frontend) and Expr
 - **Schema synchronization**: Push-based deployment
 - **Connection management**: Pool-based with error handling
 
+### Multi-Currency Support
+- **Client-level currency**: Clients can have a specific currency assigned (USD, EUR, GBP, INR, etc.) or default to organization currency
+- **Sales order currency tracking**: Each sales order stores its currency code, conversion rate, and base currency amounts
+- **Dual-currency display**: When order currency differs from organization currency, shows both original and converted base amounts
+- **Conversion rate audit trail**: Stores conversion rate at time of order creation to prevent retroactive rate drift
+
 ## Changelog
 
 - June 16, 2025. Initial setup
 - July 11, 2025. Implemented comprehensive license management system with external license manager integration, HMAC-SHA256 checksum validation, and user limit enforcement
 - July 11, 2025. Fixed license acquisition flow with proper JSON response validation, debug panel for troubleshooting, and improved license status checking. Added comprehensive logging for license validation process. Updated API endpoints to use /api/validate-license format as per external license manager specification.
 - July 11, 2025. Resolved critical checksum calculation bug by fixing mutual key storage (was storing checksum instead of actual mutual_key from response). Updated license acquisition to properly extract mutual_key field from external license manager response. Implemented validation response parsing to handle {"status": "Valid"} format. Added request deduplication with 30-second caching to prevent multiple simultaneous validation calls to external license server.
+- December 8, 2025. Added multi-currency support for sales orders: client-level currency field, order-level currency/conversion rate tracking, base currency calculations, and dual-currency display in order details and list views.
 
 ## User Preferences
 
