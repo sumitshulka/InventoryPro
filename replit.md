@@ -108,6 +108,7 @@ A comprehensive inventory management system built with React (frontend) and Expr
 - **express-session**: Session management
 - **connect-pg-simple**: PostgreSQL session store
 - **nodemailer**: Email functionality
+- **pdfkit**: PDF generation
 - **pg**: PostgreSQL client
 
 ### Database
@@ -146,6 +147,7 @@ A comprehensive inventory management system built with React (frontend) and Expr
 - July 11, 2025. Fixed license acquisition flow with proper JSON response validation, debug panel for troubleshooting, and improved license status checking. Added comprehensive logging for license validation process. Updated API endpoints to use /api/validate-license format as per external license manager specification.
 - July 11, 2025. Resolved critical checksum calculation bug by fixing mutual key storage (was storing checksum instead of actual mutual_key from response). Updated license acquisition to properly extract mutual_key field from external license manager response. Implemented validation response parsing to handle {"status": "Valid"} format. Added request deduplication with 30-second caching to prevent multiple simultaneous validation calls to external license server.
 - December 8, 2025. Added multi-currency support for sales orders: client-level currency field, order-level currency/conversion rate tracking, base currency calculations, and dual-currency display in order details and list views.
+- December 8, 2025. Added Delivery Challan feature for dispatched items: PDF generation with company header, consignee details, transport info, itemized table, and signature blocks. Users can download PDF or email it with custom message using configured email provider.
 
 ## User Preferences
 

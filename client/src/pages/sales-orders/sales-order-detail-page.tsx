@@ -80,6 +80,8 @@ import {
   XCircle,
   AlertCircle,
   ChevronDown,
+  Download,
+  Mail,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
@@ -254,6 +256,13 @@ const dispatchFormSchema = z.object({
 
 type DispatchFormValues = z.infer<typeof dispatchFormSchema>;
 
+const emailChallanSchema = z.object({
+  email: z.string().email("Valid email is required"),
+  message: z.string().optional(),
+});
+
+type EmailChallanFormValues = z.infer<typeof emailChallanSchema>;
+
 export default function SalesOrderDetailPage() {
   const { toast } = useToast();
   const { user } = useAuth();
@@ -269,6 +278,9 @@ export default function SalesOrderDetailPage() {
   const [approvalComments, setApprovalComments] = useState("");
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedWarehouseId, setSelectedWarehouseId] = useState<number | null>(null);
+  const [showEmailDialog, setShowEmailDialog] = useState(false);
+  const [selectedDispatchId, setSelectedDispatchId] = useState<number | null>(null);
+  const [downloadingChallan, setDownloadingChallan] = useState<number | null>(null);
 
   const canEdit = user?.role === "admin" || user?.role === "manager";
   const canApprove = user?.role === "admin" || user?.role === "manager";
@@ -529,6 +541,88 @@ export default function SalesOrderDetailPage() {
       });
     },
   });
+
+  const emailChallanForm = useForm<EmailChallanFormValues>({
+    resolver: zodResolver(emailChallanSchema),
+    defaultValues: {
+      email: "",
+      message: "",
+    },
+  });
+
+  const emailChallanMutation = useMutation({
+    mutationFn: async (data: EmailChallanFormValues) => {
+      if (!selectedDispatchId) throw new Error("No dispatch selected");
+      const res = await apiRequest("POST", `/api/dispatches/${selectedDispatchId}/delivery-challan/email`, data);
+      return res.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Email sent",
+        description: data.message || "Delivery challan has been emailed successfully.",
+      });
+      setShowEmailDialog(false);
+      setSelectedDispatchId(null);
+      emailChallanForm.reset();
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error sending email",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleDownloadChallan = async (dispatchId: number) => {
+    try {
+      setDownloadingChallan(dispatchId);
+      const response = await fetch(`/api/dispatches/${dispatchId}/delivery-challan`, {
+        credentials: 'include',
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Failed to download challan");
+      }
+      
+      const blob = await response.blob();
+      const contentDisposition = response.headers.get('Content-Disposition');
+      let filename = 'delivery-challan.pdf';
+      if (contentDisposition) {
+        const match = contentDisposition.match(/filename="(.+)"/);
+        if (match) filename = match[1];
+      }
+      
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+      
+      toast({
+        title: "Download complete",
+        description: "Delivery challan has been downloaded.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Download failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setDownloadingChallan(null);
+    }
+  };
+
+  const handleEmailChallan = (dispatchId: number) => {
+    setSelectedDispatchId(dispatchId);
+    emailChallanForm.reset({ email: order?.client?.email || "", message: "" });
+    setShowEmailDialog(true);
+  };
 
   const deleteMutation = useMutation({
     mutationFn: async () => {
@@ -1277,6 +1371,33 @@ export default function SalesOrderDetailPage() {
                                   ))}
                                 </div>
                               </div>
+                              <div className="flex gap-2 mt-3 pt-3 border-t">
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleDownloadChallan(dispatch.id)}
+                                  disabled={downloadingChallan === dispatch.id}
+                                  data-testid={`button-download-challan-${dispatch.id}`}
+                                >
+                                  {downloadingChallan === dispatch.id ? (
+                                    <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                                  ) : (
+                                    <Download className="h-4 w-4 mr-1" />
+                                  )}
+                                  Download Challan
+                                </Button>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleEmailChallan(dispatch.id)}
+                                  data-testid={`button-email-challan-${dispatch.id}`}
+                                >
+                                  <Mail className="h-4 w-4 mr-1" />
+                                  Email Challan
+                                </Button>
+                              </div>
                             </div>
                           ))}
                         </div>
@@ -1495,6 +1616,66 @@ export default function SalesOrderDetailPage() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        <Dialog open={showEmailDialog} onOpenChange={setShowEmailDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Email Delivery Challan</DialogTitle>
+              <DialogDescription>
+                Send the delivery challan as a PDF attachment to the specified email address.
+              </DialogDescription>
+            </DialogHeader>
+            <Form {...emailChallanForm}>
+              <form onSubmit={emailChallanForm.handleSubmit((data) => emailChallanMutation.mutate(data))} className="space-y-4">
+                <FormField
+                  control={emailChallanForm.control}
+                  name="email"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Email Address *</FormLabel>
+                      <FormControl>
+                        <Input 
+                          type="email" 
+                          placeholder="Enter recipient email" 
+                          {...field} 
+                          data-testid="input-challan-email"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={emailChallanForm.control}
+                  name="message"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Message (Optional)</FormLabel>
+                      <FormControl>
+                        <Textarea 
+                          placeholder="Add a personal message to the email" 
+                          {...field} 
+                          data-testid="input-challan-message"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <DialogFooter>
+                  <Button type="button" variant="outline" onClick={() => setShowEmailDialog(false)}>
+                    Cancel
+                  </Button>
+                  <Button type="submit" disabled={emailChallanMutation.isPending} data-testid="button-send-challan-email">
+                    {emailChallanMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                    <Mail className="h-4 w-4 mr-2" />
+                    Send Email
+                  </Button>
+                </DialogFooter>
+              </form>
+            </Form>
+          </DialogContent>
+        </Dialog>
       </div>
     </AppLayout>
   );
