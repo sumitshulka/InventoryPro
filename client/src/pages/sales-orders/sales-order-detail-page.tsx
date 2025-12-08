@@ -801,10 +801,15 @@ export default function SalesOrderDetailPage() {
                   </CardHeader>
                   <CardContent>
                     {(() => {
-                      const orderCurrency = order?.currencyCode || orgCurrency;
+                      const selectedClientId = form.watch("clientId");
+                      const selectedClient = clients.find(c => c.id.toString() === selectedClientId);
+                      const clientCurrency = selectedClient?.currencyCode;
+                      const orderCurrency = order?.currencyCode || clientCurrency || orgCurrency;
                       const orderCurrencySymbol = getCurrencySymbol(orderCurrency);
                       const showConversion = order?.currencyCode && order.currencyCode !== orgCurrency && order.conversionRate;
                       const conversionRate = parseFloat(order?.conversionRate || "1");
+                      
+                      const showClientCurrencyBanner = !order && clientCurrency && clientCurrency !== orgCurrency;
                       
                       return (
                         <>
@@ -817,6 +822,16 @@ export default function SalesOrderDetailPage() {
                                 <span className="text-blue-600">
                                   Conversion Rate: 1 {order.currencyCode} = {conversionRate.toFixed(4)} {orgCurrency}
                                 </span>
+                              </div>
+                            </div>
+                          )}
+                          {showClientCurrencyBanner && (
+                            <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                              <div className="text-sm text-blue-700 font-medium">
+                                Client Currency: {clientCurrency} ({orderCurrencySymbol})
+                              </div>
+                              <div className="text-xs text-blue-600 mt-1">
+                                Conversion rate will be set when order is saved
                               </div>
                             </div>
                           )}
