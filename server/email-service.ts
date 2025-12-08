@@ -1,11 +1,18 @@
 import nodemailer from 'nodemailer';
 import { EmailSettings } from '@shared/schema';
 
+interface EmailAttachment {
+  filename: string;
+  content: Buffer;
+  contentType?: string;
+}
+
 interface EmailParams {
   to: string;
   subject: string;
   text?: string;
   html?: string;
+  attachments?: EmailAttachment[];
 }
 
 export class EmailService {
@@ -80,13 +87,21 @@ export class EmailService {
     }
 
     try {
-      const mailOptions = {
+      const mailOptions: any = {
         from: `"${this.settings.fromName}" <${this.settings.fromEmail}>`,
         to: params.to,
         subject: params.subject,
         text: params.text,
         html: params.html,
       };
+      
+      if (params.attachments && params.attachments.length > 0) {
+        mailOptions.attachments = params.attachments.map(att => ({
+          filename: att.filename,
+          content: att.content,
+          contentType: att.contentType || 'application/pdf',
+        }));
+      }
 
       console.log(`Sending email from: ${mailOptions.from} to: ${mailOptions.to}`);
       const result = await this.transporter.sendMail(mailOptions);

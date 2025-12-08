@@ -4,6 +4,7 @@ import { storage } from "./storage";
 import { setupAuth, hashPassword } from "./auth";
 import { licenseManager } from "./license-manager.js";
 import { requireValidLicense, checkUserLimit, checkProductLimit } from "./license-middleware.js";
+import { getEmailService } from "./email-service";
 import { z } from "zod";
 import { 
   insertItemSchema, 
@@ -5894,6 +5895,178 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(updatedDispatch);
     } catch (error: any) {
       console.error("Error marking dispatch as delivered:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Download delivery challan PDF
+  app.get("/api/dispatches/:id/delivery-challan", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      
+      const dispatch = await storage.getSalesOrderDispatch(id);
+      if (!dispatch) {
+        return res.status(404).json({ message: "Dispatch not found" });
+      }
+      
+      // Get dispatch items
+      const dispatchItems = await storage.getDispatchItemsByDispatch(id);
+      const enrichedDispatchItems = await Promise.all(dispatchItems.map(async (di) => {
+        const item = await storage.getItem(di.itemId);
+        return { ...di, item };
+      }));
+      
+      // Get related data
+      const order = await storage.getSalesOrder(dispatch.salesOrderId);
+      if (!order) {
+        return res.status(404).json({ message: "Sales order not found" });
+      }
+      
+      const [client, warehouse, organization, dispatcher] = await Promise.all([
+        storage.getClient(order.clientId),
+        storage.getWarehouse(order.warehouseId),
+        storage.getOrganizationSettings(),
+        storage.getUser(dispatch.dispatchedBy)
+      ]);
+      
+      if (!client) {
+        return res.status(404).json({ message: "Client not found" });
+      }
+      if (!warehouse) {
+        return res.status(404).json({ message: "Warehouse not found" });
+      }
+      
+      // Generate PDF
+      const { generateDeliveryChallanPDF } = await import('./pdf/delivery-challan');
+      const pdfBuffer = await generateDeliveryChallanPDF({
+        dispatch: { ...dispatch, items: enrichedDispatchItems },
+        order,
+        client,
+        warehouse,
+        organization: organization || {
+          organizationName: 'My Organization',
+          currency: 'USD',
+          currencySymbol: '$'
+        },
+        dispatchedBy: dispatcher ? { id: dispatcher.id, name: dispatcher.name } : null
+      });
+      
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="${dispatch.dispatchCode}-delivery-challan.pdf"`);
+      res.setHeader('Content-Length', pdfBuffer.length);
+      res.send(pdfBuffer);
+    } catch (error: any) {
+      console.error("Error generating delivery challan:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Email delivery challan PDF
+  app.post("/api/dispatches/:id/delivery-challan/email", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const user = req.user as any;
+      const { email, message } = req.body;
+      
+      if (!email) {
+        return res.status(400).json({ message: "Email address is required" });
+      }
+      
+      const dispatch = await storage.getSalesOrderDispatch(id);
+      if (!dispatch) {
+        return res.status(404).json({ message: "Dispatch not found" });
+      }
+      
+      // Get dispatch items
+      const dispatchItems = await storage.getDispatchItemsByDispatch(id);
+      const enrichedDispatchItems = await Promise.all(dispatchItems.map(async (di) => {
+        const item = await storage.getItem(di.itemId);
+        return { ...di, item };
+      }));
+      
+      // Get related data
+      const order = await storage.getSalesOrder(dispatch.salesOrderId);
+      if (!order) {
+        return res.status(404).json({ message: "Sales order not found" });
+      }
+      
+      const [client, warehouse, organization, dispatcher] = await Promise.all([
+        storage.getClient(order.clientId),
+        storage.getWarehouse(order.warehouseId),
+        storage.getOrganizationSettings(),
+        storage.getUser(dispatch.dispatchedBy)
+      ]);
+      
+      if (!client) {
+        return res.status(404).json({ message: "Client not found" });
+      }
+      if (!warehouse) {
+        return res.status(404).json({ message: "Warehouse not found" });
+      }
+      
+      // Check email service
+      const emailService = getEmailService();
+      if (!emailService) {
+        return res.status(400).json({ message: "Email service is not configured. Please configure email settings first." });
+      }
+      
+      // Generate PDF
+      const { generateDeliveryChallanPDF } = await import('./pdf/delivery-challan');
+      const pdfBuffer = await generateDeliveryChallanPDF({
+        dispatch: { ...dispatch, items: enrichedDispatchItems },
+        order,
+        client,
+        warehouse,
+        organization: organization || {
+          organizationName: 'My Organization',
+          currency: 'USD',
+          currencySymbol: '$'
+        },
+        dispatchedBy: dispatcher ? { id: dispatcher.id, name: dispatcher.name } : null
+      });
+      
+      // Send email with attachment
+      const orgName = organization?.organizationName || 'Our Company';
+      const sent = await emailService.sendEmail({
+        to: email,
+        subject: `Delivery Challan - ${dispatch.dispatchCode}`,
+        html: `
+          <h2>Delivery Challan</h2>
+          <p>Dear Customer,</p>
+          <p>Please find attached the delivery challan for your recent shipment.</p>
+          <p><strong>Dispatch Code:</strong> ${dispatch.dispatchCode}</p>
+          <p><strong>Order:</strong> ${order.orderCode}</p>
+          <p><strong>Date:</strong> ${new Date(dispatch.dispatchDate).toLocaleDateString()}</p>
+          ${message ? `<p><strong>Note:</strong> ${message}</p>` : ''}
+          <br/>
+          <p>Best regards,<br/>${orgName}</p>
+        `,
+        text: `Delivery Challan - ${dispatch.dispatchCode}\n\nDispatch Code: ${dispatch.dispatchCode}\nOrder: ${order.orderCode}\nDate: ${new Date(dispatch.dispatchDate).toLocaleDateString()}\n${message ? `Note: ${message}\n` : ''}\n\nBest regards,\n${orgName}`,
+        attachments: [{
+          filename: `${dispatch.dispatchCode}-delivery-challan.pdf`,
+          content: pdfBuffer,
+          contentType: 'application/pdf'
+        }]
+      });
+      
+      if (!sent) {
+        return res.status(500).json({ message: "Failed to send email. Please check email settings." });
+      }
+      
+      await logAuditEvent(
+        user.id,
+        'EMAIL',
+        'dispatch',
+        id,
+        `Emailed delivery challan to ${email}`,
+        null,
+        { email, dispatchCode: dispatch.dispatchCode },
+        req
+      );
+      
+      res.json({ success: true, message: `Delivery challan sent to ${email}` });
+    } catch (error: any) {
+      console.error("Error emailing delivery challan:", error);
       res.status(500).json({ message: error.message });
     }
   });
