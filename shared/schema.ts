@@ -846,6 +846,7 @@ export type InsertClient = z.infer<typeof insertClientSchema>;
 export const salesOrders = pgTable("sales_orders", {
   id: serial("id").primaryKey(),
   orderCode: text("order_code").notNull().unique(), // Auto-generated: SO-0001
+  clientPoReference: text("client_po_reference"), // Client's Purchase Order reference number
   clientId: integer("client_id").notNull().references(() => clients.id),
   warehouseId: integer("warehouse_id").notNull().references(() => warehouses.id), // User's warehouse
   createdBy: integer("created_by").notNull().references(() => users.id),
