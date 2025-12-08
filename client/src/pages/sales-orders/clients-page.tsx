@@ -60,17 +60,17 @@ import { Client } from "@shared/schema";
 
 const CURRENCY_OPTIONS = [
   { code: "", label: "Use Organization Default" },
-  { code: "USD", label: "USD - US Dollar" },
-  { code: "EUR", label: "EUR - Euro" },
-  { code: "GBP", label: "GBP - British Pound" },
-  { code: "INR", label: "INR - Indian Rupee" },
-  { code: "AED", label: "AED - UAE Dirham" },
-  { code: "SAR", label: "SAR - Saudi Riyal" },
-  { code: "JPY", label: "JPY - Japanese Yen" },
-  { code: "CNY", label: "CNY - Chinese Yuan" },
-  { code: "AUD", label: "AUD - Australian Dollar" },
-  { code: "CAD", label: "CAD - Canadian Dollar" },
-  { code: "SGD", label: "SGD - Singapore Dollar" },
+  { code: "USD", label: "$ USD - US Dollar" },
+  { code: "EUR", label: "€ EUR - Euro" },
+  { code: "GBP", label: "£ GBP - British Pound" },
+  { code: "INR", label: "₹ INR - Indian Rupee" },
+  { code: "AED", label: "د.إ AED - UAE Dirham" },
+  { code: "SAR", label: "﷼ SAR - Saudi Riyal" },
+  { code: "JPY", label: "¥ JPY - Japanese Yen" },
+  { code: "CNY", label: "¥ CNY - Chinese Yuan" },
+  { code: "AUD", label: "A$ AUD - Australian Dollar" },
+  { code: "CAD", label: "C$ CAD - Canadian Dollar" },
+  { code: "SGD", label: "S$ SGD - Singapore Dollar" },
   { code: "CHF", label: "CHF - Swiss Franc" },
 ];
 

@@ -80,6 +80,8 @@ const CURRENCY_SYMBOLS: Record<string, string> = {
   CHF: "CHF",
   CNY: "¥",
   SGD: "S$",
+  AED: "د.إ",
+  SAR: "﷼",
 };
 
 const getCurrencySymbol = (currencyCode: string | undefined | null): string => {
