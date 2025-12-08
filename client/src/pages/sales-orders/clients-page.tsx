@@ -162,8 +162,8 @@ export default function ClientsPage() {
         return res.json();
       }
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
       toast({
         title: isEditMode ? "Client updated" : "Client created",
         description: isEditMode
@@ -186,8 +186,8 @@ export default function ClientsPage() {
       const res = await apiRequest("PATCH", `/api/clients/${id}`, { isActive });
       return res.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
       toast({
         title: "Client status updated",
         description: "The client status has been updated.",
@@ -207,8 +207,8 @@ export default function ClientsPage() {
       const res = await apiRequest("DELETE", `/api/clients/${id}`);
       return res.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
       toast({
         title: "Client deleted",
         description: "The client has been deleted successfully.",
