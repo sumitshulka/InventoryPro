@@ -4689,6 +4689,229 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Client Sales Orders Report
+  app.get("/api/reports/client-sales-orders", requireAuth, async (req, res) => {
+    try {
+      const { clientId, startDate, endDate, status, warehouseId } = req.query;
+      
+      if (!clientId) {
+        return res.status(400).json({ message: "Client ID is required" });
+      }
+      
+      const clientIdNum = parseInt(clientId as string);
+      const client = await storage.getClient(clientIdNum);
+      if (!client) {
+        return res.status(404).json({ message: "Client not found" });
+      }
+      
+      // Get all sales orders
+      const allOrders = await storage.getAllSalesOrders();
+      
+      // Filter by client
+      let filteredOrders = allOrders.filter(order => order.clientId === clientIdNum);
+      
+      // Apply date filters
+      if (startDate) {
+        const start = new Date(startDate as string);
+        start.setHours(0, 0, 0, 0);
+        filteredOrders = filteredOrders.filter(order => 
+          new Date(order.orderDate) >= start
+        );
+      }
+      if (endDate) {
+        const end = new Date(endDate as string);
+        end.setHours(23, 59, 59, 999);
+        filteredOrders = filteredOrders.filter(order => 
+          new Date(order.orderDate) <= end
+        );
+      }
+      
+      // Apply status filter (can be comma-separated)
+      if (status && status !== 'all') {
+        const statuses = (status as string).split(',');
+        filteredOrders = filteredOrders.filter(order => statuses.includes(order.status));
+      }
+      
+      // Apply warehouse filter
+      if (warehouseId && warehouseId !== 'all') {
+        const whId = parseInt(warehouseId as string);
+        filteredOrders = filteredOrders.filter(order => order.warehouseId === whId);
+      }
+      
+      // Get warehouses for enrichment
+      const allWarehouses = await storage.getAllWarehouses();
+      const warehouseMap = new Map(allWarehouses.map(w => [w.id, w]));
+      
+      // Enrich orders and calculate dispatched amounts
+      const enrichedOrders = await Promise.all(filteredOrders.map(async (order) => {
+        const warehouse = warehouseMap.get(order.warehouseId);
+        const items = await storage.getSalesOrderItemsByOrder(order.id);
+        const dispatches = await storage.getSalesOrderDispatchesByOrder(order.id);
+        
+        // Calculate total dispatched
+        let totalDispatched = 0;
+        for (const dispatch of dispatches) {
+          const dispatchItems = await storage.getDispatchItemsByDispatch(dispatch.id);
+          totalDispatched += dispatchItems.reduce((sum, di) => sum + di.quantity, 0);
+        }
+        
+        const totalOrderedQty = items.reduce((sum, item) => sum + item.quantity, 0);
+        const remainingQty = totalOrderedQty - totalDispatched;
+        
+        return {
+          id: order.id,
+          orderCode: order.orderCode,
+          clientPoReference: order.clientPoReference,
+          orderDate: order.orderDate,
+          status: order.status,
+          warehouseId: order.warehouseId,
+          warehouseName: warehouse?.name || 'Unknown',
+          currencyCode: order.currencyCode,
+          subtotal: order.subtotal,
+          taxAmount: order.taxAmount,
+          totalAmount: order.totalAmount,
+          totalAmountBase: order.totalAmountBase,
+          conversionRate: order.conversionRate,
+          itemCount: items.length,
+          totalOrderedQty,
+          totalDispatched,
+          remainingQty
+        };
+      }));
+      
+      // Sort by order date descending
+      enrichedOrders.sort((a, b) => new Date(b.orderDate).getTime() - new Date(a.orderDate).getTime());
+      
+      // Calculate summary statistics
+      const summary = {
+        totalOrders: enrichedOrders.length,
+        totalValue: enrichedOrders.reduce((sum, o) => sum + parseFloat(o.totalAmount || '0'), 0),
+        totalValueBase: enrichedOrders.reduce((sum, o) => sum + parseFloat(o.totalAmountBase || o.totalAmount || '0'), 0),
+        statusCounts: {
+          draft: enrichedOrders.filter(o => o.status === 'draft').length,
+          waiting_approval: enrichedOrders.filter(o => o.status === 'waiting_approval').length,
+          approved: enrichedOrders.filter(o => o.status === 'approved').length,
+          partial_shipped: enrichedOrders.filter(o => o.status === 'partial_shipped').length,
+          closed: enrichedOrders.filter(o => o.status === 'closed').length,
+        },
+        avgOrderValue: enrichedOrders.length > 0 
+          ? enrichedOrders.reduce((sum, o) => sum + parseFloat(o.totalAmount || '0'), 0) / enrichedOrders.length 
+          : 0
+      };
+      
+      // Calculate monthly trend data
+      const monthlyData: Record<string, { month: string; orders: number; value: number }> = {};
+      enrichedOrders.forEach(order => {
+        const date = new Date(order.orderDate);
+        const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+        if (!monthlyData[monthKey]) {
+          monthlyData[monthKey] = { month: monthKey, orders: 0, value: 0 };
+        }
+        monthlyData[monthKey].orders++;
+        monthlyData[monthKey].value += parseFloat(order.totalAmount || '0');
+      });
+      
+      const trend = Object.values(monthlyData).sort((a, b) => a.month.localeCompare(b.month));
+      
+      res.json({
+        client: {
+          id: client.id,
+          clientCode: client.clientCode,
+          companyName: client.companyName,
+          currencyCode: client.currencyCode
+        },
+        summary,
+        trend,
+        orders: enrichedOrders
+      });
+    } catch (error: any) {
+      console.error('Client sales orders report error:', error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Export Client Sales Orders Report as CSV
+  app.get("/api/export/client-sales-orders", requireAuth, async (req, res) => {
+    try {
+      const { clientId, startDate, endDate, status, warehouseId } = req.query;
+      
+      if (!clientId) {
+        return res.status(400).json({ message: "Client ID is required" });
+      }
+      
+      const clientIdNum = parseInt(clientId as string);
+      const client = await storage.getClient(clientIdNum);
+      if (!client) {
+        return res.status(404).json({ message: "Client not found" });
+      }
+      
+      // Get all sales orders
+      const allOrders = await storage.getAllSalesOrders();
+      
+      // Filter by client
+      let filteredOrders = allOrders.filter(order => order.clientId === clientIdNum);
+      
+      // Apply date filters
+      if (startDate) {
+        const start = new Date(startDate as string);
+        start.setHours(0, 0, 0, 0);
+        filteredOrders = filteredOrders.filter(order => 
+          new Date(order.orderDate) >= start
+        );
+      }
+      if (endDate) {
+        const end = new Date(endDate as string);
+        end.setHours(23, 59, 59, 999);
+        filteredOrders = filteredOrders.filter(order => 
+          new Date(order.orderDate) <= end
+        );
+      }
+      
+      // Apply status filter
+      if (status && status !== 'all') {
+        const statuses = (status as string).split(',');
+        filteredOrders = filteredOrders.filter(order => statuses.includes(order.status));
+      }
+      
+      // Apply warehouse filter
+      if (warehouseId && warehouseId !== 'all') {
+        const whId = parseInt(warehouseId as string);
+        filteredOrders = filteredOrders.filter(order => order.warehouseId === whId);
+      }
+      
+      // Get warehouses
+      const allWarehouses = await storage.getAllWarehouses();
+      const warehouseMap = new Map(allWarehouses.map(w => [w.id, w]));
+      
+      // Build CSV
+      const headers = ['Order Code', 'Client PO', 'Order Date', 'Status', 'Warehouse', 'Currency', 'Subtotal', 'Tax', 'Total', 'Items'];
+      const rows = filteredOrders.map(order => {
+        const warehouse = warehouseMap.get(order.warehouseId);
+        return [
+          order.orderCode,
+          order.clientPoReference || '',
+          order.orderDate,
+          order.status,
+          warehouse?.name || '',
+          order.currencyCode || 'USD',
+          order.subtotal || '0',
+          order.taxAmount || '0',
+          order.totalAmount || '0',
+          'See detail'
+        ];
+      });
+      
+      const csv = [headers.join(','), ...rows.map(row => row.map(cell => `"${cell}"`).join(','))].join('\n');
+      
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename="client-${client.clientCode}-sales-orders.csv"`);
+      res.send(csv);
+    } catch (error: any) {
+      console.error('Export client sales orders error:', error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Analytics API endpoints
   
   // Fastest Moving Items Analytics
