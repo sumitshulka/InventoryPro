@@ -4694,21 +4694,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { clientId, startDate, endDate, status, warehouseId } = req.query;
       
-      if (!clientId) {
-        return res.status(400).json({ message: "Client ID is required" });
-      }
-      
-      const clientIdNum = parseInt(clientId as string);
-      const client = await storage.getClient(clientIdNum);
-      if (!client) {
-        return res.status(404).json({ message: "Client not found" });
+      // Client is optional - if not provided, show all clients
+      let client = null;
+      let clientIdNum: number | null = null;
+      if (clientId && clientId !== 'all') {
+        clientIdNum = parseInt(clientId as string);
+        client = await storage.getClient(clientIdNum);
+        if (!client) {
+          return res.status(404).json({ message: "Client not found" });
+        }
       }
       
       // Get all sales orders
       const allOrders = await storage.getAllSalesOrders();
       
-      // Filter by client
-      let filteredOrders = allOrders.filter(order => order.clientId === clientIdNum);
+      // Get all clients for enrichment when showing all
+      const allClients = await storage.getAllClients();
+      const clientMap = new Map(allClients.map(c => [c.id, c]));
+      
+      // Filter by client (if specified)
+      let filteredOrders = clientIdNum 
+        ? allOrders.filter(order => order.clientId === clientIdNum)
+        : allOrders;
       
       // Apply date filters
       if (startDate) {
@@ -4745,6 +4752,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Enrich orders and calculate dispatched amounts
       const enrichedOrders = await Promise.all(filteredOrders.map(async (order) => {
         const warehouse = warehouseMap.get(order.warehouseId);
+        const orderClient = clientMap.get(order.clientId);
         const items = await storage.getSalesOrderItemsByOrder(order.id);
         const dispatches = await storage.getSalesOrderDispatchesByOrder(order.id);
         
@@ -4761,6 +4769,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return {
           id: order.id,
           orderCode: order.orderCode,
+          clientId: order.clientId,
+          clientName: orderClient?.companyName || 'Unknown',
+          clientCode: orderClient?.clientCode || '',
           clientPoReference: order.clientPoReference,
           orderDate: order.orderDate,
           status: order.status,
@@ -4814,12 +4825,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const trend = Object.values(monthlyData).sort((a, b) => a.month.localeCompare(b.month));
       
       res.json({
-        client: {
+        client: client ? {
           id: client.id,
           clientCode: client.clientCode,
           companyName: client.companyName,
           currencyCode: client.currencyCode
-        },
+        } : null,
         summary,
         trend,
         orders: enrichedOrders
@@ -4835,21 +4846,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { clientId, startDate, endDate, status, warehouseId } = req.query;
       
-      if (!clientId) {
-        return res.status(400).json({ message: "Client ID is required" });
+      // Client is optional - if not provided, export all clients
+      let client = null;
+      let clientIdNum: number | null = null;
+      if (clientId && clientId !== 'all') {
+        clientIdNum = parseInt(clientId as string);
+        client = await storage.getClient(clientIdNum);
+        if (!client) {
+          return res.status(404).json({ message: "Client not found" });
+        }
       }
       
-      const clientIdNum = parseInt(clientId as string);
-      const client = await storage.getClient(clientIdNum);
-      if (!client) {
-        return res.status(404).json({ message: "Client not found" });
-      }
-      
-      // Get all sales orders
+      // Get all sales orders and clients
       const allOrders = await storage.getAllSalesOrders();
+      const allClients = await storage.getAllClients();
+      const clientMap = new Map(allClients.map(c => [c.id, c]));
       
-      // Filter by client
-      let filteredOrders = allOrders.filter(order => order.clientId === clientIdNum);
+      // Filter by client (if specified)
+      let filteredOrders = clientIdNum 
+        ? allOrders.filter(order => order.clientId === clientIdNum)
+        : allOrders;
       
       // Apply date filters
       if (startDate) {
@@ -4884,11 +4900,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const warehouseMap = new Map(allWarehouses.map(w => [w.id, w]));
       
       // Build CSV
-      const headers = ['Order Code', 'Client PO', 'Order Date', 'Status', 'Warehouse', 'Currency', 'Subtotal', 'Tax', 'Total', 'Items'];
+      const headers = ['Order Code', 'Client', 'Client PO', 'Order Date', 'Status', 'Warehouse', 'Currency', 'Subtotal', 'Tax', 'Total'];
       const rows = filteredOrders.map(order => {
         const warehouse = warehouseMap.get(order.warehouseId);
+        const orderClient = clientMap.get(order.clientId);
         return [
           order.orderCode,
+          orderClient?.companyName || 'Unknown',
           order.clientPoReference || '',
           order.orderDate,
           order.status,
@@ -4896,15 +4914,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
           order.currencyCode || 'USD',
           order.subtotal || '0',
           order.taxAmount || '0',
-          order.totalAmount || '0',
-          'See detail'
+          order.totalAmount || '0'
         ];
       });
       
       const csv = [headers.join(','), ...rows.map(row => row.map(cell => `"${cell}"`).join(','))].join('\n');
       
+      const filename = client ? `client-${client.clientCode}-sales-orders.csv` : 'all-clients-sales-orders.csv';
       res.setHeader('Content-Type', 'text/csv');
-      res.setHeader('Content-Disposition', `attachment; filename="client-${client.clientCode}-sales-orders.csv"`);
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
       res.send(csv);
     } catch (error: any) {
       console.error('Export client sales orders error:', error);
