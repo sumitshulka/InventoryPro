@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import AppLayout from "@/components/layout/app-layout";
 import { Button } from "@/components/ui/button";
@@ -22,7 +22,12 @@ import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { format } from "date-fns";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear } from "date-fns";
 import {
   Loader2,
   Download,
@@ -36,6 +41,9 @@ import {
   FileText,
   Eye,
   ChartLine,
+  ChevronDown,
+  ChevronUp,
+  Filter,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useCurrency } from "@/hooks/use-currency";
@@ -73,6 +81,9 @@ interface Client {
 interface SalesOrder {
   id: number;
   orderCode: string;
+  clientId?: number;
+  clientName?: string;
+  clientCode?: string;
   clientPoReference?: string;
   orderDate: string;
   status: string;
@@ -96,7 +107,7 @@ interface ReportData {
     clientCode: string;
     companyName: string;
     currencyCode?: string;
-  };
+  } | null;
   summary: {
     totalOrders: number;
     totalValue: number;
@@ -127,6 +138,16 @@ const STATUS_OPTIONS = [
   { value: "closed", label: "Closed" },
 ];
 
+type DateRangePreset = "today" | "this_week" | "this_month" | "this_year" | "custom";
+
+const DATE_RANGE_OPTIONS: { value: DateRangePreset; label: string }[] = [
+  { value: "today", label: "Today" },
+  { value: "this_week", label: "This Week" },
+  { value: "this_month", label: "This Month" },
+  { value: "this_year", label: "This Year" },
+  { value: "custom", label: "Custom Range" },
+];
+
 const getStatusBadge = (status: string) => {
   const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "outline" | "destructive" }> = {
     draft: { label: "Draft", variant: "outline" },
@@ -139,16 +160,35 @@ const getStatusBadge = (status: string) => {
   return <Badge variant={config.variant} data-testid={`badge-status-${status}`}>{config.label}</Badge>;
 };
 
+function getDateRangeForPreset(preset: DateRangePreset): { start: Date; end: Date } {
+  const now = new Date();
+  switch (preset) {
+    case "today":
+      return { start: startOfDay(now), end: endOfDay(now) };
+    case "this_week":
+      return { start: startOfWeek(now, { weekStartsOn: 1 }), end: endOfWeek(now, { weekStartsOn: 1 }) };
+    case "this_month":
+      return { start: startOfMonth(now), end: endOfMonth(now) };
+    case "this_year":
+      return { start: startOfYear(now), end: endOfYear(now) };
+    default:
+      return { start: startOfMonth(now), end: endOfMonth(now) };
+  }
+}
+
 export default function ClientSalesOrderReportPage() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const { formatCurrency, currencySymbol } = useCurrency();
 
-  const [selectedClientId, setSelectedClientId] = useState<string>("");
-  const [startDate, setStartDate] = useState<Date | undefined>();
-  const [endDate, setEndDate] = useState<Date | undefined>();
+  const defaultDateRange = getDateRangeForPreset("this_month");
+  const [selectedClientId, setSelectedClientId] = useState<string>("all");
+  const [dateRangePreset, setDateRangePreset] = useState<DateRangePreset>("this_month");
+  const [startDate, setStartDate] = useState<Date>(defaultDateRange.start);
+  const [endDate, setEndDate] = useState<Date>(defaultDateRange.end);
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [warehouseFilter, setWarehouseFilter] = useState<string>("all");
+  const [filtersOpen, setFiltersOpen] = useState(true);
 
   const { data: clients = [], isLoading: clientsLoading } = useQuery<Client[]>({
     queryKey: ["/api/clients"],
@@ -158,27 +198,38 @@ export default function ClientSalesOrderReportPage() {
     queryKey: ["/api/warehouses"],
   });
 
-  const queryParams = new URLSearchParams();
-  if (selectedClientId) queryParams.set("clientId", selectedClientId);
-  if (startDate) queryParams.set("startDate", format(startDate, "yyyy-MM-dd"));
-  if (endDate) queryParams.set("endDate", format(endDate, "yyyy-MM-dd"));
-  if (statusFilter !== "all") queryParams.set("status", statusFilter);
-  if (warehouseFilter !== "all") queryParams.set("warehouseId", warehouseFilter);
+  const handleDateRangeChange = (preset: DateRangePreset) => {
+    setDateRangePreset(preset);
+    if (preset !== "custom") {
+      const range = getDateRangeForPreset(preset);
+      setStartDate(range.start);
+      setEndDate(range.end);
+    }
+  };
+
+  const queryParams = useMemo(() => {
+    const params = new URLSearchParams();
+    if (selectedClientId && selectedClientId !== "all") {
+      params.set("clientId", selectedClientId);
+    }
+    params.set("startDate", format(startDate, "yyyy-MM-dd"));
+    params.set("endDate", format(endDate, "yyyy-MM-dd"));
+    if (statusFilter !== "all") params.set("status", statusFilter);
+    if (warehouseFilter !== "all") params.set("warehouseId", warehouseFilter);
+    return params;
+  }, [selectedClientId, startDate, endDate, statusFilter, warehouseFilter]);
 
   const { data: reportData, isLoading: reportLoading, refetch } = useQuery<ReportData>({
-    queryKey: ["/api/reports/client-sales-orders", selectedClientId, startDate, endDate, statusFilter, warehouseFilter],
+    queryKey: ["/api/reports/client-sales-orders", selectedClientId, startDate?.toISOString(), endDate?.toISOString(), statusFilter, warehouseFilter],
     queryFn: async () => {
-      if (!selectedClientId) return null;
       const res = await fetch(`/api/reports/client-sales-orders?${queryParams.toString()}`);
       if (!res.ok) throw new Error("Failed to fetch report");
       return res.json();
     },
-    enabled: !!selectedClientId,
   });
 
   const exportMutation = useMutation({
     mutationFn: async () => {
-      if (!selectedClientId) throw new Error("Select a client first");
       const res = await fetch(`/api/export/client-sales-orders?${queryParams.toString()}`);
       if (!res.ok) throw new Error("Failed to export data");
       return res.text();
@@ -188,13 +239,14 @@ export default function ClientSalesOrderReportPage() {
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.setAttribute("download", `client-sales-orders-${selectedClientId}.csv`);
+      const filename = selectedClientId !== "all" ? `client-sales-orders-${selectedClientId}.csv` : "all-clients-sales-orders.csv";
+      link.setAttribute("download", filename);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       toast({
         title: "Export successful",
-        description: "Client sales order report has been exported to CSV.",
+        description: "Sales order report has been exported to CSV.",
       });
     },
     onError: (error: Error) => {
@@ -218,6 +270,10 @@ export default function ClientSalesOrderReportPage() {
   };
 
   const activeClients = clients.filter((c) => c.id);
+  const isAllClients = selectedClientId === "all";
+  const dateRangeLabel = dateRangePreset === "custom" 
+    ? `${format(startDate, "MMM dd")} - ${format(endDate, "MMM dd, yyyy")}`
+    : DATE_RANGE_OPTIONS.find(o => o.value === dateRangePreset)?.label || "This Month";
 
   if (clientsLoading || warehousesLoading) {
     return (
@@ -236,13 +292,15 @@ export default function ClientSalesOrderReportPage() {
           <h1 className="text-2xl font-medium text-gray-800" data-testid="text-page-title">
             Client Sales Order Report
           </h1>
-          <p className="text-gray-600">Analyze sales orders by client with flexible filters</p>
+          <p className="text-gray-600">
+            {isAllClients ? "All Clients" : reportData?.client?.companyName || "Select a client"} 
+            {" "}&bull;{" "}{dateRangeLabel}
+          </p>
         </div>
         <div className="flex space-x-2">
           <Button
             variant="outline"
             onClick={() => refetch()}
-            disabled={!selectedClientId}
             data-testid="button-refresh"
           >
             <RefreshCw className="mr-2 h-4 w-4" />
@@ -250,7 +308,7 @@ export default function ClientSalesOrderReportPage() {
           </Button>
           <Button
             onClick={() => exportMutation.mutate()}
-            disabled={exportMutation.isPending || !selectedClientId}
+            disabled={exportMutation.isPending}
             data-testid="button-export"
           >
             {exportMutation.isPending ? (
@@ -263,142 +321,157 @@ export default function ClientSalesOrderReportPage() {
         </div>
       </div>
 
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2">
-            <Building2 className="h-5 w-5" />
-            Filter Criteria
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-            <div className="space-y-2">
-              <Label>Client *</Label>
-              <Select value={selectedClientId} onValueChange={setSelectedClientId}>
-                <SelectTrigger data-testid="select-client">
-                  <SelectValue placeholder="Select a client" />
-                </SelectTrigger>
-                <SelectContent>
-                  {activeClients.map((client) => (
-                    <SelectItem key={client.id} value={client.id.toString()}>
-                      {client.companyName} ({client.clientCode})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Start Date</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className="w-full justify-start text-left font-normal"
-                    data-testid="button-start-date"
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {startDate ? format(startDate, "MMM dd, yyyy") : "From date"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={startDate}
-                    onSelect={setStartDate}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
-
-            <div className="space-y-2">
-              <Label>End Date</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className="w-full justify-start text-left font-normal"
-                    data-testid="button-end-date"
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {endDate ? format(endDate, "MMM dd, yyyy") : "To date"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={endDate}
-                    onSelect={setEndDate}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Status</Label>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger data-testid="select-status">
-                  <SelectValue placeholder="All Statuses" />
-                </SelectTrigger>
-                <SelectContent>
-                  {STATUS_OPTIONS.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Warehouse</Label>
-              <Select value={warehouseFilter} onValueChange={setWarehouseFilter}>
-                <SelectTrigger data-testid="select-warehouse">
-                  <SelectValue placeholder="All Warehouses" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Warehouses</SelectItem>
-                  {warehouses.map((wh: any) => (
-                    <SelectItem key={wh.id} value={wh.id.toString()}>
-                      {wh.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          {startDate || endDate ? (
-            <div className="mt-4 flex gap-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setStartDate(undefined);
-                  setEndDate(undefined);
-                }}
-                data-testid="button-clear-dates"
-              >
-                Clear Dates
-              </Button>
-            </div>
-          ) : null}
-        </CardContent>
-      </Card>
-
-      {!selectedClientId ? (
+      <Collapsible open={filtersOpen} onOpenChange={setFiltersOpen} className="mb-6">
         <Card>
-          <CardContent className="py-12">
-            <div className="text-center text-gray-500">
-              <Building2 className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p className="text-lg font-medium">Select a Client</p>
-              <p className="text-sm">Choose a client from the dropdown above to view their sales order report</p>
-            </div>
-          </CardContent>
+          <CollapsibleTrigger asChild>
+            <CardHeader className="cursor-pointer hover:bg-gray-50 transition-colors">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Filter className="h-5 w-5" />
+                  Filter Criteria
+                </CardTitle>
+                <div className="flex items-center gap-2">
+                  {!filtersOpen && (
+                    <span className="text-sm text-gray-500">
+                      {isAllClients ? "All Clients" : reportData?.client?.companyName || "..."} &bull; {dateRangeLabel}
+                    </span>
+                  )}
+                  {filtersOpen ? (
+                    <ChevronUp className="h-5 w-5 text-gray-500" />
+                  ) : (
+                    <ChevronDown className="h-5 w-5 text-gray-500" />
+                  )}
+                </div>
+              </div>
+            </CardHeader>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <CardContent className="pt-0">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+                <div className="space-y-2">
+                  <Label>Client</Label>
+                  <Select value={selectedClientId} onValueChange={setSelectedClientId}>
+                    <SelectTrigger data-testid="select-client">
+                      <SelectValue placeholder="All Clients" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Clients</SelectItem>
+                      {activeClients.map((client) => (
+                        <SelectItem key={client.id} value={client.id.toString()}>
+                          {client.companyName} ({client.clientCode})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Date Range</Label>
+                  <Select value={dateRangePreset} onValueChange={(v) => handleDateRangeChange(v as DateRangePreset)}>
+                    <SelectTrigger data-testid="select-date-range">
+                      <SelectValue placeholder="This Month" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {DATE_RANGE_OPTIONS.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {dateRangePreset === "custom" && (
+                  <>
+                    <div className="space-y-2">
+                      <Label>Start Date</Label>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            className="w-full justify-start text-left font-normal"
+                            data-testid="button-start-date"
+                          >
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {format(startDate, "MMM dd, yyyy")}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={startDate}
+                            onSelect={(d) => d && setStartDate(d)}
+                            initialFocus
+                          />
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>End Date</Label>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            className="w-full justify-start text-left font-normal"
+                            data-testid="button-end-date"
+                          >
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {format(endDate, "MMM dd, yyyy")}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={endDate}
+                            onSelect={(d) => d && setEndDate(d)}
+                            initialFocus
+                          />
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                  </>
+                )}
+
+                <div className="space-y-2">
+                  <Label>Status</Label>
+                  <Select value={statusFilter} onValueChange={setStatusFilter}>
+                    <SelectTrigger data-testid="select-status">
+                      <SelectValue placeholder="All Statuses" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {STATUS_OPTIONS.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Warehouse</Label>
+                  <Select value={warehouseFilter} onValueChange={setWarehouseFilter}>
+                    <SelectTrigger data-testid="select-warehouse">
+                      <SelectValue placeholder="All Warehouses" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Warehouses</SelectItem>
+                      {warehouses.map((wh: any) => (
+                        <SelectItem key={wh.id} value={wh.id.toString()}>
+                          {wh.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </CardContent>
+          </CollapsibleContent>
         </Card>
-      ) : reportLoading ? (
+      </Collapsible>
+
+      {reportLoading ? (
         <div className="flex items-center justify-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
@@ -546,6 +619,7 @@ export default function ClientSalesOrderReportPage() {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Order Code</TableHead>
+                        {isAllClients && <TableHead>Client</TableHead>}
                         <TableHead>Client PO</TableHead>
                         <TableHead>Date</TableHead>
                         <TableHead>Status</TableHead>
@@ -563,6 +637,12 @@ export default function ClientSalesOrderReportPage() {
                           <TableCell className="font-mono font-medium">
                             {order.orderCode}
                           </TableCell>
+                          {isAllClients && (
+                            <TableCell>
+                              <span className="font-medium">{order.clientName}</span>
+                              <span className="text-xs text-gray-500 ml-1">({order.clientCode})</span>
+                            </TableCell>
+                          )}
                           <TableCell className="text-gray-500">
                             {order.clientPoReference || "-"}
                           </TableCell>
@@ -617,26 +697,26 @@ export default function ClientSalesOrderReportPage() {
                   </p>
                 </div>
                 <div className="text-center p-4 bg-yellow-50 rounded-lg">
-                  <p className="text-sm text-gray-500 mb-1">Waiting Approval</p>
-                  <p className="text-xl font-bold text-yellow-600" data-testid="text-waiting-count">
+                  <p className="text-sm text-yellow-600 mb-1">Waiting Approval</p>
+                  <p className="text-xl font-bold text-yellow-700" data-testid="text-waiting-count">
                     {reportData.summary.statusCounts.waiting_approval}
                   </p>
                 </div>
                 <div className="text-center p-4 bg-green-50 rounded-lg">
-                  <p className="text-sm text-gray-500 mb-1">Approved</p>
-                  <p className="text-xl font-bold text-green-600">
+                  <p className="text-sm text-green-600 mb-1">Approved</p>
+                  <p className="text-xl font-bold text-green-700" data-testid="text-approved-breakdown">
                     {reportData.summary.statusCounts.approved}
                   </p>
                 </div>
                 <div className="text-center p-4 bg-blue-50 rounded-lg">
-                  <p className="text-sm text-gray-500 mb-1">Partial Shipped</p>
-                  <p className="text-xl font-bold text-blue-600" data-testid="text-partial-count">
+                  <p className="text-sm text-blue-600 mb-1">Partial Shipped</p>
+                  <p className="text-xl font-bold text-blue-700" data-testid="text-partial-count">
                     {reportData.summary.statusCounts.partial_shipped}
                   </p>
                 </div>
                 <div className="text-center p-4 bg-gray-100 rounded-lg">
-                  <p className="text-sm text-gray-500 mb-1">Closed</p>
-                  <p className="text-xl font-bold" data-testid="text-closed-count">
+                  <p className="text-sm text-gray-600 mb-1">Closed</p>
+                  <p className="text-xl font-bold text-gray-700" data-testid="text-closed-count">
                     {reportData.summary.statusCounts.closed}
                   </p>
                 </div>
@@ -644,7 +724,17 @@ export default function ClientSalesOrderReportPage() {
             </CardContent>
           </Card>
         </>
-      ) : null}
+      ) : (
+        <Card>
+          <CardContent className="py-12">
+            <div className="text-center text-gray-500">
+              <Building2 className="h-12 w-12 mx-auto mb-4 opacity-50" />
+              <p className="text-lg font-medium">No Data Available</p>
+              <p className="text-sm">Adjust the filters above to view the report</p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </AppLayout>
   );
 }
