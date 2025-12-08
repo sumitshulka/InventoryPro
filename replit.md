@@ -149,6 +149,7 @@ A comprehensive inventory management system built with React (frontend) and Expr
 - December 8, 2025. Added multi-currency support for sales orders: client-level currency field, order-level currency/conversion rate tracking, base currency calculations, and dual-currency display in order details and list views.
 - December 8, 2025. Added Delivery Challan feature for dispatched items: PDF generation with company header, consignee details, transport info, itemized table, and signature blocks. Users can download PDF or email it with custom message using configured email provider.
 - December 8, 2025. Added Client PO Reference field to sales orders: optional field to store client's purchase order number for reference. Displayed in order header and list view.
+- December 8, 2025. Improved inventory selection UI for sales orders: Added searchable product picker modal with text search, category filtering, pagination, and rich product cards. Replaced inline inventory grid with "Add Products" button for better scalability with large product catalogs.
 
 ## User Preferences
 
