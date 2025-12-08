@@ -30,6 +30,9 @@ import IssuesPage from "@/pages/issues-page";
 import MyProfilePage from "@/pages/my-profile-page";
 import DisposedInventoryReportPage from "@/pages/disposed-inventory-report-page";
 import AnalyticsReportPage from "@/pages/analytics-report-page";
+import ClientsPage from "@/pages/sales-orders/clients-page";
+import SalesOrdersListPage from "@/pages/sales-orders/sales-orders-list-page";
+import SalesOrderDetailPage from "@/pages/sales-orders/sales-order-detail-page";
 import { ProtectedRoute } from "./lib/protected-route";
 
 function Router() {
@@ -74,6 +77,10 @@ function Router() {
           <ProtectedRoute path="/audit-trail" component={AuditTrailPage} />
           <ProtectedRoute path="/analytics" component={AnalyticsReportPage} />
           <ProtectedRoute path="/settings" component={SettingsPage} />
+          <ProtectedRoute path="/clients" component={ClientsPage} />
+          <ProtectedRoute path="/sales-orders" component={SalesOrdersListPage} />
+          <ProtectedRoute path="/sales-orders/new" component={SalesOrderDetailPage} />
+          <ProtectedRoute path="/sales-orders/:id" component={SalesOrderDetailPage} />
           <Route component={NotFound} />
         </Switch>
       </LicenseGuard>

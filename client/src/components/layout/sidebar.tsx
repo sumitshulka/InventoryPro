@@ -265,6 +265,43 @@ export default function Sidebar({ user, isOpen, onClose }: SidebarProps) {
                 </ul>
               </div>
 
+              {/* SALES Section */}
+              {hasInventoryAccess && (
+                <div className="mb-4">
+                  <p className="text-xs font-medium text-gray-500 px-3 py-2">SALES</p>
+                  <ul>
+                    <li>
+                      <Link 
+                        href="/clients"
+                        className={cn(
+                          "flex items-center px-3 py-2 rounded-md",
+                          isActive("/clients") 
+                            ? "bg-primary/10 border-l-4 border-primary text-primary" 
+                            : "text-gray-700 hover:text-primary hover:bg-primary/5"
+                        )}
+                      >
+                        <span className="material-icons mr-3">business</span>
+                        <span className="whitespace-nowrap">Clients</span>
+                      </Link>
+                    </li>
+                    <li>
+                      <Link 
+                        href="/sales-orders"
+                        className={cn(
+                          "flex items-center px-3 py-2 rounded-md",
+                          isActive("/sales-orders") || location.startsWith("/sales-orders/")
+                            ? "bg-primary/10 border-l-4 border-primary text-primary" 
+                            : "text-gray-700 hover:text-primary hover:bg-primary/5"
+                        )}
+                      >
+                        <span className="material-icons mr-3">receipt</span>
+                        <span className="whitespace-nowrap">Sales Orders</span>
+                      </Link>
+                    </li>
+                  </ul>
+                </div>
+              )}
+
               {/* REPORTING Section */}
               {hasReportAccess && (
                 <div className="mb-4">
