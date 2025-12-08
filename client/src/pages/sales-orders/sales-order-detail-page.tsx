@@ -427,14 +427,8 @@ export default function SalesOrderDetailPage() {
     const lineSubtotal = quantity * price;
     const taxAmount = (lineSubtotal * tax) / 100;
     
-    update(index, {
-      ...watchItems[index],
-      quantity,
-      unitPrice,
-      taxPercent,
-      taxAmount: taxAmount.toFixed(2),
-      lineTotal: lineSubtotal.toFixed(2),
-    });
+    form.setValue(`items.${index}.taxAmount`, taxAmount.toFixed(2));
+    form.setValue(`items.${index}.lineTotal`, lineSubtotal.toFixed(2));
   };
 
   const saveMutation = useMutation({
@@ -1197,16 +1191,18 @@ export default function SalesOrderDetailPage() {
                                   <Input
                                     type="number"
                                     min={1}
-                                    {...form.register(`items.${index}.quantity`, { valueAsNumber: true })}
-                                    onChange={(e) => {
-                                      const qty = parseInt(e.target.value) || 1;
-                                      updateLineItemCalculations(
-                                        index,
-                                        qty,
-                                        watchItems[index].unitPrice,
-                                        watchItems[index].taxPercent
-                                      );
-                                    }}
+                                    {...form.register(`items.${index}.quantity`, { 
+                                      valueAsNumber: true,
+                                      onChange: (e) => {
+                                        const qty = parseInt(e.target.value) || 1;
+                                        updateLineItemCalculations(
+                                          index,
+                                          qty,
+                                          watchItems[index]?.unitPrice || "0",
+                                          watchItems[index]?.taxPercent || "0"
+                                        );
+                                      }
+                                    })}
                                     disabled={!isDraft}
                                     className="w-20"
                                     data-testid={`input-quantity-${index}`}
@@ -1216,15 +1212,16 @@ export default function SalesOrderDetailPage() {
                                   <Input
                                     type="number"
                                     step="0.01"
-                                    {...form.register(`items.${index}.unitPrice`)}
-                                    onChange={(e) => {
-                                      updateLineItemCalculations(
-                                        index,
-                                        watchItems[index].quantity,
-                                        e.target.value,
-                                        watchItems[index].taxPercent
-                                      );
-                                    }}
+                                    {...form.register(`items.${index}.unitPrice`, {
+                                      onChange: (e) => {
+                                        updateLineItemCalculations(
+                                          index,
+                                          watchItems[index]?.quantity || 1,
+                                          e.target.value,
+                                          watchItems[index]?.taxPercent || "0"
+                                        );
+                                      }
+                                    })}
                                     disabled={!isDraft}
                                     className="w-28"
                                     data-testid={`input-price-${index}`}
@@ -1234,15 +1231,16 @@ export default function SalesOrderDetailPage() {
                                   <Input
                                     type="number"
                                     step="0.01"
-                                    {...form.register(`items.${index}.taxPercent`)}
-                                    onChange={(e) => {
-                                      updateLineItemCalculations(
-                                        index,
-                                        watchItems[index].quantity,
-                                        watchItems[index].unitPrice,
-                                        e.target.value
-                                      );
-                                    }}
+                                    {...form.register(`items.${index}.taxPercent`, {
+                                      onChange: (e) => {
+                                        updateLineItemCalculations(
+                                          index,
+                                          watchItems[index]?.quantity || 1,
+                                          watchItems[index]?.unitPrice || "0",
+                                          e.target.value
+                                        );
+                                      }
+                                    })}
                                     disabled={!isDraft}
                                     className="w-20"
                                     data-testid={`input-tax-${index}`}
