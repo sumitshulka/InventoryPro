@@ -22,6 +22,12 @@ import {
   insertTransferUpdateSchema,
   insertNotificationSchema,
   insertEmailSettingsSchema,
+  insertClientSchema,
+  insertSalesOrderSchema,
+  insertSalesOrderItemSchema,
+  insertSalesOrderApprovalSchema,
+  insertSalesOrderDispatchSchema,
+  insertSalesOrderDispatchItemSchema,
   departments,
   organizationSettings,
   users,
@@ -42,7 +48,13 @@ import {
   transferItems,
   transferUpdates,
   rejectedGoods,
-  notifications
+  notifications,
+  clients,
+  salesOrders,
+  salesOrderItems,
+  salesOrderApprovals,
+  salesOrderDispatches,
+  salesOrderDispatchItems
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, lte, exists, isNotNull, or } from "drizzle-orm";
@@ -5042,6 +5054,810 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(priceVariationData);
     } catch (error: any) {
       console.error("Price variation analysis error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ==================== CLIENT MANAGEMENT ROUTES ====================
+
+  // Get all clients
+  app.get("/api/clients", requireAuth, async (req, res) => {
+    try {
+      const allClients = await storage.getAllClients();
+      res.json(allClients);
+    } catch (error: any) {
+      console.error("Error fetching clients:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get active clients only
+  app.get("/api/clients/active", requireAuth, async (req, res) => {
+    try {
+      const activeClients = await storage.getActiveClients();
+      res.json(activeClients);
+    } catch (error: any) {
+      console.error("Error fetching active clients:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get next client code
+  app.get("/api/clients/next-code", requireAuth, async (req, res) => {
+    try {
+      const code = await storage.getNextClientCode();
+      res.json({ code });
+    } catch (error: any) {
+      console.error("Error generating client code:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get single client by ID
+  app.get("/api/clients/:id", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const client = await storage.getClient(id);
+      if (!client) {
+        return res.status(404).json({ message: "Client not found" });
+      }
+      res.json(client);
+    } catch (error: any) {
+      console.error("Error fetching client:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Create new client
+  app.post("/api/clients", requireAuth, async (req, res) => {
+    try {
+      const clientCode = await storage.getNextClientCode();
+      const clientData = insertClientSchema.parse({
+        ...req.body,
+        clientCode
+      });
+      const newClient = await storage.createClient(clientData);
+      
+      await logAuditEvent(
+        (req.user as any).id,
+        'CREATE',
+        'client',
+        newClient.id,
+        `Created client: ${newClient.companyName}`,
+        null,
+        newClient,
+        req
+      );
+      
+      res.status(201).json(newClient);
+    } catch (error: any) {
+      console.error("Error creating client:", error);
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ message: "Validation error", errors: error.errors });
+      }
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Update client
+  app.patch("/api/clients/:id", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const existingClient = await storage.getClient(id);
+      if (!existingClient) {
+        return res.status(404).json({ message: "Client not found" });
+      }
+      
+      const updatedClient = await storage.updateClient(id, req.body);
+      
+      await logAuditEvent(
+        (req.user as any).id,
+        'UPDATE',
+        'client',
+        id,
+        `Updated client: ${updatedClient?.companyName}`,
+        existingClient,
+        updatedClient,
+        req
+      );
+      
+      res.json(updatedClient);
+    } catch (error: any) {
+      console.error("Error updating client:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Delete client
+  app.delete("/api/clients/:id", requireAuth, checkRole("manager"), async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const existingClient = await storage.getClient(id);
+      if (!existingClient) {
+        return res.status(404).json({ message: "Client not found" });
+      }
+      
+      // Check if client has any sales orders
+      const clientOrders = await db.select().from(salesOrders).where(eq(salesOrders.clientId, id)).limit(1);
+      if (clientOrders.length > 0) {
+        return res.status(400).json({ message: "Cannot delete client with existing sales orders. Deactivate instead." });
+      }
+      
+      const deleted = await storage.deleteClient(id);
+      
+      await logAuditEvent(
+        (req.user as any).id,
+        'DELETE',
+        'client',
+        id,
+        `Deleted client: ${existingClient.companyName}`,
+        existingClient,
+        null,
+        req
+      );
+      
+      res.json({ success: deleted });
+    } catch (error: any) {
+      console.error("Error deleting client:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ==================== SALES ORDER ROUTES ====================
+
+  // Get all sales orders with related data
+  app.get("/api/sales-orders", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as any;
+      let orders;
+      
+      // Filter based on user role and warehouse assignment
+      if (user.role === 'admin' || user.role === 'manager') {
+        orders = await storage.getAllSalesOrders();
+      } else if (user.warehouseId) {
+        orders = await storage.getSalesOrdersByWarehouse(user.warehouseId);
+      } else {
+        orders = await storage.getSalesOrdersByUser(user.id);
+      }
+      
+      // Enrich with client and warehouse info
+      const enrichedOrders = await Promise.all(orders.map(async (order) => {
+        const [client, warehouse, creator, items] = await Promise.all([
+          storage.getClient(order.clientId),
+          storage.getWarehouse(order.warehouseId),
+          storage.getUser(order.createdBy),
+          storage.getSalesOrderItemsByOrder(order.id)
+        ]);
+        
+        return {
+          ...order,
+          client,
+          warehouse,
+          creator: creator ? { id: creator.id, name: creator.name } : null,
+          itemCount: items.length
+        };
+      }));
+      
+      res.json(enrichedOrders);
+    } catch (error: any) {
+      console.error("Error fetching sales orders:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get next order code
+  app.get("/api/sales-orders/next-code", requireAuth, async (req, res) => {
+    try {
+      const code = await storage.getNextSalesOrderCode();
+      res.json({ code });
+    } catch (error: any) {
+      console.error("Error generating order code:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get pending approvals for current user
+  app.get("/api/sales-orders/pending-approvals", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const pendingApprovals = await storage.getPendingSalesOrderApprovals(user.id);
+      
+      // Enrich with order details
+      const enrichedApprovals = await Promise.all(pendingApprovals.map(async (approval) => {
+        const order = await storage.getSalesOrder(approval.salesOrderId);
+        const client = order ? await storage.getClient(order.clientId) : null;
+        return {
+          ...approval,
+          order,
+          client
+        };
+      }));
+      
+      res.json(enrichedApprovals);
+    } catch (error: any) {
+      console.error("Error fetching pending approvals:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get single sales order with full details
+  app.get("/api/sales-orders/:id", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const order = await storage.getSalesOrder(id);
+      if (!order) {
+        return res.status(404).json({ message: "Sales order not found" });
+      }
+      
+      const [client, warehouse, creator, orderItems, approvals, dispatches] = await Promise.all([
+        storage.getClient(order.clientId),
+        storage.getWarehouse(order.warehouseId),
+        storage.getUser(order.createdBy),
+        storage.getSalesOrderItemsByOrder(id),
+        storage.getSalesOrderApprovalsByOrder(id),
+        storage.getSalesOrderDispatchesByOrder(id)
+      ]);
+      
+      // Enrich items with item details
+      const enrichedItems = await Promise.all(orderItems.map(async (orderItem) => {
+        const item = await storage.getItem(orderItem.itemId);
+        return {
+          ...orderItem,
+          item
+        };
+      }));
+      
+      // Enrich dispatches with dispatch items and user info
+      const enrichedDispatches = await Promise.all(dispatches.map(async (dispatch) => {
+        const [dispatchItems, dispatcher] = await Promise.all([
+          storage.getDispatchItemsByDispatch(dispatch.id),
+          storage.getUser(dispatch.dispatchedBy)
+        ]);
+        
+        const enrichedDispatchItems = await Promise.all(dispatchItems.map(async (di) => {
+          const item = await storage.getItem(di.itemId);
+          return { ...di, item };
+        }));
+        
+        return {
+          ...dispatch,
+          items: enrichedDispatchItems,
+          dispatcher: dispatcher ? { id: dispatcher.id, name: dispatcher.name } : null
+        };
+      }));
+      
+      // Enrich approvals with approver info
+      const enrichedApprovals = await Promise.all(approvals.map(async (approval) => {
+        const approver = await storage.getUser(approval.approverId);
+        return {
+          ...approval,
+          approver: approver ? { id: approver.id, name: approver.name } : null
+        };
+      }));
+      
+      res.json({
+        ...order,
+        client,
+        warehouse,
+        creator: creator ? { id: creator.id, name: creator.name } : null,
+        items: enrichedItems,
+        approvals: enrichedApprovals,
+        dispatches: enrichedDispatches
+      });
+    } catch (error: any) {
+      console.error("Error fetching sales order:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Create new sales order
+  app.post("/api/sales-orders", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const { items: orderItems, ...orderData } = req.body;
+      
+      // Generate order code
+      const orderCode = await storage.getNextSalesOrderCode();
+      
+      // Create order
+      const newOrder = await storage.createSalesOrder({
+        ...orderData,
+        orderCode,
+        status: 'draft',
+        createdBy: user.id
+      });
+      
+      // Create order items
+      if (orderItems && Array.isArray(orderItems)) {
+        for (const item of orderItems) {
+          await storage.createSalesOrderItem({
+            salesOrderId: newOrder.id,
+            itemId: item.itemId,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            taxPercent: item.taxPercent || '0',
+            taxAmount: item.taxAmount || '0',
+            lineTotal: item.lineTotal,
+            notes: item.notes
+          });
+        }
+      }
+      
+      await logAuditEvent(
+        user.id,
+        'CREATE',
+        'sales_order',
+        newOrder.id,
+        `Created sales order: ${orderCode}`,
+        null,
+        newOrder,
+        req
+      );
+      
+      res.status(201).json(newOrder);
+    } catch (error: any) {
+      console.error("Error creating sales order:", error);
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ message: "Validation error", errors: error.errors });
+      }
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Update sales order
+  app.patch("/api/sales-orders/:id", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const existingOrder = await storage.getSalesOrder(id);
+      if (!existingOrder) {
+        return res.status(404).json({ message: "Sales order not found" });
+      }
+      
+      // Only allow updates if order is in draft status
+      if (existingOrder.status !== 'draft' && !['admin', 'manager'].includes((req.user as any).role)) {
+        return res.status(400).json({ message: "Cannot modify order that is not in draft status" });
+      }
+      
+      const { items: orderItems, ...orderData } = req.body;
+      
+      const updatedOrder = await storage.updateSalesOrder(id, orderData);
+      
+      // Update items if provided
+      if (orderItems && Array.isArray(orderItems)) {
+        // Delete existing items and recreate
+        await storage.deleteSalesOrderItemsByOrder(id);
+        for (const item of orderItems) {
+          await storage.createSalesOrderItem({
+            salesOrderId: id,
+            itemId: item.itemId,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            taxPercent: item.taxPercent || '0',
+            taxAmount: item.taxAmount || '0',
+            lineTotal: item.lineTotal,
+            notes: item.notes
+          });
+        }
+      }
+      
+      await logAuditEvent(
+        (req.user as any).id,
+        'UPDATE',
+        'sales_order',
+        id,
+        `Updated sales order: ${existingOrder.orderCode}`,
+        existingOrder,
+        updatedOrder,
+        req
+      );
+      
+      res.json(updatedOrder);
+    } catch (error: any) {
+      console.error("Error updating sales order:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Submit sales order for approval
+  app.post("/api/sales-orders/:id/submit", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const user = req.user as any;
+      const order = await storage.getSalesOrder(id);
+      
+      if (!order) {
+        return res.status(404).json({ message: "Sales order not found" });
+      }
+      
+      if (order.status !== 'draft') {
+        return res.status(400).json({ message: "Only draft orders can be submitted for approval" });
+      }
+      
+      // Check if order has items
+      const orderItems = await storage.getSalesOrderItemsByOrder(id);
+      if (orderItems.length === 0) {
+        return res.status(400).json({ message: "Cannot submit order without line items" });
+      }
+      
+      // Find approver (manager or admin)
+      const allUsers = await storage.getAllUsers();
+      const approvers = allUsers.filter(u => u.role === 'manager' || u.role === 'admin');
+      
+      if (approvers.length === 0) {
+        return res.status(400).json({ message: "No approvers found in the system" });
+      }
+      
+      // Create approval request for first available approver
+      const approver = approvers[0];
+      await storage.createSalesOrderApproval({
+        salesOrderId: id,
+        approverId: approver.id,
+        approvalLevel: 'manager',
+        status: 'pending'
+      });
+      
+      // Update order status
+      const updatedOrder = await storage.updateSalesOrder(id, { status: 'waiting_approval' });
+      
+      // Create notification for approver
+      await storage.createNotification({
+        recipientId: approver.id,
+        senderId: user.id,
+        type: 'sales_order_approval',
+        title: 'Sales Order Approval Required',
+        message: `Sales order ${order.orderCode} requires your approval`,
+        category: 'approval',
+        priority: 'high',
+        entityType: 'sales_order',
+        entityId: id
+      });
+      
+      await logAuditEvent(
+        user.id,
+        'SUBMIT',
+        'sales_order',
+        id,
+        `Submitted sales order for approval: ${order.orderCode}`,
+        { status: 'draft' },
+        { status: 'waiting_approval' },
+        req
+      );
+      
+      res.json(updatedOrder);
+    } catch (error: any) {
+      console.error("Error submitting sales order:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Approve sales order
+  app.post("/api/sales-orders/:id/approve", requireAuth, checkRole("manager"), async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const user = req.user as any;
+      const { comments } = req.body;
+      
+      const order = await storage.getSalesOrder(id);
+      if (!order) {
+        return res.status(404).json({ message: "Sales order not found" });
+      }
+      
+      if (order.status !== 'waiting_approval') {
+        return res.status(400).json({ message: "Order is not waiting for approval" });
+      }
+      
+      // Find and update approval record
+      const approvals = await storage.getSalesOrderApprovalsByOrder(id);
+      const pendingApproval = approvals.find(a => a.status === 'pending');
+      
+      if (pendingApproval) {
+        await storage.updateSalesOrderApproval(pendingApproval.id, {
+          status: 'approved',
+          comments,
+          approvedAt: new Date()
+        });
+      }
+      
+      // Update order status
+      const updatedOrder = await storage.updateSalesOrder(id, { 
+        status: 'approved',
+        approvedBy: user.id,
+        approvedAt: new Date()
+      });
+      
+      // Notify creator
+      await storage.createNotification({
+        recipientId: order.createdBy,
+        senderId: user.id,
+        type: 'sales_order_approved',
+        title: 'Sales Order Approved',
+        message: `Your sales order ${order.orderCode} has been approved`,
+        category: 'approval',
+        priority: 'normal',
+        entityType: 'sales_order',
+        entityId: id
+      });
+      
+      await logAuditEvent(
+        user.id,
+        'APPROVE',
+        'sales_order',
+        id,
+        `Approved sales order: ${order.orderCode}`,
+        { status: 'waiting_approval' },
+        { status: 'approved' },
+        req
+      );
+      
+      res.json(updatedOrder);
+    } catch (error: any) {
+      console.error("Error approving sales order:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Reject sales order
+  app.post("/api/sales-orders/:id/reject", requireAuth, checkRole("manager"), async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const user = req.user as any;
+      const { comments } = req.body;
+      
+      const order = await storage.getSalesOrder(id);
+      if (!order) {
+        return res.status(404).json({ message: "Sales order not found" });
+      }
+      
+      if (order.status !== 'waiting_approval') {
+        return res.status(400).json({ message: "Order is not waiting for approval" });
+      }
+      
+      // Find and update approval record
+      const approvals = await storage.getSalesOrderApprovalsByOrder(id);
+      const pendingApproval = approvals.find(a => a.status === 'pending');
+      
+      if (pendingApproval) {
+        await storage.updateSalesOrderApproval(pendingApproval.id, {
+          status: 'rejected',
+          comments,
+          approvedAt: new Date()
+        });
+      }
+      
+      // Update order status back to draft
+      const updatedOrder = await storage.updateSalesOrder(id, { status: 'draft' });
+      
+      // Notify creator
+      await storage.createNotification({
+        recipientId: order.createdBy,
+        senderId: user.id,
+        type: 'sales_order_rejected',
+        title: 'Sales Order Rejected',
+        message: `Your sales order ${order.orderCode} has been rejected. Reason: ${comments || 'No reason provided'}`,
+        category: 'approval',
+        priority: 'high',
+        entityType: 'sales_order',
+        entityId: id
+      });
+      
+      await logAuditEvent(
+        user.id,
+        'REJECT',
+        'sales_order',
+        id,
+        `Rejected sales order: ${order.orderCode}. Reason: ${comments}`,
+        { status: 'waiting_approval' },
+        { status: 'draft' },
+        req
+      );
+      
+      res.json(updatedOrder);
+    } catch (error: any) {
+      console.error("Error rejecting sales order:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Create dispatch for sales order
+  app.post("/api/sales-orders/:id/dispatch", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const user = req.user as any;
+      const { items: dispatchItems, ...dispatchData } = req.body;
+      
+      const order = await storage.getSalesOrder(id);
+      if (!order) {
+        return res.status(404).json({ message: "Sales order not found" });
+      }
+      
+      if (order.status !== 'approved' && order.status !== 'partial_shipped') {
+        return res.status(400).json({ message: "Order must be approved before dispatching" });
+      }
+      
+      // Generate dispatch code
+      const dispatchCode = await storage.getNextDispatchCode();
+      
+      // Create dispatch record
+      const newDispatch = await storage.createSalesOrderDispatch({
+        dispatchCode,
+        salesOrderId: id,
+        dispatchedBy: user.id,
+        courierName: dispatchData.courierName,
+        trackingNumber: dispatchData.trackingNumber,
+        vehicleNumber: dispatchData.vehicleNumber,
+        driverName: dispatchData.driverName,
+        driverContact: dispatchData.driverContact,
+        notes: dispatchData.notes,
+        status: 'dispatched'
+      });
+      
+      // Process dispatch items
+      const orderItems = await storage.getSalesOrderItemsByOrder(id);
+      let allFullyDispatched = true;
+      
+      for (const dispatchItem of dispatchItems) {
+        const orderItem = orderItems.find(oi => oi.id === dispatchItem.salesOrderItemId);
+        if (!orderItem) continue;
+        
+        // Create outbound transaction for inventory deduction
+        const transactionResult = await db.insert(transactions).values({
+          itemId: orderItem.itemId,
+          warehouseId: order.warehouseId,
+          type: 'issue',
+          quantity: dispatchItem.quantity,
+          rate: orderItem.unitPrice,
+          reference: `SO-DISPATCH: ${order.orderCode}/${dispatchCode}`,
+          notes: `Dispatched for sales order ${order.orderCode}`,
+          createdBy: user.id
+        }).returning();
+        
+        // Update inventory
+        const currentInventory = await storage.getInventoryByItemAndWarehouse(orderItem.itemId, order.warehouseId);
+        if (currentInventory) {
+          const newQuantity = Math.max(0, currentInventory.quantity - dispatchItem.quantity);
+          await storage.updateInventory(currentInventory.id, { quantity: newQuantity });
+        }
+        
+        // Create dispatch item record
+        await storage.createDispatchItem({
+          dispatchId: newDispatch.id,
+          salesOrderItemId: orderItem.id,
+          itemId: orderItem.itemId,
+          quantity: dispatchItem.quantity,
+          transactionId: transactionResult[0].id,
+          notes: dispatchItem.notes
+        });
+        
+        // Update dispatched quantity on order item
+        const newDispatchedQty = (orderItem.dispatchedQuantity || 0) + dispatchItem.quantity;
+        await storage.updateSalesOrderItem(orderItem.id, {
+          dispatchedQuantity: newDispatchedQty
+        });
+        
+        // Check if fully dispatched
+        if (newDispatchedQty < orderItem.quantity) {
+          allFullyDispatched = false;
+        }
+      }
+      
+      // Check all order items for completion
+      const updatedOrderItems = await storage.getSalesOrderItemsByOrder(id);
+      const allItemsDispatched = updatedOrderItems.every(item => 
+        (item.dispatchedQuantity || 0) >= item.quantity
+      );
+      
+      // Update order status
+      const newStatus = allItemsDispatched ? 'closed' : 'partial_shipped';
+      await storage.updateSalesOrder(id, { status: newStatus });
+      
+      await logAuditEvent(
+        user.id,
+        'DISPATCH',
+        'sales_order',
+        id,
+        `Dispatched items for sales order: ${order.orderCode}. Dispatch code: ${dispatchCode}`,
+        { status: order.status },
+        { status: newStatus, dispatchCode },
+        req
+      );
+      
+      res.status(201).json(newDispatch);
+    } catch (error: any) {
+      console.error("Error creating dispatch:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Mark dispatch as delivered
+  app.post("/api/dispatches/:id/deliver", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const user = req.user as any;
+      
+      const dispatch = await storage.getSalesOrderDispatch(id);
+      if (!dispatch) {
+        return res.status(404).json({ message: "Dispatch not found" });
+      }
+      
+      const updatedDispatch = await storage.updateSalesOrderDispatch(id, {
+        status: 'delivered',
+        deliveredAt: new Date()
+      });
+      
+      await logAuditEvent(
+        user.id,
+        'DELIVER',
+        'dispatch',
+        id,
+        `Marked dispatch as delivered: ${dispatch.dispatchCode}`,
+        { status: 'dispatched' },
+        { status: 'delivered' },
+        req
+      );
+      
+      res.json(updatedDispatch);
+    } catch (error: any) {
+      console.error("Error marking dispatch as delivered:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Delete sales order (draft only)
+  app.delete("/api/sales-orders/:id", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const user = req.user as any;
+      
+      const order = await storage.getSalesOrder(id);
+      if (!order) {
+        return res.status(404).json({ message: "Sales order not found" });
+      }
+      
+      if (order.status !== 'draft' && user.role !== 'admin') {
+        return res.status(400).json({ message: "Only draft orders can be deleted" });
+      }
+      
+      const deleted = await storage.deleteSalesOrder(id);
+      
+      await logAuditEvent(
+        user.id,
+        'DELETE',
+        'sales_order',
+        id,
+        `Deleted sales order: ${order.orderCode}`,
+        order,
+        null,
+        req
+      );
+      
+      res.json({ success: deleted });
+    } catch (error: any) {
+      console.error("Error deleting sales order:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get inventory for specific warehouse (for sales order line item selection)
+  app.get("/api/warehouses/:id/available-inventory", requireAuth, async (req, res) => {
+    try {
+      const warehouseId = parseInt(req.params.id);
+      const warehouseInventory = await storage.getInventoryByWarehouse(warehouseId);
+      
+      // Enrich with item details
+      const enrichedInventory = await Promise.all(warehouseInventory.map(async (inv) => {
+        const item = await storage.getItem(inv.itemId);
+        return {
+          ...inv,
+          item
+        };
+      }));
+      
+      // Filter to only items with available quantity
+      const availableInventory = enrichedInventory.filter(inv => inv.quantity > 0);
+      
+      res.json(availableInventory);
+    } catch (error: any) {
+      console.error("Error fetching warehouse inventory:", error);
       res.status(500).json({ message: error.message });
     }
   });
