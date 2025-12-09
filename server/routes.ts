@@ -6223,7 +6223,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         storage.getOrganizationSettings(),
         storage.getUser(order.createdBy),
         storage.getSalesOrderItemsByOrder(id),
-        storage.getSalesOrderApprovals(id)
+        storage.getSalesOrderApprovalsByOrder(id)
       ]);
       
       if (!client) {
@@ -6296,7 +6296,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         storage.getOrganizationSettings(),
         storage.getUser(order.createdBy),
         storage.getSalesOrderItemsByOrder(id),
-        storage.getSalesOrderApprovals(id),
+        storage.getSalesOrderApprovalsByOrder(id),
         storage.getEmailSettings()
       ]);
       
