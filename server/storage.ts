@@ -1475,6 +1475,11 @@ export class DatabaseStorage implements IStorage {
       ));
   }
 
+  async getAllPendingSalesOrderApprovals(): Promise<SalesOrderApproval[]> {
+    return await db.select().from(salesOrderApprovals)
+      .where(eq(salesOrderApprovals.status, 'pending'));
+  }
+
   async createSalesOrderApproval(approval: InsertSalesOrderApproval): Promise<SalesOrderApproval> {
     const [newApproval] = await db.insert(salesOrderApprovals).values(approval).returning();
     return newApproval;

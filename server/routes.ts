@@ -2520,14 +2520,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get pending sales order approvals for the current user
+  // Get pending sales order approvals for the current user (or all for admins)
   app.get("/api/pending-sales-order-approvals", async (req, res) => {
     try {
       if (!req.user) {
         return res.status(401).json({ message: "Not authenticated" });
       }
       
-      const pendingApprovals = await storage.getPendingSalesOrderApprovals(req.user.id);
+      // Admins can see all pending approvals, others only see their own
+      const user = req.user as any;
+      const pendingApprovals = user.role === 'admin' 
+        ? await storage.getAllPendingSalesOrderApprovals()
+        : await storage.getPendingSalesOrderApprovals(req.user.id);
       
       // Enrich with sales order and client details
       const enrichedApprovals = await Promise.all(pendingApprovals.map(async approval => {
@@ -2578,8 +2582,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Approval not found" });
       }
       
-      // Check if this user is the assigned approver
-      if (approval.approverId !== user.id) {
+      // Check if this user is the assigned approver or an admin
+      if (approval.approverId !== user.id && user.role !== 'admin') {
         return res.status(403).json({ message: "You are not authorized to approve this sales order" });
       }
       
@@ -2631,8 +2635,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Approval not found" });
       }
       
-      // Check if this user is the assigned approver
-      if (approval.approverId !== user.id) {
+      // Check if this user is the assigned approver or an admin
+      if (approval.approverId !== user.id && user.role !== 'admin') {
         return res.status(403).json({ message: "You are not authorized to reject this sales order" });
       }
       
