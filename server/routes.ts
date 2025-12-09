@@ -2520,6 +2520,153 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get pending sales order approvals for the current user
+  app.get("/api/pending-sales-order-approvals", async (req, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      const pendingApprovals = await storage.getPendingSalesOrderApprovals(req.user.id);
+      
+      // Enrich with sales order and client details
+      const enrichedApprovals = await Promise.all(pendingApprovals.map(async approval => {
+        const salesOrder = await storage.getSalesOrder(approval.salesOrderId);
+        if (!salesOrder) return null;
+        
+        const [client, warehouse, creator, orderItems] = await Promise.all([
+          storage.getClient(salesOrder.clientId),
+          storage.getWarehouse(salesOrder.warehouseId),
+          storage.getUser(salesOrder.createdBy),
+          storage.getSalesOrderItemsByOrder(salesOrder.id)
+        ]);
+        
+        // Calculate total
+        let totalAmount = 0;
+        orderItems.forEach(item => {
+          totalAmount += parseFloat(item.lineTotal || '0');
+        });
+        
+        return {
+          ...approval,
+          salesOrder: {
+            ...salesOrder,
+            client: client ? { id: client.id, companyName: client.companyName, contactPerson: client.contactPerson } : null,
+            warehouse: warehouse ? { id: warehouse.id, name: warehouse.name } : null,
+            creator: creator ? { id: creator.id, name: creator.name } : null,
+            itemCount: orderItems.length,
+            totalAmount: totalAmount.toFixed(2)
+          }
+        };
+      }));
+      
+      res.json(enrichedApprovals.filter(Boolean));
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Approve a sales order approval
+  app.patch("/api/sales-order-approvals/:id/approve", requireAuth, async (req, res) => {
+    try {
+      const approvalId = parseInt(req.params.id);
+      const user = req.user as any;
+      const { comments } = req.body;
+      
+      const approval = await storage.getSalesOrderApproval(approvalId);
+      if (!approval) {
+        return res.status(404).json({ message: "Approval not found" });
+      }
+      
+      // Check if this user is the assigned approver
+      if (approval.approverId !== user.id) {
+        return res.status(403).json({ message: "You are not authorized to approve this sales order" });
+      }
+      
+      // Update the approval
+      const updatedApproval = await storage.updateSalesOrderApproval(approvalId, {
+        status: 'approved',
+        comments,
+        approvedAt: new Date()
+      });
+      
+      // Check if all approvals are complete and update sales order status
+      const salesOrder = await storage.getSalesOrder(approval.salesOrderId);
+      if (salesOrder) {
+        const allApprovals = await storage.getSalesOrderApprovalsByOrder(approval.salesOrderId);
+        const allApproved = allApprovals.every(app => app.status === 'approved');
+        
+        if (allApproved) {
+          await storage.updateSalesOrder(approval.salesOrderId, { status: 'approved' });
+        }
+      }
+      
+      await logAuditEvent(
+        user.id,
+        'APPROVE',
+        'sales_order_approval',
+        approvalId,
+        `Approved sales order ${salesOrder?.orderCode}`,
+        { status: 'pending' },
+        { status: 'approved' },
+        req
+      );
+      
+      res.json(updatedApproval);
+    } catch (error: any) {
+      console.error("Error approving sales order:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Reject a sales order approval
+  app.patch("/api/sales-order-approvals/:id/reject", requireAuth, async (req, res) => {
+    try {
+      const approvalId = parseInt(req.params.id);
+      const user = req.user as any;
+      const { comments } = req.body;
+      
+      const approval = await storage.getSalesOrderApproval(approvalId);
+      if (!approval) {
+        return res.status(404).json({ message: "Approval not found" });
+      }
+      
+      // Check if this user is the assigned approver
+      if (approval.approverId !== user.id) {
+        return res.status(403).json({ message: "You are not authorized to reject this sales order" });
+      }
+      
+      // Update the approval
+      const updatedApproval = await storage.updateSalesOrderApproval(approvalId, {
+        status: 'rejected',
+        comments,
+        approvedAt: new Date()
+      });
+      
+      // Update the sales order status to rejected
+      const salesOrder = await storage.getSalesOrder(approval.salesOrderId);
+      if (salesOrder) {
+        await storage.updateSalesOrder(approval.salesOrderId, { status: 'rejected' });
+      }
+      
+      await logAuditEvent(
+        user.id,
+        'REJECT',
+        'sales_order_approval',
+        approvalId,
+        `Rejected sales order ${salesOrder?.orderCode}`,
+        { status: 'pending' },
+        { status: 'rejected' },
+        req
+      );
+      
+      res.json(updatedApproval);
+    } catch (error: any) {
+      console.error("Error rejecting sales order:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.post("/api/request-approvals/:id/approve", async (req, res) => {
     try {
       if (!req.user) {
