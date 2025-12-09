@@ -1186,19 +1186,36 @@ export class DatabaseStorage implements IStorage {
     return true;
   }
 
-  async approveDisposal(transferId: number, userId: number): Promise<boolean> {
-    await this.updateTransfer(transferId, { status: 'disposal_approved', approvedBy: userId });
-    return true;
+  async approveDisposal(transferId: number, disposalReason: string, userId: number): Promise<any> {
+    const updatedTransfer = await this.updateTransfer(transferId, { 
+      status: 'disposed', 
+      disposalReason,
+      disposalDate: new Date(),
+      approvedBy: userId,
+      updatedAt: new Date()
+    });
+    return updatedTransfer;
   }
 
-  async recordReturnShipment(transferId: number, data: any): Promise<boolean> {
-    await this.updateTransfer(transferId, { status: 'return_shipped', ...data });
-    return true;
+  async recordReturnShipment(transferId: number, courierName: string, trackingNumber: string, userId: number): Promise<any> {
+    const updatedTransfer = await this.updateTransfer(transferId, { 
+      status: 'return_shipped',
+      returnCourierName: courierName,
+      returnTrackingNumber: trackingNumber,
+      returnShippedDate: new Date(),
+      updatedAt: new Date()
+    });
+    return updatedTransfer;
   }
 
-  async recordReturnDelivery(transferId: number, data: any): Promise<boolean> {
-    await this.updateTransfer(transferId, { status: 'return_delivered', ...data });
-    return true;
+  async recordReturnDelivery(transferId: number, userId: number): Promise<any> {
+    const updatedTransfer = await this.updateTransfer(transferId, { 
+      status: 'returned',
+      returnDeliveredDate: new Date(),
+      receivedBy: userId,
+      updatedAt: new Date()
+    });
+    return updatedTransfer;
   }
 
   // Issues operations

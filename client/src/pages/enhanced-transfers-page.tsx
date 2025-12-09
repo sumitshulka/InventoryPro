@@ -213,6 +213,18 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>;
 
+const approvalSchema = z.object({
+  receiptNumber: z.string().optional(),
+  trackingNumber: z.string().optional(),
+  courierName: z.string().optional(),
+  expectedShipmentDate: z.string().optional(),
+  expectedArrivalDate: z.string().optional(),
+  actualShipmentDate: z.string().optional(),
+  handoverPersonName: z.string().optional(),
+  handoverPersonContact: z.string().optional(),
+  notes: z.string().optional(),
+});
+
 const receiptSchema = z.object({
   receiptNumber: z.string().min(1, "Receipt number is required"),
   handoverDate: z.string().min(1, "Handover date is required"),
@@ -238,6 +250,7 @@ const acceptanceSchema = z.object({
   })),
 });
 
+type ApprovalFormValues = z.infer<typeof approvalSchema>;
 type ReceiptFormValues = z.infer<typeof receiptSchema>;
 type AcceptanceFormValues = z.infer<typeof acceptanceSchema>;
 type ReturnShippedFormValues=z.infer<typeof returnShippedSchema>;
@@ -246,6 +259,7 @@ export default function EnhancedTransfersPage() {
   const { toast } = useToast();
   const { user } = useAuth();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [approvalDialogOpen, setApprovalDialogOpen] = useState(false);
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
   const [receiptDialogOpen, setReceiptDialogOpen] = useState(false);
   const [returnShippedDialogOpen,setReturnShippedDialogOpen]= useState(false);
@@ -322,6 +336,21 @@ export default function EnhancedTransfersPage() {
     },
   });
 
+
+  const approvalForm = useForm<ApprovalFormValues>({
+    resolver: zodResolver(approvalSchema),
+    defaultValues: {
+      receiptNumber: "",
+      trackingNumber: "",
+      courierName: "",
+      expectedShipmentDate: "",
+      expectedArrivalDate: "",
+      actualShipmentDate: "",
+      handoverPersonName: "",
+      handoverPersonContact: "",
+      notes: "",
+    },
+  });
 
   const acceptanceForm = useForm<AcceptanceFormValues>({
     resolver: zodResolver(acceptanceSchema),
@@ -610,6 +639,35 @@ export default function EnhancedTransfersPage() {
     return_shippmentForm.reset();
   };
 
+  const handleApprovalSubmit = (data: ApprovalFormValues) => {
+    if (!selectedTransfer) return;
+    
+    const approvalData: any = {
+      status: 'approved',
+      updateType: 'approval',
+      updateDescription: 'Transfer approved with transit details',
+    };
+
+    // Add all fields from the approval form
+    if (data.receiptNumber) approvalData.receiptNumber = data.receiptNumber;
+    if (data.trackingNumber) approvalData.trackingNumber = data.trackingNumber;
+    if (data.courierName) approvalData.courierName = data.courierName;
+    if (data.expectedShipmentDate) approvalData.expectedShipmentDate = new Date(data.expectedShipmentDate);
+    if (data.expectedArrivalDate) approvalData.expectedArrivalDate = new Date(data.expectedArrivalDate);
+    if (data.actualShipmentDate) approvalData.actualShipmentDate = new Date(data.actualShipmentDate);
+    if (data.handoverPersonName) approvalData.handoverPersonName = data.handoverPersonName;
+    if (data.handoverPersonContact) approvalData.handoverPersonContact = data.handoverPersonContact;
+    if (data.notes) approvalData.notes = data.notes;
+
+    updateTransferMutation.mutate({
+      id: selectedTransfer.id,
+      ...approvalData,
+    });
+    
+    setApprovalDialogOpen(false);
+    approvalForm.reset();
+  };
+
   const handleAcceptanceSubmit = (data: AcceptanceFormValues) => {
     console.log("✅ Form submitted with data:", data);
 
@@ -832,6 +890,7 @@ if (user?.role === "employee" && user?.isWarehouseOperator && user?.warehouseId)
                             <TableHead>Mode</TableHead>
                             <TableHead>Items</TableHead>
                             <TableHead>Status</TableHead>
+                            <TableHead>Created</TableHead>
                             <TableHead>Expected Shipment</TableHead>
                             <TableHead>Actions</TableHead>
                           </TableRow>
@@ -839,13 +898,13 @@ if (user?.role === "employee" && user?.isWarehouseOperator && user?.warehouseId)
                         <TableBody>
                           {transfersLoading ? (
                             <TableRow>
-                              <TableCell colSpan={8} className="text-center py-8">
+                              <TableCell colSpan={9} className="text-center py-8">
                                 <Loader2 className="h-6 w-6 animate-spin mx-auto" />
                               </TableCell>
                             </TableRow>
                           ) : paginatedTransfers.length === 0 ? (
                             <TableRow>
-                              <TableCell colSpan={8} className="text-center py-8 text-gray-500">
+                              <TableCell colSpan={9} className="text-center py-8 text-gray-500">
                                 No transfers found
                               </TableCell>
                             </TableRow>
@@ -880,6 +939,12 @@ if (user?.role === "employee" && user?.isWarehouseOperator && user?.warehouseId)
                             </TableCell>
                             <TableCell>
                               {getStatusBadge(transfer.status)}
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-1 text-sm">
+                                <Calendar className="w-3 h-3" />
+                                {formatDateTime(transfer.createdAt)}
+                              </div>
                             </TableCell>
                             <TableCell>
                               {transfer.expectedShipmentDate ? (
@@ -922,8 +987,11 @@ if (user?.role === "employee" && user?.isWarehouseOperator && user?.warehouseId)
                                       variant="ghost"
                                       size="sm"
                                       className="text-green-600"
-                                      onClick={() => handleUpdateStatus(transfer.id, "approved")}
-                                      title="Approve transfer"
+                                      onClick={() => {
+                                        setSelectedTransfer(transfer);
+                                        setApprovalDialogOpen(true);
+                                      }}
+                                      title="Approve transfer and enter transit details"
                                     >
                                       <CheckCircle className="h-4 w-4" />
                                     </Button>
@@ -2280,6 +2348,133 @@ if (user?.role === "employee" && user?.isWarehouseOperator && user?.warehouseId)
                 Close
               </Button>
             </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Approval Dialog */}
+        <Dialog open={approvalDialogOpen} onOpenChange={setApprovalDialogOpen}>
+          <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Approve Transfer & Enter Transit Details</DialogTitle>
+              <DialogDescription>
+                Approve transfer {selectedTransfer?.transferCode} and enter shipment information
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={approvalForm.handleSubmit(handleApprovalSubmit)} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="receiptNumber">Receipt Number</Label>
+                  <Input
+                    id="receiptNumber"
+                    {...approvalForm.register("receiptNumber")}
+                    placeholder="Enter receipt number"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="trackingNumber">Tracking Number</Label>
+                  <Input
+                    id="trackingNumber"
+                    {...approvalForm.register("trackingNumber")}
+                    placeholder="Enter tracking number"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="courierName">Courier Name</Label>
+                  <Input
+                    id="courierName"
+                    {...approvalForm.register("courierName")}
+                    placeholder="Enter courier name"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="expectedShipmentDate">Expected Shipment Date</Label>
+                  <Input
+                    id="expectedShipmentDate"
+                    type="datetime-local"
+                    {...approvalForm.register("expectedShipmentDate")}
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="expectedArrivalDate">Expected Arrival Date</Label>
+                  <Input
+                    id="expectedArrivalDate"
+                    type="datetime-local"
+                    {...approvalForm.register("expectedArrivalDate")}
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="actualShipmentDate">Actual Shipment Date</Label>
+                  <Input
+                    id="actualShipmentDate"
+                    type="datetime-local"
+                    {...approvalForm.register("actualShipmentDate")}
+                  />
+                </div>
+                
+                {selectedTransfer?.transferMode === 'handover' && (
+                  <>
+                    <div className="space-y-2">
+                      <Label htmlFor="handoverPersonName">Handover Person Name</Label>
+                      <Input
+                        id="handoverPersonName"
+                        {...approvalForm.register("handoverPersonName")}
+                        placeholder="Enter name"
+                      />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="handoverPersonContact">Handover Person Contact</Label>
+                      <Input
+                        id="handoverPersonContact"
+                        {...approvalForm.register("handoverPersonContact")}
+                        placeholder="Enter contact number"
+                      />
+                    </div>
+                  </>
+                )}
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="notes">Notes</Label>
+                <Textarea
+                  id="notes"
+                  {...approvalForm.register("notes")}
+                  placeholder="Enter any additional notes about the shipment..."
+                  rows={3}
+                />
+              </div>
+              
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setApprovalDialogOpen(false);
+                    approvalForm.reset();
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={updateTransferMutation.isPending}
+                >
+                  {updateTransferMutation.isPending ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Approving...
+                    </>
+                  ) : (
+                    "Approve Transfer"
+                  )}
+                </Button>
+              </DialogFooter>
+            </form>
           </DialogContent>
         </Dialog>
 
