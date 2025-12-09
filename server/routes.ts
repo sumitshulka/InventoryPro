@@ -6145,6 +6145,185 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Download sales order PDF
+  app.get("/api/sales-orders/:id/pdf", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      
+      const order = await storage.getSalesOrder(id);
+      if (!order) {
+        return res.status(404).json({ message: "Sales order not found" });
+      }
+      
+      const [client, warehouse, organization, creator, orderItems, approvals] = await Promise.all([
+        storage.getClient(order.clientId),
+        storage.getWarehouse(order.warehouseId),
+        storage.getOrganizationSettings(),
+        storage.getUser(order.createdBy),
+        storage.getSalesOrderItemsByOrder(id),
+        storage.getSalesOrderApprovals(id)
+      ]);
+      
+      if (!client) {
+        return res.status(404).json({ message: "Client not found" });
+      }
+      if (!warehouse) {
+        return res.status(404).json({ message: "Warehouse not found" });
+      }
+      
+      // Enrich items with product details
+      const enrichedItems = await Promise.all(orderItems.map(async (orderItem) => {
+        const item = await storage.getItem(orderItem.itemId);
+        return { ...orderItem, item };
+      }));
+      
+      // Enrich approvals with approver info
+      const enrichedApprovals = await Promise.all(approvals.map(async (approval) => {
+        const approver = await storage.getUser(approval.approverId);
+        return {
+          ...approval,
+          approver: approver ? { id: approver.id, name: approver.name } : null
+        };
+      }));
+      
+      // Generate PDF
+      const { generateSalesOrderPDF } = await import('./pdf/sales-order');
+      const pdfBuffer = await generateSalesOrderPDF({
+        order,
+        items: enrichedItems,
+        client,
+        warehouse,
+        organization: organization || {
+          organizationName: 'My Organization',
+          currency: 'USD',
+          currencySymbol: '$'
+        },
+        creator: creator ? { id: creator.id, name: creator.name } : null,
+        approvals: enrichedApprovals
+      });
+      
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="${order.orderCode}-sales-order.pdf"`);
+      res.setHeader('Content-Length', pdfBuffer.length);
+      res.send(pdfBuffer);
+    } catch (error: any) {
+      console.error("Error generating sales order PDF:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Email sales order PDF
+  app.post("/api/sales-orders/:id/pdf/email", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const user = req.user as any;
+      const { email, subject, message } = req.body;
+      
+      if (!email) {
+        return res.status(400).json({ message: "Email address is required" });
+      }
+      
+      const order = await storage.getSalesOrder(id);
+      if (!order) {
+        return res.status(404).json({ message: "Sales order not found" });
+      }
+      
+      const [client, warehouse, organization, creator, orderItems, approvals, emailSettings] = await Promise.all([
+        storage.getClient(order.clientId),
+        storage.getWarehouse(order.warehouseId),
+        storage.getOrganizationSettings(),
+        storage.getUser(order.createdBy),
+        storage.getSalesOrderItemsByOrder(id),
+        storage.getSalesOrderApprovals(id),
+        storage.getEmailSettings()
+      ]);
+      
+      if (!client) {
+        return res.status(404).json({ message: "Client not found" });
+      }
+      if (!warehouse) {
+        return res.status(404).json({ message: "Warehouse not found" });
+      }
+      if (!emailSettings) {
+        return res.status(400).json({ message: "Email settings not configured" });
+      }
+      
+      // Enrich items with product details
+      const enrichedItems = await Promise.all(orderItems.map(async (orderItem) => {
+        const item = await storage.getItem(orderItem.itemId);
+        return { ...orderItem, item };
+      }));
+      
+      // Enrich approvals with approver info
+      const enrichedApprovals = await Promise.all(approvals.map(async (approval) => {
+        const approver = await storage.getUser(approval.approverId);
+        return {
+          ...approval,
+          approver: approver ? { id: approver.id, name: approver.name } : null
+        };
+      }));
+      
+      // Generate PDF
+      const { generateSalesOrderPDF } = await import('./pdf/sales-order');
+      const pdfBuffer = await generateSalesOrderPDF({
+        order,
+        items: enrichedItems,
+        client,
+        warehouse,
+        organization: organization || {
+          organizationName: 'My Organization',
+          currency: 'USD',
+          currencySymbol: '$'
+        },
+        creator: creator ? { id: creator.id, name: creator.name } : null,
+        approvals: enrichedApprovals
+      });
+      
+      // Send email
+      const emailService = getEmailService() || initializeEmailService(emailSettings);
+      
+      const emailSubject = subject || `Sales Order ${order.orderCode}`;
+      const emailHtml = `
+        <p>Dear ${client.contactPerson || client.companyName},</p>
+        <p>${message || `Please find attached the sales order ${order.orderCode}.`}</p>
+        <p>Order Details:</p>
+        <ul>
+          <li>Order Number: ${order.orderCode}</li>
+          <li>Order Date: ${new Date(order.orderDate).toLocaleDateString()}</li>
+          <li>Status: ${order.status.toUpperCase().replace('_', ' ')}</li>
+        </ul>
+        <p>Best regards,<br>${organization?.organizationName || 'Our Team'}</p>
+      `;
+      
+      await emailService.sendEmail({
+        to: email,
+        subject: emailSubject,
+        html: emailHtml,
+        attachments: [{
+          filename: `${order.orderCode}-sales-order.pdf`,
+          content: pdfBuffer,
+          contentType: 'application/pdf'
+        }]
+      });
+      
+      await logAuditEvent(
+        user.id,
+        'EMAIL',
+        'sales_order',
+        id,
+        `Emailed sales order PDF to ${email}`,
+        null,
+        { email, subject: emailSubject },
+        req
+      );
+      
+      res.json({ success: true, message: `Sales order PDF sent to ${email}` });
+    } catch (error: any) {
+      console.error("Error emailing sales order PDF:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Download delivery challan PDF
   app.get("/api/dispatches/:id/delivery-challan", requireAuth, async (req, res) => {
     try {

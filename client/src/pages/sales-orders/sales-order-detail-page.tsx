@@ -309,6 +309,12 @@ export default function SalesOrderDetailPage() {
   const [downloadingChallan, setDownloadingChallan] = useState<number | null>(null);
   const [showProductPicker, setShowProductPicker] = useState(false);
   const [itemDetailsCache, setItemDetailsCache] = useState<Record<number, Item>>({});
+  const [downloadingOrderPDF, setDownloadingOrderPDF] = useState(false);
+  const [showOrderEmailDialog, setShowOrderEmailDialog] = useState(false);
+  const [orderEmailAddress, setOrderEmailAddress] = useState("");
+  const [orderEmailSubject, setOrderEmailSubject] = useState("");
+  const [orderEmailMessage, setOrderEmailMessage] = useState("");
+  const [sendingOrderEmail, setSendingOrderEmail] = useState(false);
 
   const canEdit = user?.role === "admin" || user?.role === "manager";
   const canApprove = user?.role === "admin" || user?.role === "manager";
@@ -669,6 +675,88 @@ export default function SalesOrderDetailPage() {
     setShowEmailDialog(true);
   };
 
+  const handleDownloadOrderPDF = async () => {
+    if (!orderId) return;
+    try {
+      setDownloadingOrderPDF(true);
+      const response = await fetch(`/api/sales-orders/${orderId}/pdf`, {
+        credentials: 'include',
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Failed to download PDF");
+      }
+      
+      const blob = await response.blob();
+      const contentDisposition = response.headers.get('Content-Disposition');
+      let filename = 'sales-order.pdf';
+      if (contentDisposition) {
+        const match = contentDisposition.match(/filename="(.+)"/);
+        if (match) filename = match[1];
+      }
+      
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+      
+      toast({
+        title: "Download complete",
+        description: "Sales order PDF has been downloaded.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Download failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setDownloadingOrderPDF(false);
+    }
+  };
+
+  const handleOpenOrderEmailDialog = () => {
+    setOrderEmailAddress(order?.client?.email || "");
+    setOrderEmailSubject(`Sales Order ${order?.orderCode || ""}`);
+    setOrderEmailMessage("");
+    setShowOrderEmailDialog(true);
+  };
+
+  const handleSendOrderEmail = async () => {
+    if (!orderId || !orderEmailAddress) return;
+    try {
+      setSendingOrderEmail(true);
+      const response = await apiRequest("POST", `/api/sales-orders/${orderId}/pdf/email`, {
+        email: orderEmailAddress,
+        subject: orderEmailSubject,
+        message: orderEmailMessage,
+      });
+      const data = await response.json();
+      
+      toast({
+        title: "Email sent",
+        description: data.message || "Sales order PDF has been emailed successfully.",
+      });
+      setShowOrderEmailDialog(false);
+      setOrderEmailAddress("");
+      setOrderEmailSubject("");
+      setOrderEmailMessage("");
+    } catch (error: any) {
+      toast({
+        title: "Error sending email",
+        description: error.message || "Failed to send email",
+        variant: "destructive",
+      });
+    } finally {
+      setSendingOrderEmail(false);
+    }
+  };
+
   const deleteMutation = useMutation({
     mutationFn: async () => {
       const res = await apiRequest("DELETE", `/api/sales-orders/${orderId}`);
@@ -881,6 +969,31 @@ export default function SalesOrderDetailPage() {
                 <Trash className="h-4 w-4 mr-2" />
                 Delete
               </Button>
+            )}
+            {!isNew && order && (
+              <>
+                <Button
+                  variant="outline"
+                  onClick={handleDownloadOrderPDF}
+                  disabled={downloadingOrderPDF}
+                  data-testid="button-download-order-pdf"
+                >
+                  {downloadingOrderPDF ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Download className="h-4 w-4 mr-2" />
+                  )}
+                  Download PDF
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={handleOpenOrderEmailDialog}
+                  data-testid="button-email-order-pdf"
+                >
+                  <Mail className="h-4 w-4 mr-2" />
+                  Email PDF
+                </Button>
+              </>
             )}
           </div>
         </div>
@@ -1755,6 +1868,65 @@ export default function SalesOrderDetailPage() {
                 </DialogFooter>
               </form>
             </Form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Email Sales Order PDF Dialog */}
+        <Dialog open={showOrderEmailDialog} onOpenChange={setShowOrderEmailDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Email Sales Order PDF</DialogTitle>
+              <DialogDescription>
+                Send the sales order as a PDF attachment to the specified email address.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="order-email">Email Address *</Label>
+                <Input
+                  id="order-email"
+                  type="email"
+                  placeholder="Enter recipient email"
+                  value={orderEmailAddress}
+                  onChange={(e) => setOrderEmailAddress(e.target.value)}
+                  data-testid="input-order-email"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="order-subject">Subject</Label>
+                <Input
+                  id="order-subject"
+                  placeholder="Email subject"
+                  value={orderEmailSubject}
+                  onChange={(e) => setOrderEmailSubject(e.target.value)}
+                  data-testid="input-order-subject"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="order-message">Message (Optional)</Label>
+                <Textarea
+                  id="order-message"
+                  placeholder="Add a personal message to the email"
+                  value={orderEmailMessage}
+                  onChange={(e) => setOrderEmailMessage(e.target.value)}
+                  data-testid="input-order-message"
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setShowOrderEmailDialog(false)}>
+                Cancel
+              </Button>
+              <Button
+                onClick={handleSendOrderEmail}
+                disabled={sendingOrderEmail || !orderEmailAddress}
+                data-testid="button-send-order-email"
+              >
+                {sendingOrderEmail && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                <Mail className="h-4 w-4 mr-2" />
+                Send Email
+              </Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
 
