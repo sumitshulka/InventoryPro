@@ -176,6 +176,10 @@ interface SalesOrderDetail {
   totalTaxBase?: string;
   totalAmountBase?: string;
   shippingAddress?: string;
+  shippingCity?: string;
+  shippingState?: string;
+  shippingZipCode?: string;
+  shippingCountry?: string;
   notes?: string;
   createdBy: number;
   createdAt: string;
@@ -362,17 +366,16 @@ export default function SalesOrderDetailPage() {
     if (order) {
       const clientId = order.clientId?.toString() || "";
       const warehouseId = order.warehouseId?.toString() || "";
-      const parsedAddress = parseShippingAddress(order.shippingAddress);
       
       form.reset({
         clientId,
         warehouseId,
         orderDate: order.orderDate ? format(new Date(order.orderDate), "yyyy-MM-dd") : "",
         clientPoReference: order.clientPoReference || "",
-        shippingAddressLine: parsedAddress.line,
-        shippingCity: parsedAddress.city,
-        shippingState: parsedAddress.state,
-        shippingCountry: parsedAddress.country,
+        shippingAddressLine: order.shippingAddress || "",
+        shippingCity: order.shippingCity || "",
+        shippingState: order.shippingState || "",
+        shippingCountry: order.shippingCountry || "",
         notes: order.notes || "",
         items: (order.items || []).map(item => ({
           itemId: item.itemId,
