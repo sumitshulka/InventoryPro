@@ -322,18 +322,20 @@ export default function SalesOrdersListPage() {
                           {(() => {
                             const orderCurrency = order.currencyCode || orgCurrency;
                             const orderCurrencySymbol = getCurrencySymbol(orderCurrency);
+                            const totalAmount = parseFloat(order.totalAmount || "0") || 0;
+                            const totalAmountBase = parseFloat(order.totalAmountBase || "0") || 0;
                             const showBase = order.currencyCode && order.currencyCode !== orgCurrency && order.totalAmountBase;
                             return (
                               <div>
                                 <div className="font-medium">
-                                  {orderCurrencySymbol}{parseFloat(order.totalAmount).toLocaleString("en-US", {
+                                  {orderCurrencySymbol}{totalAmount.toLocaleString("en-US", {
                                     minimumFractionDigits: 2,
                                     maximumFractionDigits: 2,
                                   })}
                                 </div>
                                 {showBase && (
                                   <div className="text-xs text-gray-400">
-                                    ({orgCurrencySymbol}{parseFloat(order.totalAmountBase!).toLocaleString("en-US", {
+                                    ({orgCurrencySymbol}{totalAmountBase.toLocaleString("en-US", {
                                       minimumFractionDigits: 2,
                                       maximumFractionDigits: 2,
                                     })} {orgCurrency})
