@@ -32,6 +32,7 @@ import DisposedInventoryReportPage from "@/pages/disposed-inventory-report-page"
 import AnalyticsReportPage from "@/pages/analytics-report-page";
 import ClientSalesOrderReportPage from "@/pages/client-sales-order-report-page";
 import ClientsPage from "@/pages/sales-orders/clients-page";
+import ClientDashboardPage from "@/pages/sales-orders/client-dashboard-page";
 import SalesOrdersListPage from "@/pages/sales-orders/sales-orders-list-page";
 import SalesOrderDetailPage from "@/pages/sales-orders/sales-order-detail-page";
 import { ProtectedRoute } from "./lib/protected-route";
@@ -79,6 +80,7 @@ function Router() {
           <ProtectedRoute path="/analytics" component={AnalyticsReportPage} />
           <ProtectedRoute path="/reports/client-sales-orders" component={ClientSalesOrderReportPage} />
           <ProtectedRoute path="/settings" component={SettingsPage} />
+          <ProtectedRoute path="/clients/:id" component={ClientDashboardPage} />
           <ProtectedRoute path="/clients" component={ClientsPage} />
           <ProtectedRoute path="/sales-orders" component={SalesOrdersListPage} />
           <ProtectedRoute path="/sales-orders/new" component={SalesOrderDetailPage} />

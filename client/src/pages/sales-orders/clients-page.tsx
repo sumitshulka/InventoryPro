@@ -53,7 +53,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { apiRequest, queryClient, invalidateRelatedQueries } from "@/lib/queryClient";
-import { Loader2, Plus, Edit, Trash, Building2, Phone, Mail, MapPin, Search, ToggleLeft, ToggleRight, Copy } from "lucide-react";
+import { Loader2, Plus, Edit, Trash, Building2, Phone, Mail, MapPin, Search, ToggleLeft, ToggleRight, Copy, Eye } from "lucide-react";
+import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { Client } from "@shared/schema";
@@ -100,6 +101,7 @@ type ClientFormValues = z.infer<typeof clientFormSchema>;
 export default function ClientsPage() {
   const { toast } = useToast();
   const { user } = useAuth();
+  const [, navigate] = useLocation();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [editClientId, setEditClientId] = useState<number | null>(null);
@@ -382,7 +384,7 @@ export default function ClientsPage() {
                       <TableHead>Phone</TableHead>
                       <TableHead>City</TableHead>
                       <TableHead>Status</TableHead>
-                      {canManage && <TableHead className="text-right">Actions</TableHead>}
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -440,29 +442,40 @@ export default function ClientsPage() {
                             )}
                           </div>
                         </TableCell>
-                        {canManage && (
-                          <TableCell className="text-right">
+                        <TableCell className="text-right">
                             <div className="flex justify-end gap-2">
                               <Button
                                 variant="ghost"
-                                size="icon"
-                                onClick={() => handleEdit(client)}
-                                data-testid={`button-edit-client-${client.id}`}
+                                size="sm"
+                                onClick={() => navigate(`/clients/${client.id}`)}
+                                data-testid={`button-view-client-${client.id}`}
                               >
-                                <Edit className="h-4 w-4" />
+                                <Eye className="h-4 w-4 mr-1" />
+                                View
                               </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleDeleteClick(client.id)}
-                                className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                                data-testid={`button-delete-client-${client.id}`}
-                              >
-                                <Trash className="h-4 w-4" />
-                              </Button>
+                              {canManage && (
+                                <>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => handleEdit(client)}
+                                    data-testid={`button-edit-client-${client.id}`}
+                                  >
+                                    <Edit className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => handleDeleteClick(client.id)}
+                                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                    data-testid={`button-delete-client-${client.id}`}
+                                  >
+                                    <Trash className="h-4 w-4" />
+                                  </Button>
+                                </>
+                              )}
                             </div>
                           </TableCell>
-                        )}
                       </TableRow>
                     ))}
                   </TableBody>

@@ -5405,6 +5405,68 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get client dashboard with sales orders and summary
+  app.get("/api/clients/:id/dashboard", requireAuth, async (req, res) => {
+    try {
+      const clientId = parseInt(req.params.id);
+      const client = await storage.getClient(clientId);
+      if (!client) {
+        return res.status(404).json({ message: "Client not found" });
+      }
+
+      // Get all sales orders for this client
+      const allOrders = await storage.getSalesOrders();
+      const clientOrders = allOrders.filter((o: any) => o.clientId === clientId);
+
+      // Calculate summary
+      const statusCounts: Record<string, number> = {
+        draft: 0,
+        waiting_approval: 0,
+        approved: 0,
+        partial_shipped: 0,
+        closed: 0,
+      };
+
+      let totalValue = 0;
+      let totalValueBase = 0;
+
+      clientOrders.forEach((order: any) => {
+        const status = order.status;
+        if (status in statusCounts) {
+          statusCounts[status]++;
+        } else {
+          statusCounts[status] = 1;
+        }
+        const grandTotal = parseFloat(order.grandTotal) || 0;
+        const grandTotalBase = order.grandTotalBase ? parseFloat(order.grandTotalBase) : grandTotal;
+        totalValue += grandTotal;
+        totalValueBase += grandTotalBase;
+      });
+
+      const summary = {
+        totalOrders: clientOrders.length,
+        totalValue,
+        totalValueBase,
+        avgOrderValue: clientOrders.length > 0 ? totalValueBase / clientOrders.length : 0,
+        statusCounts,
+      };
+
+      // Sort orders by date descending
+      const sortedOrders = clientOrders.sort((a: any, b: any) => 
+        new Date(b.orderDate).getTime() - new Date(a.orderDate).getTime()
+      );
+
+      res.json({
+        client,
+        salesOrders: sortedOrders,
+        summary,
+      });
+    } catch (error: any) {
+      console.error("Error fetching client dashboard:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Create new client
   app.post("/api/clients", requireAuth, async (req, res) => {
     try {
