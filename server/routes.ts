@@ -6266,13 +6266,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const transactionResult = await db.insert(transactions).values({
           transactionCode,
           itemId: orderItem.itemId,
-          warehouseId: order.warehouseId,
-          type: 'issue',
+          sourceWarehouseId: order.warehouseId,
+          transactionType: 'issue',
           quantity: dispatchItem.quantity,
           rate: orderItem.unitPrice,
-          reference: `SO-DISPATCH: ${order.orderCode}/${dispatchCode}`,
-          notes: `Dispatched for sales order ${order.orderCode}`,
-          createdBy: user.id
+          userId: user.id,
+          status: 'completed'
         }).returning();
         
         // Update inventory
