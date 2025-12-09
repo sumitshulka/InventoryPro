@@ -5415,7 +5415,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Get all sales orders for this client
-      const allOrders = await storage.getSalesOrders();
+      const allOrders = await storage.getAllSalesOrders();
       const clientOrders = allOrders.filter((o: any) => o.clientId === clientId);
 
       // Calculate summary
