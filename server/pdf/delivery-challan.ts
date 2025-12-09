@@ -233,30 +233,41 @@ export function generateDeliveryChallanPDF(data: ChallanData): Promise<Buffer> {
       colX += colWidths.unit;
       doc.text(String(totalQty), colX, rowY, { width: colWidths.qty, align: 'right' });
 
+      // Move to after the totals row
+      doc.y = rowY + 20;
+
       if (dispatch.notes) {
-        doc.y = rowY + 30;
-        doc.font('Helvetica-Bold').fontSize(10).text('Remarks:', 40, doc.y);
-        doc.font('Helvetica').fontSize(9).text(dispatch.notes, 40, doc.y + 12, { width: pageWidth });
+        doc.font('Helvetica-Bold').fontSize(10).text('Remarks:', 40);
+        doc.font('Helvetica').fontSize(9).text(dispatch.notes, 40, doc.y, { width: pageWidth });
+        doc.moveDown(1);
       }
 
-      const footerY = doc.page.height - 120;
-      doc.moveTo(40, footerY).lineTo(doc.page.width - 40, footerY).stroke();
+      // Check if we need a new page for footer (need ~120px for footer)
+      if (doc.y > doc.page.height - 140) {
+        doc.addPage();
+      }
+
+      // Draw footer below current content
+      doc.moveDown(2);
+      const footerStartY = doc.y;
+      
+      doc.moveTo(40, footerStartY).lineTo(doc.page.width - 40, footerStartY).stroke();
       
       doc.font('Helvetica').fontSize(8);
-      doc.text('1. Goods once dispatched cannot be returned without prior approval.', 40, footerY + 10);
-      doc.text('2. Please verify the contents upon receipt and report any discrepancies immediately.', 40, footerY + 20);
-      doc.text('3. This is a computer-generated document.', 40, footerY + 30);
+      doc.text('1. Goods once dispatched cannot be returned without prior approval.', 40, footerStartY + 10);
+      doc.text('2. Please verify the contents upon receipt and report any discrepancies immediately.', 40, footerStartY + 20);
+      doc.text('3. This is a computer-generated document.', 40, footerStartY + 30);
 
       doc.font('Helvetica-Bold').fontSize(9);
-      doc.text('Received By:', 40, footerY + 55);
-      doc.text('Authorized Signatory', 400, footerY + 55);
+      doc.text('Received By:', 40, footerStartY + 55);
+      doc.text('Authorized Signatory', 400, footerStartY + 55);
       
-      doc.moveTo(40, footerY + 75).lineTo(150, footerY + 75).stroke();
-      doc.moveTo(400, footerY + 75).lineTo(doc.page.width - 40, footerY + 75).stroke();
+      doc.moveTo(40, footerStartY + 75).lineTo(150, footerStartY + 75).stroke();
+      doc.moveTo(400, footerStartY + 75).lineTo(doc.page.width - 40, footerStartY + 75).stroke();
       
       doc.font('Helvetica').fontSize(8);
-      doc.text('(Signature & Date)', 55, footerY + 78);
-      doc.text('(Signature & Stamp)', 420, footerY + 78);
+      doc.text('(Signature & Date)', 55, footerStartY + 78);
+      doc.text('(Signature & Stamp)', 420, footerStartY + 78);
 
       doc.end();
     } catch (error) {
