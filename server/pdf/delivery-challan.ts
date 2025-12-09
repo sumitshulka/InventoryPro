@@ -47,6 +47,24 @@ export function generateDeliveryChallanPDF(data: ChallanData): Promise<Buffer> {
       const { dispatch, order, client, warehouse, organization } = data;
       const pageWidth = doc.page.width - 80;
 
+      // Add company logo if available
+      if (organization.logo) {
+        try {
+          let logoData = organization.logo;
+          if (logoData.includes('base64,')) {
+            logoData = logoData.split('base64,')[1];
+          }
+          const logoBuffer = Buffer.from(logoData, 'base64');
+          
+          const logoWidth = 80;
+          const logoX = (doc.page.width - logoWidth) / 2;
+          doc.image(logoBuffer, logoX, 40, { width: logoWidth });
+          doc.y = 130;
+        } catch (logoError) {
+          console.error('Error rendering logo in PDF:', logoError);
+        }
+      }
+
       doc.font('Helvetica-Bold').fontSize(20).text('DELIVERY CHALLAN', { align: 'center' });
       doc.moveDown(0.5);
       

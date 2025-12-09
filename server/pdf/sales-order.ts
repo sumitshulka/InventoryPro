@@ -117,6 +117,27 @@ export function generateSalesOrderPDF(data: SalesOrderPDFData): Promise<Buffer> 
       const currencyCode = order.currencyCode || organization.currency;
       const currencySymbol = getCurrencySymbol(currencyCode);
 
+      // Add company logo if available
+      if (organization.logo) {
+        try {
+          // Handle base64 logo data
+          let logoData = organization.logo;
+          if (logoData.includes('base64,')) {
+            logoData = logoData.split('base64,')[1];
+          }
+          const logoBuffer = Buffer.from(logoData, 'base64');
+          
+          // Center the logo at the top
+          const logoWidth = 80;
+          const logoX = (doc.page.width - logoWidth) / 2;
+          doc.image(logoBuffer, logoX, 40, { width: logoWidth });
+          doc.y = 130; // Move down after logo
+        } catch (logoError) {
+          console.error('Error rendering logo in PDF:', logoError);
+          // Continue without logo
+        }
+      }
+
       doc.font('Helvetica-Bold').fontSize(20).text('SALES ORDER', { align: 'center' });
       doc.moveDown(0.5);
       
