@@ -110,6 +110,24 @@ const getCurrencySymbol = (currencyCode: string | undefined | null): string => {
   return CURRENCY_SYMBOLS[currencyCode] || currencyCode + " ";
 };
 
+const formatAmount = (amount: string | number, currencyCode?: string): string => {
+  const numAmount = typeof amount === "string" ? parseFloat(amount) || 0 : amount;
+  
+  // Use Indian numbering system for INR
+  if (currencyCode === "INR") {
+    return numAmount.toLocaleString("en-IN", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+  }
+  
+  // Standard formatting for other currencies
+  return numAmount.toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+};
+
 interface EnrichedInventory {
   id: number;
   itemId: number;
@@ -174,7 +192,7 @@ interface SalesOrderDetail {
   conversionRate?: string;
   subtotalBase?: string;
   totalTaxBase?: string;
-  totalAmountBase?: string;
+  grandTotalBase?: string;
   shippingAddress?: string;
   shippingCity?: string;
   shippingState?: string;
@@ -1104,29 +1122,29 @@ export default function SalesOrderDetailPage() {
                           )}
                           <div className="grid grid-cols-3 gap-4 text-center">
                             <div>
-                              <div className="text-2xl font-bold">{orderCurrencySymbol}{totals.subtotal}</div>
+                              <div className="text-2xl font-bold">{orderCurrencySymbol}{formatAmount(totals.subtotal, orderCurrency)}</div>
                               <div className="text-sm text-gray-500">Subtotal</div>
                               {showConversion && order.subtotalBase && (
                                 <div className="text-xs text-gray-400 mt-1">
-                                  ({orgCurrencySymbol}{parseFloat(order.subtotalBase).toFixed(2)} {orgCurrency})
+                                  ({orgCurrencySymbol}{formatAmount(order.subtotalBase, orgCurrency)} {orgCurrency})
                                 </div>
                               )}
                             </div>
                             <div>
-                              <div className="text-2xl font-bold">{orderCurrencySymbol}{totals.taxAmount}</div>
+                              <div className="text-2xl font-bold">{orderCurrencySymbol}{formatAmount(totals.taxAmount, orderCurrency)}</div>
                               <div className="text-sm text-gray-500">Tax</div>
                               {showConversion && order.totalTaxBase && (
                                 <div className="text-xs text-gray-400 mt-1">
-                                  ({orgCurrencySymbol}{parseFloat(order.totalTaxBase).toFixed(2)} {orgCurrency})
+                                  ({orgCurrencySymbol}{formatAmount(order.totalTaxBase, orgCurrency)} {orgCurrency})
                                 </div>
                               )}
                             </div>
                             <div>
-                              <div className="text-2xl font-bold text-primary">{orderCurrencySymbol}{totals.totalAmount}</div>
+                              <div className="text-2xl font-bold text-primary">{orderCurrencySymbol}{formatAmount(totals.totalAmount, orderCurrency)}</div>
                               <div className="text-sm text-gray-500">Total</div>
-                              {showConversion && order.totalAmountBase && (
+                              {showConversion && order.grandTotalBase && (
                                 <div className="text-xs text-gray-400 mt-1">
-                                  ({orgCurrencySymbol}{parseFloat(order.totalAmountBase).toFixed(2)} {orgCurrency})
+                                  ({orgCurrencySymbol}{formatAmount(order.grandTotalBase, orgCurrency)} {orgCurrency})
                                 </div>
                               )}
                             </div>
