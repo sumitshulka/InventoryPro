@@ -45,11 +45,11 @@ interface EnrichedSalesOrder {
   status: string;
   orderDate: string;
   subtotal: string;
-  taxAmount: string;
-  totalAmount: string;
+  totalTax: string;
+  grandTotal: string;
   currencyCode?: string;
   conversionRate?: string;
-  totalAmountBase?: string;
+  grandTotalBase?: string;
   shippingAddress: string | null;
   notes: string | null;
   createdBy: number;
@@ -322,20 +322,20 @@ export default function SalesOrdersListPage() {
                           {(() => {
                             const orderCurrency = order.currencyCode || orgCurrency;
                             const orderCurrencySymbol = getCurrencySymbol(orderCurrency);
-                            const totalAmount = parseFloat(order.totalAmount || "0") || 0;
-                            const totalAmountBase = parseFloat(order.totalAmountBase || "0") || 0;
-                            const showBase = order.currencyCode && order.currencyCode !== orgCurrency && order.totalAmountBase;
+                            const grandTotal = parseFloat(order.grandTotal || "0") || 0;
+                            const grandTotalBase = parseFloat(order.grandTotalBase || "0") || 0;
+                            const showBase = order.currencyCode && order.currencyCode !== orgCurrency && order.grandTotalBase;
                             return (
                               <div>
                                 <div className="font-medium">
-                                  {orderCurrencySymbol}{totalAmount.toLocaleString("en-US", {
+                                  {orderCurrencySymbol}{grandTotal.toLocaleString("en-US", {
                                     minimumFractionDigits: 2,
                                     maximumFractionDigits: 2,
                                   })}
                                 </div>
                                 {showBase && (
                                   <div className="text-xs text-gray-400">
-                                    ({orgCurrencySymbol}{totalAmountBase.toLocaleString("en-US", {
+                                    ({orgCurrencySymbol}{grandTotalBase.toLocaleString("en-US", {
                                       minimumFractionDigits: 2,
                                       maximumFractionDigits: 2,
                                     })} {orgCurrency})
