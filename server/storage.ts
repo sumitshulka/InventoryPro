@@ -86,7 +86,8 @@ import {
   salesOrderItems,
   salesOrderApprovals,
   salesOrderDispatches,
-  salesOrderDispatchItems
+  salesOrderDispatchItems,
+  organizationSettings
 } from "@shared/schema";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
@@ -178,6 +179,9 @@ export interface IStorage {
   updateEmailSettings(id: number, settings: any): Promise<any>;
   markEmailSettingsAsVerified(id: number): Promise<any>;
   deleteEmailSettings(id: number): Promise<boolean>;
+
+  // Organization settings operations
+  getOrganizationSettings(): Promise<any>;
 
   // User operations extensions
   getUserById(id: number): Promise<any>;
@@ -1253,6 +1257,16 @@ export class DatabaseStorage implements IStorage {
     } catch (error) {
       console.error('Error deleting email settings:', error);
       return false;
+    }
+  }
+
+  async getOrganizationSettings(): Promise<any> {
+    try {
+      const [settings] = await db.select().from(organizationSettings).limit(1);
+      return settings;
+    } catch (error) {
+      console.error('Error fetching organization settings:', error);
+      return null;
     }
   }
 
