@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useToast } from "@/hooks/use-toast"; // check this path
+import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { formatDateTime } from "@/lib/utils";
 import {
   Select,
   SelectContent,
@@ -12,7 +13,6 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { format } from "date-fns";
 import { RefreshCw } from "lucide-react";
 import { DataTablePagination } from "@/components/ui/data-table-pagination";
 
@@ -33,9 +33,7 @@ export default function AuditTrailPage() {
     queryKey: ["/api/users"],
   });
 
-  const uniqueActions = [
-    ...new Set((auditLogs || []).map((log: any) => log.action)),
-  ];
+  const uniqueActions = [...new Set((auditLogs || []).map((log: any) => log.action))];
 
   const uniqueEntityTypes = [
     ...new Set(
@@ -45,13 +43,12 @@ export default function AuditTrailPage() {
     ),
   ];
 
-  // ------- FIXED FILTER LOGIC --------
+  // ---------------- FILTERING ----------------
   const filteredLogs = (auditLogs || []).filter((log: any) => {
-    // FIX: Fallback to empty string ("") to safely use .includes()
     const action = log.action || "";
     const details = log.details || "";
     const userName = log.user?.name || "";
-    
+
     const searchLower = searchTerm.toLowerCase();
 
     const matchesSearch =
@@ -61,8 +58,7 @@ export default function AuditTrailPage() {
       userName.toLowerCase().includes(searchLower);
 
     const matchesAction =
-      actionFilter === "all" ||
-      action.toLowerCase() === actionFilter.toLowerCase();
+      actionFilter === "all" || action.toLowerCase() === actionFilter.toLowerCase();
 
     const matchesUser =
       userFilter === "all" || log.userId?.toString() === userFilter;
@@ -74,9 +70,8 @@ export default function AuditTrailPage() {
     return matchesSearch && matchesAction && matchesUser && matchesEntity;
   });
 
-  // ------- FIXED BADGE LOGIC --------
+  // ---------------- BADGE COLORS ----------------
   const getActionBadgeColor = (action: string) => {
-    // FIX: Handle undefined/null action safely
     const a = (action || "").toLowerCase();
 
     if (a.includes("create")) return "bg-green-100 text-green-800";
@@ -89,6 +84,7 @@ export default function AuditTrailPage() {
     return "bg-gray-100 text-gray-800";
   };
 
+  // ---------------- LOADING ----------------
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -97,8 +93,7 @@ export default function AuditTrailPage() {
     );
   }
 
-  // NOTE: Ensure filteredLogs is sliced properly if DataTablePagination
-  // does not handle the slicing logic internally.
+  // ---------------- MAIN UI ----------------
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -110,16 +105,17 @@ export default function AuditTrailPage() {
         </div>
       </div>
 
+      {/* ---------------- FILTER CARD ---------------- */}
       <Card>
         <CardHeader>
           <CardTitle>Filters</CardTitle>
         </CardHeader>
+
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            {/* Search */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Search
-              </label>
+              <label className="block text-sm font-medium mb-2">Search</label>
               <Input
                 placeholder="Search actions, details, or users..."
                 value={searchTerm}
@@ -127,17 +123,17 @@ export default function AuditTrailPage() {
               />
             </div>
 
+            {/* Action */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Action Type
-              </label>
+              <label className="block text-sm font-medium mb-2">Action Type</label>
               <Select value={actionFilter} onValueChange={setActionFilter}>
                 <SelectTrigger>
                   <SelectValue placeholder="All Actions" />
                 </SelectTrigger>
+
                 <SelectContent>
                   <SelectItem value="all">All Actions</SelectItem>
-                  {uniqueActions.map((action: any) => (
+                  {uniqueActions.map((action) => (
                     <SelectItem key={action} value={action}>
                       {action?.charAt(0).toUpperCase() + action?.slice(1)}
                     </SelectItem>
@@ -146,14 +142,14 @@ export default function AuditTrailPage() {
               </Select>
             </div>
 
+            {/* User */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                User
-              </label>
+              <label className="block text-sm font-medium mb-2">User</label>
               <Select value={userFilter} onValueChange={setUserFilter}>
                 <SelectTrigger>
                   <SelectValue placeholder="All Users" />
                 </SelectTrigger>
+
                 <SelectContent>
                   <SelectItem value="all">All Users</SelectItem>
                   {users?.map((user: any) => (
@@ -165,17 +161,17 @@ export default function AuditTrailPage() {
               </Select>
             </div>
 
+            {/* Entity */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Entity Type
-              </label>
+              <label className="block text-sm font-medium mb-2">Entity Type</label>
               <Select value={entityFilter} onValueChange={setEntityFilter}>
                 <SelectTrigger>
                   <SelectValue placeholder="All Entity Types" />
                 </SelectTrigger>
+
                 <SelectContent>
                   <SelectItem value="all">All Entity Types</SelectItem>
-                  {uniqueEntityTypes.map((type: any) => (
+                  {uniqueEntityTypes.map((type) => (
                     <SelectItem key={type} value={type}>
                       {type.charAt(0).toUpperCase() + type.slice(1)}
                     </SelectItem>
@@ -187,6 +183,7 @@ export default function AuditTrailPage() {
         </CardContent>
       </Card>
 
+      {/* ---------------- AUDIT LOG LIST ---------------- */}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
@@ -196,9 +193,7 @@ export default function AuditTrailPage() {
               variant="outline"
               size="sm"
               onClick={async () => {
-                await queryClient.refetchQueries({
-                  queryKey: ["/api/audit-logs"],
-                });
+                await queryClient.refetchQueries({ queryKey: ["/api/audit-logs"] });
                 await queryClient.refetchQueries({ queryKey: ["/api/users"] });
 
                 toast({
@@ -225,16 +220,12 @@ export default function AuditTrailPage() {
                 ) : (
                   <div className="space-y-4">
                     {paginatedLogs.map((log: any) => (
-                      <div
-                        key={log.id}
-                        className="border rounded-lg p-4 hover:bg-gray-50"
-                      >
+                      <div key={log.id} className="border rounded-lg p-4 hover:bg-gray-50">
                         <div className="flex items-start justify-between">
                           <div className="flex-1">
+                            {/* Header Row */}
                             <div className="flex items-center gap-3 mb-2">
-                              <Badge
-                                className={getActionBadgeColor(log.action)}
-                              >
+                              <Badge className={getActionBadgeColor(log.action)}>
                                 {log.action?.toUpperCase()}
                               </Badge>
 
@@ -243,12 +234,7 @@ export default function AuditTrailPage() {
                               </span>
 
                               <span className="text-sm text-gray-500">
-                                {log.createdAt
-                                  ? format(
-                                      new Date(log.createdAt),
-                                      "MMM dd, yyyy HH:mm:ss"
-                                    )
-                                  : "Unknown time"}
+                                {formatDateTime(log.createdAt)}
                               </span>
                             </div>
 
@@ -256,28 +242,33 @@ export default function AuditTrailPage() {
                               {log.details || "No details available"}
                             </p>
 
-                            {/* Diff Viewer */}
+                            {/* --------- DIFF VIEWER (with auto-date formatting) --------- */}
                             {(log.oldValues || log.newValues) && (
                               <div className="mt-2 space-y-2">
                                 {(() => {
                                   try {
-                                    const oldValues = log.oldValues
-                                      ? JSON.parse(log.oldValues)
-                                      : {};
-                                    const newValues = log.newValues
-                                      ? JSON.parse(log.newValues)
-                                      : {};
+                                    const oldValues = log.oldValues ? JSON.parse(log.oldValues) : {};
+                                    const newValues = log.newValues ? JSON.parse(log.newValues) : {};
 
-                                    const changes = [];
+                                    // STRICT ISO DATE CHECK
+                                    const isoDateRegex =
+                                      /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/;
+
+                                    const isDateString = (value: any) =>
+                                      typeof value === "string" && isoDateRegex.test(value);
+
+                                    const changes: any[] = [];
 
                                     for (const key of Object.keys(newValues)) {
-                                      const oldVal = oldValues[key];
-                                      const newVal = newValues[key];
+                                      let oldVal = oldValues[key];
+                                      let newVal = newValues[key];
+
+                                      // 🔥 Apply formatting only for real ISO timestamps
+                                      if (isDateString(oldVal)) oldVal = formatDateTime(oldVal);
+                                      if (isDateString(newVal)) newVal = formatDateTime(newVal);
 
                                       const hasMeaningfulOld =
-                                        oldVal !== null &&
-                                        oldVal !== undefined &&
-                                        oldVal !== "";
+                                        oldVal !== null && oldVal !== undefined && oldVal !== "";
 
                                       if (!hasMeaningfulOld) {
                                         changes.push({
@@ -300,16 +291,12 @@ export default function AuditTrailPage() {
 
                                     return (
                                       <div className="text-sm">
-                                        <div className="font-medium text-gray-700 mb-1">
-                                          Changes:
-                                        </div>
+                                        <div className="font-medium text-gray-700 mb-1">Changes:</div>
                                         <ul className="list-disc list-inside space-y-1 text-gray-600">
                                           {changes.map((c, idx) => (
                                             <li key={idx}>
                                               <strong>{c.field}:</strong>{" "}
-                                              {c.showDirection
-                                                ? `${c.old} → ${c.new}`
-                                                : `${c.new}`}
+                                              {c.showDirection ? `${c.old} → ${c.new}` : `${c.new}`}
                                             </li>
                                           ))}
                                         </ul>
@@ -320,6 +307,7 @@ export default function AuditTrailPage() {
                                     return null;
                                   }
                                 })()}
+
                               </div>
                             )}
 

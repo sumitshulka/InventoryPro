@@ -6494,6 +6494,9 @@ app.get("/api/disposed-inventory", async (req: Request, res: Response) => {
               }
 
             }
+            else if (transaction.transactionType === 'disposal' && transaction.sourceWarehouseId === invItem.warehouseId){
+              inventoryAsOfDate -=transaction.quantity;
+            }
 
         }
 
@@ -6527,16 +6530,16 @@ app.get("/api/disposed-inventory", async (req: Request, res: Response) => {
       }
 
       // Log audit event
-      await logAuditEvent(
-        req.user.id,
-        'VIEW',
-        'report',
-        null,
-        `Generated inventory valuation report using ${valuationMethod} method`,
-        null,
-        null,
-        req
-      );
+      // await logAuditEvent(
+      //   req.user.id,
+      //   'VIEW',
+      //   'report',
+      //   null,
+      //   `Generated inventory valuation report using ${valuationMethod} method`,
+      //   null,
+      //   null,
+      //   req
+      // );
 
       res.json(valuationReport);
     } catch (error: any) {
@@ -7132,6 +7135,7 @@ app.get("/api/disposed-inventory", async (req: Request, res: Response) => {
       } = req.query;
       
       const targetDate = new Date(asOfDate + "T23:59:59");
+      console.log("Target date:", targetDate);
 
       // Get required data
       const allItems = await storage.getAllItems();
@@ -7142,6 +7146,9 @@ app.get("/api/disposed-inventory", async (req: Request, res: Response) => {
       const itemMap = new Map(allItems.map(i => [i.id, i]));
       const warehouseMap = new Map(allWarehouses.map(w => [w.id, w]));
       const categoryMap = new Map(allCategories.map(c => [c.id, c]));
+      console.log("All items:", allItems.length);
+      console.log("All warehouses:", allWarehouses.length);
+      console.log("All transactions:", allTransactions.length);
 
       // -----------------------------
       // 1️⃣ BUILD INVENTORY AS OF DATE
@@ -7150,7 +7157,7 @@ app.get("/api/disposed-inventory", async (req: Request, res: Response) => {
       const inventorySnapshot = new Map();
 
       // Helper function
-      function addQty(itemId, warehouseId, delta) {
+      const addQty= function (itemId:any, warehouseId:any, delta:any) {
         const key = `${itemId}-${warehouseId}`;
         const current = inventorySnapshot.get(key) || 0;
         inventorySnapshot.set(key, current + delta);
@@ -7159,6 +7166,7 @@ app.get("/api/disposed-inventory", async (req: Request, res: Response) => {
       const relevantTx = allTransactions.filter(
         tx => new Date(tx.createdAt) <= targetDate
       );
+      console.log("Relevant transactions:", relevantTx);
 
       for (const tx of relevantTx) {
         const src = tx.sourceWarehouseId;
@@ -7175,7 +7183,7 @@ app.get("/api/disposed-inventory", async (req: Request, res: Response) => {
         // ------------------------
         // CHECK-OUT
         // ------------------------
-        else if (tx.transactionType === "check-out") {
+        else if (tx.transactionType === "issue") {
           addQty(tx.itemId, src, -qty);
         }
 
@@ -7228,15 +7236,18 @@ app.get("/api/disposed-inventory", async (req: Request, res: Response) => {
             addQty(tx.itemId, src, -qty);
           }
 
-          else if (tx.status === "restocked") {
-            // Items returned to source warehouse
-            addQty(tx.itemId, src, qty);
-          }
+          // else if (tx.status === "restocked") {
+          //   // Items returned to source warehouse
+          //   addQty(tx.itemId, src, qty);
+          // }
 
           else if (tx.status === "disposed") {
             // Items destroyed after rejection
             addQty(tx.itemId, src, -qty);
           }
+        }
+        else if (tx.transactionType==='disposal'){
+          addQty(tx.itemId,src,-qty);
         }
       }
 
@@ -7249,6 +7260,8 @@ app.get("/api/disposed-inventory", async (req: Request, res: Response) => {
           quantity: qty
         };
       });
+      
+      console.log("Snapshot:", [...inventorySnapshot.entries()]);
 
       // -----------------------------------
       // 2️⃣ FILTER INVENTORY FOR LOW-STOCK
@@ -7266,7 +7279,12 @@ app.get("/api/disposed-inventory", async (req: Request, res: Response) => {
 
         return true;
       });
+      console.log("Inventory List:", inventoryList);
+      
+      console.log("Filtered Low Stock:", filteredInventory);
 
+      // -----------------------------------
+      // 3️⃣ BUILD RESPONSE OBJECT
       // -----------------------------------
       // 3️⃣ BUILD RESPONSE OBJECT
       // -----------------------------------
@@ -7281,14 +7299,46 @@ app.get("/api/disposed-inventory", async (req: Request, res: Response) => {
         if (inv.quantity <= 0 || stockPercentage <= 25) itemStatus = "critical";
         else if (stockPercentage <= 50) itemStatus = "low";
 
+        // -----------------------------------
+        // LAST RESTOCK DATE CALCULATION
+        // -----------------------------------
         const lastRestock = allTransactions
-          .filter(t => 
-            t.itemId === inv.itemId &&
-            t.destinationWarehouseId === inv.warehouseId &&
-            (t.transactionType === "check-in" || t.transactionType === "adjustment") &&
-            new Date(t.createdAt) <= targetDate
-          )
-          .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+          .filter(t => {
+            if (t.itemId !== inv.itemId) return false;
+
+            let effectiveDate = null;
+
+            // 1️⃣ Check-in → stock arrives at destination
+            if (t.transactionType === "check-in" &&
+                t.destinationWarehouseId === inv.warehouseId) {
+              effectiveDate = t.createdAt;
+            }
+
+            // 2️⃣ Transfer Completed → arrives at destination
+            else if (
+              t.transactionType === "transfer" &&
+              t.status === "completed" &&
+              t.destinationWarehouseId === inv.warehouseId
+            ) {
+              effectiveDate = t.completedAt || t.createdAt;
+            }
+
+            // 3️⃣ Transfer Restocked → returns to source
+            else if (
+              t.transactionType === "transfer" &&
+              t.status === "restocked" &&
+              t.sourceWarehouseId === inv.warehouseId
+            ) {
+              effectiveDate = t.completedAt || t.createdAt;
+            }
+
+            if (!effectiveDate) return false;
+            if (new Date(effectiveDate) > targetDate) return false;
+
+            t._restockDate = new Date(effectiveDate);
+            return true;
+          })
+          .sort((a, b) => b._restockDate - a._restockDate); // newest first
 
         return {
           itemId: inv.itemId,
@@ -7299,11 +7349,14 @@ app.get("/api/disposed-inventory", async (req: Request, res: Response) => {
           minStockLevel: item.minStockLevel,
           categoryName: category?.name,
           stockPercentage,
-          lastRestockDate: lastRestock[0]?.createdAt || null,
+          lastRestockDate: lastRestock[0]?._restockDate || null,
           status: itemStatus
         };
       });
 
+      // --------------------------------------------------
+      // FILTER BY STATUS (critical / low / warning)
+      // --------------------------------------------------
       const finalData = status 
         ? lowStockData.filter(i => i.status === status)
         : lowStockData;
@@ -7311,6 +7364,7 @@ app.get("/api/disposed-inventory", async (req: Request, res: Response) => {
       finalData.sort((a, b) => a.stockPercentage - b.stockPercentage);
 
       res.json(finalData);
+
 
     } catch (error) {
       console.error("Low stock report error:", error);

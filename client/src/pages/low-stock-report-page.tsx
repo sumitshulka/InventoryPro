@@ -7,8 +7,9 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Download, FileText, AlertTriangle, Package, MapPin } from "lucide-react";
+import { Loader2, Download, FileText, AlertTriangle, Package, MapPin,RefreshCw } from "lucide-react";
 import { format } from "date-fns";
+import { useToast } from "@/hooks/use-toast";
 
 interface LowStockItem {
   id: number;
@@ -68,6 +69,7 @@ export default function LowStockReportPage() {
     }
   });
 
+
   const handleFilterChange = (key: string, value: string) => {
     setFilters(prev => ({ ...prev, [key]: value }));
   };
@@ -121,6 +123,7 @@ export default function LowStockReportPage() {
     link.download = `low-stock-report-${filters.asOfDate}.csv`;
     link.click();
   };
+    const { toast } = useToast();
 
   const getStatusBadge = (status: string) => {
     const statusConfig = {
@@ -163,18 +166,31 @@ export default function LowStockReportPage() {
             </p>
           </div>
           <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={()=>{refetch()
+                toast({
+                  title: "Refreshed",
+                  description: "Low Stock Report has been refreshed",
+                });}
+              }
+            >
+              <RefreshCw className="h-4 w-4 " />
+            </Button>
             <Button 
               onClick={exportToCSV} 
-              variant="outline"
+              className="flex items-center gap-2"
               disabled={lowStockData.length === 0}
             >
               <Download className="mr-2 h-4 w-4" />
               Export CSV
             </Button>
-            <Button onClick={() => refetch()}>
+            {/* <Button onClick={() => refetch()}>
               <FileText className="mr-2 h-4 w-4" />
               Refresh Report
-            </Button>
+            </Button> */}
+            
           </div>
         </div>
 
