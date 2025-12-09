@@ -672,7 +672,7 @@ export default function SalesOrderDetailPage() {
         driverName: "",
         driverContact: "",
         notes: "",
-        items: order.items
+        items: (order.items || [])
           .filter(item => (item.quantity - (item.dispatchedQuantity || 0)) > 0)
           .map(item => ({
             salesOrderItemId: item.id!,
@@ -1186,7 +1186,7 @@ export default function SalesOrderDetailPage() {
                           {fields.map((field, index) => {
                             const cachedItem = itemDetailsCache[field.itemId];
                             const inventoryItem = availableInventory.find(i => i.itemId === field.itemId);
-                            const orderItem = order?.items.find(i => i.itemId === field.itemId);
+                            const orderItem = order?.items?.find(i => i.itemId === field.itemId);
                             const itemName = cachedItem?.name || inventoryItem?.item?.name || orderItem?.item?.name || `Item #${field.itemId}`;
                             const itemSku = cachedItem?.sku || inventoryItem?.item?.sku || orderItem?.item?.sku;
                             return (
@@ -1568,7 +1568,7 @@ export default function SalesOrderDetailPage() {
                     </TableHeader>
                     <TableBody>
                       {dispatchForm.watch("items")?.map((di, index) => {
-                        const orderItem = order?.items.find(i => i.id === di.salesOrderItemId);
+                        const orderItem = order?.items?.find(i => i.id === di.salesOrderItemId);
                         const remaining = orderItem ? orderItem.quantity - (orderItem.dispatchedQuantity || 0) : 0;
                         return (
                           <TableRow key={index}>
