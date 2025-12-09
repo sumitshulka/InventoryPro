@@ -6317,7 +6317,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Delete sales order (draft only)
+  // Delete sales order (before dispatch)
   app.delete("/api/sales-orders/:id", requireAuth, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
@@ -6328,8 +6328,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Sales order not found" });
       }
       
-      if (order.status !== 'draft' && user.role !== 'admin') {
-        return res.status(400).json({ message: "Only draft orders can be deleted" });
+      // Allow deletion for draft, waiting_approval, and approved statuses (before dispatch)
+      const deletableStatuses = ['draft', 'waiting_approval', 'approved'];
+      if (!deletableStatuses.includes(order.status)) {
+        return res.status(400).json({ message: "Cannot delete order after dispatch has started" });
       }
       
       const deleted = await storage.deleteSalesOrder(id);

@@ -811,16 +811,6 @@ export default function SalesOrderDetailPage() {
                     Submit for Approval
                   </Button>
                 )}
-                {!isNew && canEdit && (
-                  <Button
-                    variant="destructive"
-                    onClick={() => setDeleteDialogOpen(true)}
-                    data-testid="button-delete-order"
-                  >
-                    <Trash className="h-4 w-4 mr-2" />
-                    Delete
-                  </Button>
-                )}
               </>
             )}
             {isWaitingApproval && canApprove && (
@@ -847,6 +837,16 @@ export default function SalesOrderDetailPage() {
               <Button onClick={openDispatchDialog} data-testid="button-dispatch">
                 <Truck className="h-4 w-4 mr-2" />
                 Create Dispatch
+              </Button>
+            )}
+            {!isNew && (isDraft || isWaitingApproval || order?.status === "approved") && (
+              <Button
+                variant="destructive"
+                onClick={() => setDeleteDialogOpen(true)}
+                data-testid="button-delete-order"
+              >
+                <Trash className="h-4 w-4 mr-2" />
+                Delete
               </Button>
             )}
           </div>
