@@ -225,6 +225,7 @@ export interface IStorage {
   getSalesOrderApproval(id: number): Promise<SalesOrderApproval | undefined>;
   getSalesOrderApprovalsByOrder(orderId: number): Promise<SalesOrderApproval[]>;
   getPendingSalesOrderApprovals(approverId: number): Promise<SalesOrderApproval[]>;
+  getAllPendingSalesOrderApprovals(): Promise<SalesOrderApproval[]>;
   createSalesOrderApproval(approval: InsertSalesOrderApproval): Promise<SalesOrderApproval>;
   updateSalesOrderApproval(id: number, approvalData: Partial<InsertSalesOrderApproval>): Promise<SalesOrderApproval | undefined>;
 
