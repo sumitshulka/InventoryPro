@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
@@ -151,6 +151,40 @@ export default function ClientsPage() {
     form.setValue("shippingZipCode", billingValues.billingZipCode);
     form.setValue("shippingCountry", billingValues.billingCountry);
   };
+
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const editId = urlParams.get('editId');
+    if (editId && clients.length > 0) {
+      const clientToEdit = clients.find(c => c.id === parseInt(editId));
+      if (clientToEdit && canManage) {
+        setIsEditMode(true);
+        setEditClientId(clientToEdit.id);
+        form.reset({
+          companyName: clientToEdit.companyName,
+          contactPerson: clientToEdit.contactPerson,
+          email: clientToEdit.email,
+          phone: clientToEdit.phone,
+          billingAddress: clientToEdit.billingAddress,
+          billingCity: clientToEdit.billingCity,
+          billingState: clientToEdit.billingState,
+          billingZipCode: clientToEdit.billingZipCode,
+          billingCountry: clientToEdit.billingCountry,
+          shippingAddress: clientToEdit.shippingAddress,
+          shippingCity: clientToEdit.shippingCity,
+          shippingState: clientToEdit.shippingState,
+          shippingZipCode: clientToEdit.shippingZipCode,
+          shippingCountry: clientToEdit.shippingCountry,
+          taxId: clientToEdit.taxId || "",
+          paymentTerms: clientToEdit.paymentTerms || "Net 30",
+          currencyCode: clientToEdit.currencyCode || "",
+          notes: clientToEdit.notes || "",
+        });
+        setIsDialogOpen(true);
+        window.history.replaceState({}, '', '/clients');
+      }
+    }
+  }, [clients, canManage, form]);
 
   const createClientMutation = useMutation({
     mutationFn: async (data: ClientFormValues) => {

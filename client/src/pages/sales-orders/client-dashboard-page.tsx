@@ -246,114 +246,132 @@ export default function ClientDashboardPage() {
           </Card>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           <Card className="lg:col-span-1">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <User className="h-5 w-5" />
-                Client Details
-              </CardTitle>
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <User className="h-4 w-4" />
+                  Client Details
+                </CardTitle>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => navigate(`/clients?editId=${client.id}`)}
+                  data-testid="button-edit-client"
+                >
+                  <Edit className="h-3 w-3 mr-1" />
+                  Edit
+                </Button>
+              </div>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-3 pt-0">
               <div>
-                <p className="text-sm font-medium text-gray-500">Contact Person</p>
-                <p className="font-medium">{client.contactPerson}</p>
+                <p className="text-xs font-medium text-gray-500">Contact Person</p>
+                <p className="font-medium text-sm">{client.contactPerson}</p>
               </div>
               <div className="flex items-center gap-2">
-                <Mail className="h-4 w-4 text-gray-400" />
-                <a href={`mailto:${client.email}`} className="text-blue-600 hover:underline">
+                <Mail className="h-3 w-3 text-gray-400" />
+                <a href={`mailto:${client.email}`} className="text-blue-600 hover:underline text-sm">
                   {client.email}
                 </a>
               </div>
               <div className="flex items-center gap-2">
-                <Phone className="h-4 w-4 text-gray-400" />
-                <span>{client.phone}</span>
+                <Phone className="h-3 w-3 text-gray-400" />
+                <span className="text-sm">{client.phone}</span>
               </div>
               {client.taxId && (
                 <div>
-                  <p className="text-sm font-medium text-gray-500">Tax ID / GST</p>
-                  <p className="font-mono">{client.taxId}</p>
+                  <p className="text-xs font-medium text-gray-500">Tax ID / GST</p>
+                  <p className="font-mono text-sm">{client.taxId}</p>
                 </div>
               )}
-              {client.paymentTerms && (
-                <div className="flex items-center gap-2">
-                  <CreditCard className="h-4 w-4 text-gray-400" />
-                  <span>{client.paymentTerms}</span>
-                </div>
-              )}
-              {client.currencyCode && (
-                <div>
-                  <p className="text-sm font-medium text-gray-500">Preferred Currency</p>
-                  <p>{client.currencyCode}</p>
-                </div>
-              )}
-              <Separator />
-              <div>
-                <p className="text-sm font-medium text-gray-500 mb-2 flex items-center gap-2">
-                  <MapPin className="h-4 w-4" />
-                  Billing Address
-                </p>
-                <p className="text-sm">
-                  {client.billingAddress}<br />
-                  {client.billingCity}, {client.billingState} {client.billingZipCode}<br />
-                  {client.billingCountry}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm font-medium text-gray-500 mb-2 flex items-center gap-2">
-                  <Package className="h-4 w-4" />
-                  Shipping Address
-                </p>
-                <p className="text-sm">
-                  {client.shippingAddress}<br />
-                  {client.shippingCity}, {client.shippingState} {client.shippingZipCode}<br />
-                  {client.shippingCountry}
-                </p>
+              <div className="flex flex-wrap gap-3">
+                {client.paymentTerms && (
+                  <div className="flex items-center gap-1">
+                    <CreditCard className="h-3 w-3 text-gray-400" />
+                    <span className="text-sm">{client.paymentTerms}</span>
+                  </div>
+                )}
+                {client.currencyCode && (
+                  <div className="flex items-center gap-1">
+                    <DollarSign className="h-3 w-3 text-gray-400" />
+                    <span className="text-sm">{client.currencyCode}</span>
+                  </div>
+                )}
               </div>
               {client.notes && (
-                <>
-                  <Separator />
-                  <div>
-                    <p className="text-sm font-medium text-gray-500 mb-1">Notes</p>
-                    <p className="text-sm text-gray-600">{client.notes}</p>
-                  </div>
-                </>
+                <div className="pt-2 border-t">
+                  <p className="text-xs font-medium text-gray-500 mb-1">Notes</p>
+                  <p className="text-sm text-gray-600">{client.notes}</p>
+                </div>
               )}
             </CardContent>
           </Card>
 
           <Card className="lg:col-span-2">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-2">
-                  <FileText className="h-5 w-5" />
-                  Order Status Summary
-                </CardTitle>
-              </div>
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <FileText className="h-4 w-4" />
+                Order Status Summary
+              </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                <div className="p-3 rounded-lg bg-gray-50">
-                  <p className="text-sm text-gray-500">Draft</p>
-                  <p className="text-xl font-bold">{summary.statusCounts.draft || 0}</p>
+            <CardContent className="pt-0">
+              <div className="flex flex-wrap gap-3">
+                <div className="px-4 py-2 rounded-lg bg-gray-50 flex-1 min-w-[100px]">
+                  <p className="text-xs text-gray-500">Draft</p>
+                  <p className="text-lg font-bold">{summary.statusCounts.draft || 0}</p>
                 </div>
-                <div className="p-3 rounded-lg bg-yellow-50">
-                  <p className="text-sm text-yellow-700">Waiting Approval</p>
-                  <p className="text-xl font-bold text-yellow-700">{summary.statusCounts.waiting_approval || 0}</p>
+                <div className="px-4 py-2 rounded-lg bg-yellow-50 flex-1 min-w-[100px]">
+                  <p className="text-xs text-yellow-700">Waiting Approval</p>
+                  <p className="text-lg font-bold text-yellow-700">{summary.statusCounts.waiting_approval || 0}</p>
                 </div>
-                <div className="p-3 rounded-lg bg-blue-50">
-                  <p className="text-sm text-blue-700">Approved</p>
-                  <p className="text-xl font-bold text-blue-700">{summary.statusCounts.approved || 0}</p>
+                <div className="px-4 py-2 rounded-lg bg-blue-50 flex-1 min-w-[100px]">
+                  <p className="text-xs text-blue-700">Approved</p>
+                  <p className="text-lg font-bold text-blue-700">{summary.statusCounts.approved || 0}</p>
                 </div>
-                <div className="p-3 rounded-lg bg-purple-50">
-                  <p className="text-sm text-purple-700">Partially Shipped</p>
-                  <p className="text-xl font-bold text-purple-700">{summary.statusCounts.partial_shipped || 0}</p>
+                <div className="px-4 py-2 rounded-lg bg-purple-50 flex-1 min-w-[100px]">
+                  <p className="text-xs text-purple-700">Partial Shipped</p>
+                  <p className="text-lg font-bold text-purple-700">{summary.statusCounts.partial_shipped || 0}</p>
                 </div>
-                <div className="p-3 rounded-lg bg-green-50">
-                  <p className="text-sm text-green-700">Closed</p>
-                  <p className="text-xl font-bold text-green-700">{summary.statusCounts.closed || 0}</p>
+                <div className="px-4 py-2 rounded-lg bg-green-50 flex-1 min-w-[100px]">
+                  <p className="text-xs text-green-700">Closed</p>
+                  <p className="text-lg font-bold text-green-700">{summary.statusCounts.closed || 0}</p>
                 </div>
               </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <MapPin className="h-4 w-4" />
+                Billing Address
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <p className="text-sm">
+                {client.billingAddress}<br />
+                {client.billingCity}, {client.billingState} {client.billingZipCode}<br />
+                {client.billingCountry}
+              </p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Package className="h-4 w-4" />
+                Shipping Address
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <p className="text-sm">
+                {client.shippingAddress}<br />
+                {client.shippingCity}, {client.shippingState} {client.shippingZipCode}<br />
+                {client.shippingCountry}
+              </p>
             </CardContent>
           </Card>
         </div>
