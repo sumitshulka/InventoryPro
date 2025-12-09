@@ -745,7 +745,7 @@ export default function SalesOrderDetailPage() {
   const isDraft = !order || order.status === "draft";
   const isWaitingApproval = order?.status === "waiting_approval";
   const canDispatch = order?.status === "approved" || order?.status === "partial_shipped";
-  const hasRemainingItems = order?.items.some(item => (item.quantity - (item.dispatchedQuantity || 0)) > 0);
+  const hasRemainingItems = order?.items?.some(item => (item.quantity - (item.dispatchedQuantity || 0)) > 0);
 
   return (
     <AppLayout>
