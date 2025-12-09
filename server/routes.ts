@@ -5570,6 +5570,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get all sales orders for this client
       const allOrders = await storage.getAllSalesOrders();
       const clientOrders = allOrders.filter((o: any) => o.clientId === clientId);
+      
+      console.log("Client orders sample:", clientOrders.length > 0 ? JSON.stringify(clientOrders[0]) : "No orders");
 
       // Calculate summary
       const statusCounts: Record<string, number> = {
