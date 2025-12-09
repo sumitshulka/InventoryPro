@@ -2587,10 +2587,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "You are not authorized to approve this sales order" });
       }
       
-      // Update the approval
+      // Update the approval - record who actually approved
       const updatedApproval = await storage.updateSalesOrderApproval(approvalId, {
         status: 'approved',
         comments,
+        approvedById: user.id,
         approvedAt: new Date()
       });
       
@@ -2640,10 +2641,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "You are not authorized to reject this sales order" });
       }
       
-      // Update the approval
+      // Update the approval - record who actually rejected
       const updatedApproval = await storage.updateSalesOrderApproval(approvalId, {
         status: 'rejected',
         comments,
+        approvedById: user.id,
         approvedAt: new Date()
       });
       
@@ -5836,12 +5838,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         };
       }));
       
-      // Enrich approvals with approver info
+      // Enrich approvals with approver info and actual approver info
       const enrichedApprovals = await Promise.all(approvals.map(async (approval) => {
         const approver = await storage.getUser(approval.approverId);
+        const approvedBy = approval.approvedById ? await storage.getUser(approval.approvedById) : null;
         return {
           ...approval,
-          approver: approver ? { id: approver.id, name: approver.name } : null
+          approver: approver ? { id: approver.id, name: approver.name } : null,
+          approvedBy: approvedBy ? { id: approvedBy.id, name: approvedBy.name } : null
         };
       }));
       

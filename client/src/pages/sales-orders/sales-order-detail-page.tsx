@@ -170,11 +170,13 @@ interface Dispatch {
 interface Approval {
   id: number;
   approverId: number;
+  approvedById?: number;
   approvalLevel: string;
   status: string;
   comments?: string;
   approvedAt?: string;
   approver?: { id: number; name: string };
+  approvedBy?: { id: number; name: string };
 }
 
 interface SalesOrderDetail {
@@ -1473,7 +1475,16 @@ export default function SalesOrderDetailPage() {
                               )}
                               <div className="flex-1">
                                 <div className="flex items-center gap-2">
-                                  <span className="font-medium">{approval.approver?.name}</span>
+                                  <span className="font-medium">
+                                    {approval.status !== 'pending' && approval.approvedBy?.name 
+                                      ? approval.approvedBy.name 
+                                      : approval.approver?.name}
+                                  </span>
+                                  {approval.approvedBy && approval.approvedBy.id !== approval.approverId && (
+                                    <span className="text-xs text-gray-500">
+                                      (on behalf of {approval.approver?.name})
+                                    </span>
+                                  )}
                                   <Badge
                                     className={
                                       approval.status === "approved"

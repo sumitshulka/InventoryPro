@@ -962,6 +962,7 @@ export const salesOrderApprovals = pgTable("sales_order_approvals", {
   id: serial("id").primaryKey(),
   salesOrderId: integer("sales_order_id").notNull().references(() => salesOrders.id),
   approverId: integer("approver_id").notNull().references(() => users.id),
+  approvedById: integer("approved_by_id").references(() => users.id), // Who actually approved (may differ from approverId if admin approves)
   approvalLevel: text("approval_level").notNull(), // manager, admin
   status: text("status").notNull().default("pending"), // pending, approved, rejected
   comments: text("comments"),
