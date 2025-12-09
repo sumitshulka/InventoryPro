@@ -6259,8 +6259,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const orderItem = orderItems.find(oi => oi.id === dispatchItem.salesOrderItemId);
         if (!orderItem) continue;
         
+        // Generate transaction code
+        const transactionCode = `TRX-${(await storage.getAllTransactions()).length + 873}`;
+        
         // Create outbound transaction for inventory deduction
         const transactionResult = await db.insert(transactions).values({
+          transactionCode,
           itemId: orderItem.itemId,
           warehouseId: order.warehouseId,
           type: 'issue',
