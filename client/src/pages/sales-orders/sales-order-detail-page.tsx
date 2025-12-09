@@ -742,10 +742,17 @@ export default function SalesOrderDetailPage() {
   }
 
   const totals = calculateTotals();
-  const isDraft = !order || order.status === "draft";
-  const isWaitingApproval = order?.status === "waiting_approval";
-  const canDispatch = order?.status === "approved" || order?.status === "partial_shipped";
+  // Normalize status to lowercase for consistent comparisons
+  const orderStatus = order?.status?.toLowerCase() || "";
+  const isDraft = !order || orderStatus === "draft";
+  const isWaitingApproval = orderStatus === "waiting_approval";
+  const isApproved = orderStatus === "approved";
+  const canDispatch = orderStatus === "approved" || orderStatus === "partial_shipped";
   const hasRemainingItems = order?.items?.some(item => (item.quantity - (item.dispatchedQuantity || 0)) > 0);
+  // Can modify order (edit line items) until approval is complete
+  const canModify = !order || orderStatus === "draft" || orderStatus === "waiting_approval";
+  // Can delete before dispatch starts
+  const canDelete = !isNew && (isDraft || isWaitingApproval || isApproved);
 
   return (
     <AppLayout>
@@ -782,36 +789,34 @@ export default function SalesOrderDetailPage() {
             </div>
           </div>
           <div className="flex gap-2">
-            {isDraft && (
-              <>
-                <Button
-                  variant="outline"
-                  onClick={form.handleSubmit(onSubmit)}
-                  disabled={saveMutation.isPending}
-                  data-testid="button-save-order"
-                >
-                  {saveMutation.isPending ? (
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  ) : (
-                    <Save className="h-4 w-4 mr-2" />
-                  )}
-                  Save Draft
-                </Button>
-                {!isNew && (
-                  <Button
-                    onClick={() => submitMutation.mutate()}
-                    disabled={submitMutation.isPending || watchItems.length === 0}
-                    data-testid="button-submit-order"
-                  >
-                    {submitMutation.isPending ? (
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    ) : (
-                      <Send className="h-4 w-4 mr-2" />
-                    )}
-                    Submit for Approval
-                  </Button>
+            {canModify && (
+              <Button
+                variant="outline"
+                onClick={form.handleSubmit(onSubmit)}
+                disabled={saveMutation.isPending}
+                data-testid="button-save-order"
+              >
+                {saveMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Save className="h-4 w-4 mr-2" />
                 )}
-              </>
+                {isDraft ? "Save Draft" : "Save Changes"}
+              </Button>
+            )}
+            {isDraft && !isNew && (
+              <Button
+                onClick={() => submitMutation.mutate()}
+                disabled={submitMutation.isPending || watchItems.length === 0}
+                data-testid="button-submit-order"
+              >
+                {submitMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Send className="h-4 w-4 mr-2" />
+                )}
+                Submit for Approval
+              </Button>
             )}
             {isWaitingApproval && canApprove && (
               <>
@@ -839,7 +844,7 @@ export default function SalesOrderDetailPage() {
                 Create Dispatch
               </Button>
             )}
-            {!isNew && (isDraft || isWaitingApproval || order?.status === "approved") && (
+            {canDelete && (
               <Button
                 variant="destructive"
                 onClick={() => setDeleteDialogOpen(true)}
@@ -869,7 +874,7 @@ export default function SalesOrderDetailPage() {
                             <Select
                               value={field.value}
                               onValueChange={field.onChange}
-                              disabled={!isDraft}
+                              disabled={!canModify}
                             >
                               <FormControl>
                                 <SelectTrigger data-testid="select-client">
@@ -897,7 +902,7 @@ export default function SalesOrderDetailPage() {
                             <Select
                               value={field.value}
                               onValueChange={field.onChange}
-                              disabled={!isDraft}
+                              disabled={!canModify}
                             >
                               <FormControl>
                                 <SelectTrigger data-testid="select-warehouse">
@@ -923,7 +928,7 @@ export default function SalesOrderDetailPage() {
                           <FormItem>
                             <FormLabel>Order Date</FormLabel>
                             <FormControl>
-                              <Input type="date" {...field} disabled={!isDraft} data-testid="input-order-date" />
+                              <Input type="date" {...field} disabled={!canModify} data-testid="input-order-date" />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -939,7 +944,7 @@ export default function SalesOrderDetailPage() {
                               <Input 
                                 placeholder="Enter client's purchase order number"
                                 {...field}
-                                disabled={!isDraft}
+                                disabled={!canModify}
                                 data-testid="input-client-po-reference"
                               />
                             </FormControl>
@@ -965,7 +970,7 @@ export default function SalesOrderDetailPage() {
                               <Input
                                 placeholder="Street address, building, floor"
                                 {...field}
-                                disabled={!isDraft}
+                                disabled={!canModify}
                                 data-testid="input-shipping-address-line"
                               />
                             </FormControl>
@@ -984,7 +989,7 @@ export default function SalesOrderDetailPage() {
                                 <Input
                                   placeholder="City"
                                   {...field}
-                                  disabled={!isDraft}
+                                  disabled={!canModify}
                                   data-testid="input-shipping-city"
                                 />
                               </FormControl>
@@ -1002,7 +1007,7 @@ export default function SalesOrderDetailPage() {
                                 <Input
                                   placeholder="State/Province"
                                   {...field}
-                                  disabled={!isDraft}
+                                  disabled={!canModify}
                                   data-testid="input-shipping-state"
                                 />
                               </FormControl>
@@ -1021,7 +1026,7 @@ export default function SalesOrderDetailPage() {
                               <Input
                                 placeholder="Country"
                                 {...field}
-                                disabled={!isDraft}
+                                disabled={!canModify}
                                 data-testid="input-shipping-country"
                               />
                             </FormControl>
@@ -1039,7 +1044,7 @@ export default function SalesOrderDetailPage() {
                               <Textarea
                                 placeholder="Additional notes"
                                 {...field}
-                                disabled={!isDraft}
+                                disabled={!canModify}
                                 data-testid="input-notes"
                               />
                             </FormControl>
@@ -1132,7 +1137,7 @@ export default function SalesOrderDetailPage() {
                         {fields.length} item{fields.length !== 1 ? "s" : ""} in this order
                       </CardDescription>
                     </div>
-                    {isDraft && selectedWarehouseId && (
+                    {canModify && selectedWarehouseId && (
                       <Button
                         type="button"
                         onClick={() => setShowProductPicker(true)}
@@ -1148,7 +1153,7 @@ export default function SalesOrderDetailPage() {
                       <div className="text-center py-8 text-gray-500">
                         <Package className="h-10 w-10 mx-auto mb-3 text-gray-300" />
                         <p>No items added yet.</p>
-                        {selectedWarehouseId && isDraft ? (
+                        {selectedWarehouseId && canModify ? (
                           <Button
                             type="button"
                             variant="outline"
@@ -1174,7 +1179,7 @@ export default function SalesOrderDetailPage() {
                             <TableHead className="w-28">Tax Amount</TableHead>
                             <TableHead className="w-32">Line Total</TableHead>
                             {!isNew && <TableHead className="w-24">Dispatched</TableHead>}
-                            {isDraft && <TableHead className="w-16"></TableHead>}
+                            {canModify && <TableHead className="w-16"></TableHead>}
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -1212,7 +1217,7 @@ export default function SalesOrderDetailPage() {
                                         );
                                       }
                                     })}
-                                    disabled={!isDraft}
+                                    disabled={!canModify}
                                     className="w-20"
                                     data-testid={`input-quantity-${index}`}
                                   />
@@ -1231,7 +1236,7 @@ export default function SalesOrderDetailPage() {
                                         );
                                       }
                                     })}
-                                    disabled={!isDraft}
+                                    disabled={!canModify}
                                     className="w-28"
                                     data-testid={`input-price-${index}`}
                                   />
@@ -1250,7 +1255,7 @@ export default function SalesOrderDetailPage() {
                                         );
                                       }
                                     })}
-                                    disabled={!isDraft}
+                                    disabled={!canModify}
                                     className="w-20"
                                     data-testid={`input-tax-${index}`}
                                   />
@@ -1266,7 +1271,7 @@ export default function SalesOrderDetailPage() {
                                     {orderItem?.dispatchedQuantity || 0} / {orderItem?.quantity || watchItems[index]?.quantity}
                                   </TableCell>
                                 )}
-                                {isDraft && (
+                                {canModify && (
                                   <TableCell>
                                     <Button
                                       type="button"
