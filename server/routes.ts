@@ -5680,8 +5680,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const totalTaxBase = (totalTax / rate).toFixed(2);
       const grandTotalBase = (grandTotal / rate).toFixed(2);
       
-      // Create order
-      const newOrder = await storage.createSalesOrder({
+      // Parse date fields (they come as strings from frontend)
+      const parsedOrderData = {
         ...orderData,
         orderCode,
         currencyCode,
@@ -5690,8 +5690,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         totalTaxBase,
         grandTotalBase,
         status: 'draft',
-        createdBy: user.id
-      });
+        createdBy: user.id,
+        orderDate: orderData.orderDate ? new Date(orderData.orderDate) : new Date(),
+        expectedDeliveryDate: orderData.expectedDeliveryDate ? new Date(orderData.expectedDeliveryDate) : null
+      };
+      
+      // Create order
+      const newOrder = await storage.createSalesOrder(parsedOrderData);
       
       // Create order items
       if (orderItems && Array.isArray(orderItems)) {
