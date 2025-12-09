@@ -367,7 +367,7 @@ export default function SalesOrderDetailPage() {
         shippingState: parsedAddress.state,
         shippingCountry: parsedAddress.country,
         notes: order.notes || "",
-        items: order.items.map(item => ({
+        items: (order.items || []).map(item => ({
           itemId: item.itemId,
           quantity: item.quantity,
           unitPrice: item.unitPrice,
