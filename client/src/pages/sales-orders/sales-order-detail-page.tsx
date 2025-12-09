@@ -293,6 +293,13 @@ export default function SalesOrderDetailPage() {
 
   const { data: order, isLoading: orderLoading } = useQuery<SalesOrderDetail>({
     queryKey: ["/api/sales-orders", orderId],
+    queryFn: async () => {
+      const res = await fetch(`/api/sales-orders/${orderId}`, {
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to fetch order");
+      return res.json();
+    },
     enabled: !!orderId,
   });
 
