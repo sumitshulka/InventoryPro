@@ -346,10 +346,21 @@ export default function ClientDashboardPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <MapPin className="h-4 w-4" />
-                Billing Address
-              </CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <MapPin className="h-4 w-4" />
+                  Billing Address
+                </CardTitle>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7"
+                  onClick={() => navigate(`/clients?editId=${client.id}`)}
+                  data-testid="button-edit-billing-address"
+                >
+                  <Edit className="h-3 w-3" />
+                </Button>
+              </div>
             </CardHeader>
             <CardContent className="pt-0">
               <p className="text-sm">
@@ -361,10 +372,21 @@ export default function ClientDashboardPage() {
           </Card>
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Package className="h-4 w-4" />
-                Shipping Address
-              </CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Package className="h-4 w-4" />
+                  Shipping Address
+                </CardTitle>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7"
+                  onClick={() => navigate(`/clients?editId=${client.id}`)}
+                  data-testid="button-edit-shipping-address"
+                >
+                  <Edit className="h-3 w-3" />
+                </Button>
+              </div>
             </CardHeader>
             <CardContent className="pt-0">
               <p className="text-sm">
