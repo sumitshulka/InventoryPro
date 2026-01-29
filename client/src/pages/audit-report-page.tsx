@@ -79,7 +79,11 @@ export default function AuditReportPage() {
     enabled: !!selectedSessionId
   });
 
-  const filteredSessions = sessions.filter(session => {
+  const reportableSessions = sessions.filter(session => 
+    session.status === 'reconciliation' || session.status === 'completed'
+  );
+
+  const filteredSessions = reportableSessions.filter(session => {
     if (statusFilter === "all") return true;
     return session.status === statusFilter;
   });
@@ -196,11 +200,8 @@ export default function AuditReportPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Status</SelectItem>
-                    <SelectItem value="open">Open</SelectItem>
-                    <SelectItem value="in_progress">In Progress</SelectItem>
                     <SelectItem value="reconciliation">Reconciliation</SelectItem>
                     <SelectItem value="completed">Completed</SelectItem>
-                    <SelectItem value="cancelled">Cancelled</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -229,8 +230,8 @@ export default function AuditReportPage() {
               <div className="text-center py-4 text-muted-foreground">Loading sessions...</div>
             )}
             
-            {!sessionsLoading && sessions.length === 0 && (
-              <div className="text-center py-4 text-muted-foreground">No audit sessions found.</div>
+            {!sessionsLoading && reportableSessions.length === 0 && (
+              <div className="text-center py-4 text-muted-foreground">No audit sessions with Reconciliation or Completed status found. Reports are only available for audits that have reached reconciliation or completion.</div>
             )}
           </CardContent>
         </Card>
