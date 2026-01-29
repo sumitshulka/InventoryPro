@@ -14,7 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
-import { ArrowLeft, CheckCircle, Clock, Lock, Edit, AlertCircle, ShieldCheck, FileText, User } from "lucide-react";
+import { ArrowLeft, CheckCircle, Clock, Lock, Edit, ShieldCheck, FileText, User } from "lucide-react";
 
 interface Verification {
   id: number;
@@ -145,7 +145,7 @@ export default function AuditSpreadsheetPage() {
     setEditingItem(verification);
     setFormData({
       batchNumber: verification.batchNumber || "",
-      physicalQuantity: verification.physicalQuantity?.toString() || verification.systemQuantity.toString(),
+      physicalQuantity: verification.physicalQuantity?.toString() || "",
       notes: verification.notes || "",
       overrideNotes: ""
     });
@@ -156,7 +156,7 @@ export default function AuditSpreadsheetPage() {
     setEditingItem(verification);
     setFormData({
       batchNumber: verification.batchNumber || "",
-      physicalQuantity: verification.physicalQuantity?.toString() || verification.systemQuantity.toString(),
+      physicalQuantity: verification.physicalQuantity?.toString() || "",
       notes: verification.notes || "",
       overrideNotes: ""
     });
@@ -219,8 +219,7 @@ export default function AuditSpreadsheetPage() {
 
   const confirmedCount = verifications.filter(v => v.status === 'confirmed').length;
   const pendingCount = verifications.filter(v => v.status === 'pending').length;
-  const discrepancyCount = verifications.filter(v => v.discrepancy && v.discrepancy !== 0).length;
-
+  
   return (
     <AppLayout>
       <div className="p-6 space-y-6">
@@ -277,16 +276,7 @@ export default function AuditSpreadsheetPage() {
               <div className="text-2xl font-bold text-green-600">{confirmedCount}</div>
             </CardContent>
           </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Discrepancies</CardTitle>
-              <AlertCircle className="h-4 w-4 text-red-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-red-600">{discrepancyCount}</div>
-            </CardContent>
-          </Card>
-        </div>
+          </div>
 
         <Card>
           <CardHeader>
@@ -305,9 +295,7 @@ export default function AuditSpreadsheetPage() {
                     <TableHead>Item Code</TableHead>
                     <TableHead>Item Name</TableHead>
                     <TableHead>Batch Number</TableHead>
-                    <TableHead className="text-right">System Qty</TableHead>
                     <TableHead className="text-right">Physical Qty</TableHead>
-                    <TableHead className="text-right">Discrepancy</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Confirmed By</TableHead>
                     <TableHead>Actions</TableHead>
@@ -316,7 +304,7 @@ export default function AuditSpreadsheetPage() {
                 <TableBody>
                   {verifications.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                         No items to verify in this audit.
                       </TableCell>
                     </TableRow>
@@ -327,16 +315,8 @@ export default function AuditSpreadsheetPage() {
                         <TableCell className="font-mono text-sm">{verification.itemCode}</TableCell>
                         <TableCell>{verification.itemName}</TableCell>
                         <TableCell>{verification.batchNumber || '-'}</TableCell>
-                        <TableCell className="text-right">{verification.systemQuantity}</TableCell>
                         <TableCell className="text-right">
                           {verification.physicalQuantity !== null ? verification.physicalQuantity : '-'}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {verification.discrepancy !== null ? (
-                            <span className={verification.discrepancy === 0 ? 'text-green-600' : 'text-red-600 font-medium'}>
-                              {verification.discrepancy > 0 ? '+' : ''}{verification.discrepancy}
-                            </span>
-                          ) : '-'}
                         </TableCell>
                         <TableCell>
                           {verification.status === 'confirmed' ? (
@@ -425,15 +405,9 @@ export default function AuditSpreadsheetPage() {
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Item Code</Label>
-                  <Input value={editingItem?.itemCode || ''} disabled />
-                </div>
-                <div className="space-y-2">
-                  <Label>System Quantity</Label>
-                  <Input value={editingItem?.systemQuantity || ''} disabled />
-                </div>
+              <div className="space-y-2">
+                <Label>Item Code</Label>
+                <Input value={editingItem?.itemCode || ''} disabled />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="batchNumber">Batch Number</Label>
@@ -492,15 +466,9 @@ export default function AuditSpreadsheetPage() {
                   Batch: {editingItem?.batchNumber || 'N/A'}
                 </p>
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Item Code</Label>
-                  <Input value={editingItem?.itemCode || ''} disabled />
-                </div>
-                <div className="space-y-2">
-                  <Label>System Quantity</Label>
-                  <Input value={editingItem?.systemQuantity || ''} disabled />
-                </div>
+              <div className="space-y-2">
+                <Label>Item Code</Label>
+                <Input value={editingItem?.itemCode || ''} disabled />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="batchNumberOverride">Batch Number</Label>
