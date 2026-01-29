@@ -1098,12 +1098,14 @@ export const auditSessions = pgTable("audit_sessions", {
   id: serial("id").primaryKey(),
   auditCode: text("audit_code").notNull().unique(), // e.g., AUD-2025-001
   warehouseId: integer("warehouse_id").notNull().references(() => warehouses.id),
-  auditManagerId: integer("audit_manager_id").notNull().references(() => users.id),
+  auditManagerId: integer("audit_manager_id").references(() => users.id), // Can be null initially, assigned later
+  createdBy: integer("created_by").notNull().references(() => users.id), // Admin who created the audit
   title: text("title").notNull(),
   description: text("description"),
-  status: text("status").notNull().default("draft"), // draft, in_progress, pending_review, completed, cancelled
-  startDate: timestamp("start_date"),
-  endDate: timestamp("end_date"),
+  status: text("status").notNull().default("open"), // open, in_progress, completed, cancelled
+  startDate: timestamp("start_date").notNull(),
+  endDate: timestamp("end_date").notNull(),
+  freezeConfirmed: boolean("freeze_confirmed").notNull().default(false), // Admin confirmed warehouse freeze
   completedAt: timestamp("completed_at"),
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -1112,20 +1114,22 @@ export const auditSessions = pgTable("audit_sessions", {
   auditSessionsManagerIdx: index("audit_sessions_manager_idx").on(table.auditManagerId),
   auditSessionsStatusIdx: index("audit_sessions_status_idx").on(table.status),
   auditSessionsStartDateIdx: index("audit_sessions_start_date_idx").on(table.startDate),
+  auditSessionsCreatedByIdx: index("audit_sessions_created_by_idx").on(table.createdBy),
 }));
 
 export const insertAuditSessionSchema = createInsertSchema(auditSessions).omit({
   id: true,
   createdAt: true,
+  completedAt: true,
 }).extend({
   startDate: z.preprocess((arg) => {
     if (typeof arg === 'string' || arg instanceof Date) return new Date(arg);
     return arg;
-  }, z.date().optional()),
+  }, z.date()),
   endDate: z.preprocess((arg) => {
     if (typeof arg === 'string' || arg instanceof Date) return new Date(arg);
     return arg;
-  }, z.date().optional()),
+  }, z.date()),
 });
 
 export type AuditSession = typeof auditSessions.$inferSelect;
@@ -1136,26 +1140,38 @@ export const auditVerifications = pgTable("audit_verifications", {
   id: serial("id").primaryKey(),
   auditSessionId: integer("audit_session_id").notNull().references(() => auditSessions.id),
   itemId: integer("item_id").notNull().references(() => items.id),
+  batchNumber: text("batch_number"), // Batch number for the item
   systemQuantity: integer("system_quantity").notNull(), // Quantity in system at time of audit
   physicalQuantity: integer("physical_quantity"), // Actual counted quantity
   discrepancy: integer("discrepancy"), // Difference (physical - system)
-  status: text("status").notNull().default("pending"), // pending, verified, discrepancy, resolved
-  verifiedBy: integer("verified_by").references(() => users.id),
-  verifiedAt: timestamp("verified_at"),
+  status: text("status").notNull().default("pending"), // pending, confirmed, discrepancy
+  confirmedBy: integer("confirmed_by").references(() => users.id), // User who confirmed this record
+  confirmedAt: timestamp("confirmed_at"),
+  lockedBy: integer("locked_by").references(() => users.id), // User who locked/confirmed - only they can edit
+  lockedAt: timestamp("locked_at"),
+  overrideBy: integer("override_by").references(() => users.id), // Audit manager who overrode the lock
+  overrideAt: timestamp("override_at"),
+  overrideNotes: text("override_notes"), // Reason for override
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
   auditVerificationsSessionIdx: index("audit_verifications_session_idx").on(table.auditSessionId),
   auditVerificationsItemIdx: index("audit_verifications_item_idx").on(table.itemId),
   auditVerificationsStatusIdx: index("audit_verifications_status_idx").on(table.status),
-  auditVerificationsVerifiedByIdx: index("audit_verifications_verified_by_idx").on(table.verifiedBy),
+  auditVerificationsConfirmedByIdx: index("audit_verifications_confirmed_by_idx").on(table.confirmedBy),
+  auditVerificationsLockedByIdx: index("audit_verifications_locked_by_idx").on(table.lockedBy),
 }));
 
 export const insertAuditVerificationSchema = createInsertSchema(auditVerifications).omit({
   id: true,
   createdAt: true,
+  updatedAt: true,
+  confirmedAt: true,
+  lockedAt: true,
+  overrideAt: true,
 }).extend({
-  verifiedAt: z.preprocess((arg) => {
+  confirmedAt: z.preprocess((arg) => {
     if (typeof arg === 'string' || arg instanceof Date) return new Date(arg);
     return arg;
   }, z.date().optional()),
@@ -1163,6 +1179,32 @@ export const insertAuditVerificationSchema = createInsertSchema(auditVerificatio
 
 export type AuditVerification = typeof auditVerifications.$inferSelect;
 export type InsertAuditVerification = z.infer<typeof insertAuditVerificationSchema>;
+
+// Audit Action Logs - detailed logging of all audit actions for audit trail
+export const auditActionLogs = pgTable("audit_action_logs", {
+  id: serial("id").primaryKey(),
+  auditSessionId: integer("audit_session_id").notNull().references(() => auditSessions.id),
+  auditVerificationId: integer("audit_verification_id").references(() => auditVerifications.id),
+  actionType: text("action_type").notNull(), // create, confirm, edit, override, lock, unlock
+  performedBy: integer("performed_by").notNull().references(() => users.id),
+  performedAt: timestamp("performed_at").defaultNow().notNull(),
+  previousValues: text("previous_values"), // JSON string of previous values
+  newValues: text("new_values"), // JSON string of new values
+  notes: text("notes"),
+}, (table) => ({
+  auditActionLogsSessionIdx: index("audit_action_logs_session_idx").on(table.auditSessionId),
+  auditActionLogsVerificationIdx: index("audit_action_logs_verification_idx").on(table.auditVerificationId),
+  auditActionLogsPerformedByIdx: index("audit_action_logs_performed_by_idx").on(table.performedBy),
+  auditActionLogsTypeIdx: index("audit_action_logs_type_idx").on(table.actionType),
+}));
+
+export const insertAuditActionLogSchema = createInsertSchema(auditActionLogs).omit({
+  id: true,
+  performedAt: true,
+});
+
+export type AuditActionLog = typeof auditActionLogs.$inferSelect;
+export type InsertAuditActionLog = z.infer<typeof insertAuditActionLogSchema>;
 
 // Audit Reconciliations - records for resolving discrepancies
 export const auditReconciliations = pgTable("audit_reconciliations", {
