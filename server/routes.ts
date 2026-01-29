@@ -895,6 +895,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ==== Inventory Routes ====
+  
+  // Get warehouses currently under audit (for masking inventory values)
+  app.get("/api/warehouses/under-audit", async (req, res) => {
+    try {
+      const warehouseIds = await storage.getWarehousesUnderAudit();
+      res.json(warehouseIds);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Get all inventory
   app.get("/api/inventory", async (req, res) => {
     const inventory = await storage.getAllInventory();

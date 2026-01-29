@@ -80,6 +80,16 @@ export default function InventoryPage() {
     queryKey: ["/api/warehouses", refreshKey],
   });
 
+  // Fetch warehouses currently under audit (for masking values)
+  const { data: warehousesUnderAudit = [] } = useQuery<number[]>({
+    queryKey: ["/api/warehouses/under-audit"],
+  });
+
+  // Helper to check if a warehouse is under audit
+  const isWarehouseUnderAudit = (warehouseId: number) => {
+    return warehousesUnderAudit.includes(warehouseId);
+  };
+
   // Fetch movement history for selected item
   const { data: movementHistory, isLoading: movementLoading } = useQuery({
     queryKey: ["/api/reports/inventory-movement", refreshKey],
@@ -338,11 +348,34 @@ export default function InventoryPage() {
                         >
                           <TableCell className="font-medium">{inv.item.sku}</TableCell>
                           <TableCell>{inv.item.name}</TableCell>
-                          <TableCell>{inv.warehouse.name}</TableCell>
-                          <TableCell>{inv.quantity}</TableCell>
-                          <TableCell>{inv.item.minStockLevel}</TableCell>
                           <TableCell>
-                            {inv.isLowStock ? (
+                            {inv.warehouse.name}
+                            {isWarehouseUnderAudit(inv.warehouse.id) && (
+                              <span className="ml-2 px-2 py-0.5 bg-amber-100 text-amber-700 rounded text-xs font-medium">
+                                Under Audit
+                              </span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {isWarehouseUnderAudit(inv.warehouse.id) ? (
+                              <span className="text-gray-400 italic">***</span>
+                            ) : (
+                              inv.quantity
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {isWarehouseUnderAudit(inv.warehouse.id) ? (
+                              <span className="text-gray-400 italic">***</span>
+                            ) : (
+                              inv.item.minStockLevel
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {isWarehouseUnderAudit(inv.warehouse.id) ? (
+                              <span className="px-2 py-1 bg-amber-100 text-amber-700 rounded-full text-xs font-medium">
+                                Audit in Progress
+                              </span>
+                            ) : inv.isLowStock ? (
                               <span className="px-2 py-1 bg-red-100 text-red-800 rounded-full text-xs font-medium">
                                 Low Stock
                               </span>

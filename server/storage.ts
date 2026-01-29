@@ -1818,6 +1818,31 @@ export class DatabaseStorage implements IStorage {
     return false;
   }
 
+  async getWarehousesUnderAudit(): Promise<number[]> {
+    const now = new Date();
+    const sessions = await db.select().from(auditSessions)
+      .where(
+        or(
+          eq(auditSessions.status, 'open'),
+          eq(auditSessions.status, 'in_progress')
+        )
+      );
+    
+    const warehouseIds: Set<number> = new Set();
+    for (const session of sessions) {
+      if (session.startDate && session.endDate) {
+        const startDate = new Date(session.startDate);
+        const endDate = new Date(session.endDate);
+        startDate.setHours(0, 0, 0, 0);
+        endDate.setHours(23, 59, 59, 999);
+        if (now >= startDate && now <= endDate) {
+          warehouseIds.add(session.warehouseId);
+        }
+      }
+    }
+    return Array.from(warehouseIds);
+  }
+
   async getAuditSessionsForAuditManager(managerId: number): Promise<AuditSession[]> {
     // Get warehouses assigned to this audit manager
     const assignments = await this.getAuditManagerWarehouses(managerId);
