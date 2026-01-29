@@ -87,7 +87,7 @@ function Router() {
           <ProtectedRoute path="/sales-orders" component={SalesOrdersListPage} />
           <ProtectedRoute path="/sales-orders/new" component={SalesOrderDetailPage} />
           <ProtectedRoute path="/sales-orders/:id" component={SalesOrderDetailPage} />
-          <ProtectedRoute path="/audit-management" component={AuditManagementPage} />
+          <ProtectedRoute path="/audit-users" component={AuditManagementPage} />
           <ProtectedRoute path="/audit-dashboard" component={AuditDashboardPage} />
           <Route component={NotFound} />
         </Switch>

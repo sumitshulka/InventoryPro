@@ -486,10 +486,10 @@ export default function Sidebar({ user, isOpen, onClose }: SidebarProps) {
                     {user?.role === 'admin' && (
                       <li>
                         <Link 
-                          href="/audit-management"
+                          href="/audit-users"
                           className={cn(
                             "flex items-center px-3 py-2 rounded-md",
-                            isActive("/audit-management") 
+                            isActive("/audit-users") 
                               ? "bg-primary/10 border-l-4 border-primary text-primary" 
                               : "text-gray-700 hover:text-primary hover:bg-primary/5"
                           )}
