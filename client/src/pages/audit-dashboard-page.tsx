@@ -69,10 +69,7 @@ export default function AuditDashboardPage() {
 
   const addTeamMemberMutation = useMutation({
     mutationFn: async (data: { auditUserId: number; warehouseId: number }) => {
-      return await apiRequest("/api/audit/team", {
-        method: "POST",
-        body: JSON.stringify(data),
-      });
+      return await apiRequest("POST", "/api/audit/team", data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/audit/team'] });
@@ -89,9 +86,7 @@ export default function AuditDashboardPage() {
 
   const removeTeamMemberMutation = useMutation({
     mutationFn: async (memberId: number) => {
-      return await apiRequest(`/api/audit/team/${memberId}`, {
-        method: "DELETE",
-      });
+      return await apiRequest("DELETE", `/api/audit/team/${memberId}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/audit/team'] });

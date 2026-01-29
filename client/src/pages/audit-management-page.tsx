@@ -47,10 +47,7 @@ export default function AuditManagementPage() {
 
   const assignWarehouseMutation = useMutation({
     mutationFn: async (data: { managerId: number; warehouseId: number }) => {
-      return await apiRequest(`/api/audit/managers/${data.managerId}/warehouses`, {
-        method: "POST",
-        body: JSON.stringify({ warehouseId: data.warehouseId }),
-      });
+      return await apiRequest("POST", `/api/audit/managers/${data.managerId}/warehouses`, { warehouseId: data.warehouseId });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/audit/managers'] });
@@ -65,9 +62,7 @@ export default function AuditManagementPage() {
 
   const removeWarehouseMutation = useMutation({
     mutationFn: async (data: { managerId: number; warehouseId: number }) => {
-      return await apiRequest(`/api/audit/managers/${data.managerId}/warehouses/${data.warehouseId}`, {
-        method: "DELETE",
-      });
+      return await apiRequest("DELETE", `/api/audit/managers/${data.managerId}/warehouses/${data.warehouseId}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/audit/managers'] });
@@ -80,10 +75,7 @@ export default function AuditManagementPage() {
 
   const addTeamMemberMutation = useMutation({
     mutationFn: async (data: { auditUserId: number; auditManagerId: number; warehouseId: number }) => {
-      return await apiRequest("/api/audit/team", {
-        method: "POST",
-        body: JSON.stringify(data),
-      });
+      return await apiRequest("POST", "/api/audit/team", data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/audit/team'] });
