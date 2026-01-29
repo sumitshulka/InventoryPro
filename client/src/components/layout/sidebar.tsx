@@ -495,7 +495,7 @@ export default function Sidebar({ user, isOpen, onClose }: SidebarProps) {
                           )}
                         >
                           <span className="material-icons mr-3">verified_user</span>
-                          <span className="whitespace-nowrap">Audit Management</span>
+                          <span className="whitespace-nowrap">Audit Users</span>
                         </Link>
                       </li>
                     )}

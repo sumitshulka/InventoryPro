@@ -130,7 +130,7 @@ export default function AuditManagementPage() {
       <div className="p-8 space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold">Audit Management</h1>
+            <h1 className="text-3xl font-bold">Audit Users</h1>
           <p className="text-muted-foreground mt-1">
             Manage audit managers, audit users, and warehouse assignments
           </p>
