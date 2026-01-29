@@ -37,6 +37,8 @@ import SalesOrdersListPage from "@/pages/sales-orders/sales-orders-list-page";
 import SalesOrderDetailPage from "@/pages/sales-orders/sales-order-detail-page";
 import AuditManagementPage from "@/pages/audit-management-page";
 import AuditDashboardPage from "@/pages/audit-dashboard-page";
+import AuditSessionsPage from "@/pages/audit-sessions-page";
+import AuditSpreadsheetPage from "@/pages/audit-spreadsheet-page";
 import { ProtectedRoute } from "./lib/protected-route";
 
 function Router() {
@@ -89,6 +91,8 @@ function Router() {
           <ProtectedRoute path="/sales-orders/:id" component={SalesOrderDetailPage} />
           <ProtectedRoute path="/audit-users" component={AuditManagementPage} />
           <ProtectedRoute path="/audit-dashboard" component={AuditDashboardPage} />
+          <ProtectedRoute path="/audit-sessions" component={AuditSessionsPage} />
+          <ProtectedRoute path="/audit-spreadsheet/:id" component={AuditSpreadsheetPage} />
           <Route component={NotFound} />
         </Switch>
       </LicenseGuard>

@@ -7,6 +7,7 @@ import { requireValidLicense, checkUserLimit, checkProductLimit } from "./licens
 import { getEmailService } from "./email-service";
 import { z } from "zod";
 import { 
+  User,
   insertItemSchema, 
   insertWarehouseSchema, 
   insertCategorySchema, 

@@ -10,7 +10,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Trash2, Building2, Users, ClipboardCheck, ShieldCheck, UserPlus, Warehouse } from "lucide-react";
+import { Plus, Trash2, Building2, Users, ClipboardCheck, ShieldCheck, UserPlus, Warehouse, FileText, Clock, CheckCircle, ArrowRight } from "lucide-react";
+import { useLocation } from "wouter";
+import { format } from "date-fns";
 import type { User, Warehouse as WarehouseType } from "@shared/schema";
 
 interface AuditInfo {
@@ -33,9 +35,23 @@ interface TeamMember {
   warehouse: WarehouseType;
 }
 
+interface OpenAuditSession {
+  id: number;
+  auditCode: string;
+  title: string;
+  warehouseName: string;
+  startDate: string;
+  endDate: string;
+  status: string;
+  totalItems: number;
+  confirmedItems: number;
+  pendingItems: number;
+}
+
 export default function AuditDashboardPage() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
   const [selectedWarehouse, setSelectedWarehouse] = useState<number | null>(null);
   const [addMemberOpen, setAddMemberOpen] = useState(false);
   const [selectedWarehouseForAdd, setSelectedWarehouseForAdd] = useState<string>("");
@@ -43,6 +59,11 @@ export default function AuditDashboardPage() {
 
   const { data: auditInfo, isLoading: infoLoading } = useQuery<AuditInfo>({
     queryKey: ['/api/audit/my-info'],
+  });
+
+  const { data: openAudits = [] } = useQuery<OpenAuditSession[]>({
+    queryKey: ['/api/audit/sessions/open'],
+    enabled: user?.role === 'audit_manager' || user?.role === 'audit_user',
   });
 
   const { data: teamMembers = [], isLoading: teamLoading } = useQuery<TeamMember[]>({
@@ -130,8 +151,60 @@ export default function AuditDashboardPage() {
         <div className="p-8 space-y-6">
         <div>
           <h1 className="text-3xl font-bold">Audit Dashboard</h1>
-          <p className="text-muted-foreground mt-1">Your audit assignments</p>
+          <p className="text-muted-foreground mt-1">Your audit assignments and open audits</p>
         </div>
+
+        {openAudits.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="h-5 w-5" />
+                Open Audits
+              </CardTitle>
+              <CardDescription>
+                Active audits requiring your attention
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {openAudits.map((audit) => (
+                  <div 
+                    key={audit.id} 
+                    className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer"
+                    onClick={() => setLocation(`/audit-spreadsheet/${audit.id}`)}
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="p-2 bg-blue-100 rounded-lg">
+                        <ClipboardCheck className="h-5 w-5 text-blue-600" />
+                      </div>
+                      <div>
+                        <div className="font-medium">{audit.title}</div>
+                        <div className="text-sm text-muted-foreground">
+                          {audit.auditCode} | {audit.warehouseName}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {format(new Date(audit.startDate), 'MMM dd')} - {format(new Date(audit.endDate), 'MMM dd, yyyy')}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <div className="text-right">
+                        <div className="flex items-center gap-2">
+                          <CheckCircle className="h-4 w-4 text-green-500" />
+                          <span className="text-sm">{audit.confirmedItems}/{audit.totalItems}</span>
+                        </div>
+                        <div className="text-xs text-muted-foreground">Confirmed</div>
+                      </div>
+                      <Button size="sm" variant="outline">
+                        <ArrowRight className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         <Card>
           <CardHeader>
@@ -223,6 +296,61 @@ export default function AuditDashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      {openAudits.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              Open Audits
+            </CardTitle>
+            <CardDescription>
+              Active audits requiring verification. Click to open the spreadsheet.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {openAudits.map((audit) => (
+                <div 
+                  key={audit.id} 
+                  className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer"
+                  onClick={() => setLocation(`/audit-spreadsheet/${audit.id}`)}
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="p-2 bg-blue-100 rounded-lg">
+                      <ClipboardCheck className="h-5 w-5 text-blue-600" />
+                    </div>
+                    <div>
+                      <div className="font-medium">{audit.title}</div>
+                      <div className="text-sm text-muted-foreground">
+                        {audit.auditCode} | {audit.warehouseName}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {format(new Date(audit.startDate), 'MMM dd')} - {format(new Date(audit.endDate), 'MMM dd, yyyy')}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <div className="text-right">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle className="h-4 w-4 text-green-500" />
+                        <span className="text-sm">{audit.confirmedItems}/{audit.totalItems}</span>
+                      </div>
+                      <div className="text-xs text-muted-foreground">Confirmed</div>
+                    </div>
+                    <Badge variant={audit.status === 'open' ? 'default' : 'secondary'}>
+                      {audit.status === 'open' ? 'Open' : 'In Progress'}
+                    </Badge>
+                    <Button size="sm" variant="outline">
+                      <ArrowRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>
