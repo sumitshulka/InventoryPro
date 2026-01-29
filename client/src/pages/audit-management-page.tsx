@@ -49,8 +49,9 @@ export default function AuditManagementPage() {
     mutationFn: async (data: { managerId: number; warehouseId: number }) => {
       return await apiRequest("POST", `/api/audit/managers/${data.managerId}/warehouses`, { warehouseId: data.warehouseId });
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/audit/managers'] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['/api/audit/managers'] });
+      await queryClient.refetchQueries({ queryKey: ['/api/audit/managers'] });
       setAssignWarehouseOpen(false);
       setSelectedWarehouseId("");
       toast({ title: "Warehouse assigned successfully" });
@@ -64,8 +65,9 @@ export default function AuditManagementPage() {
     mutationFn: async (data: { managerId: number; warehouseId: number }) => {
       return await apiRequest("DELETE", `/api/audit/managers/${data.managerId}/warehouses/${data.warehouseId}`);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/audit/managers'] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['/api/audit/managers'] });
+      await queryClient.refetchQueries({ queryKey: ['/api/audit/managers'] });
       toast({ title: "Warehouse removed successfully" });
     },
     onError: (error: any) => {
@@ -77,8 +79,9 @@ export default function AuditManagementPage() {
     mutationFn: async (data: { auditUserId: number; auditManagerId: number; warehouseId: number }) => {
       return await apiRequest("POST", "/api/audit/team", data);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/audit/team'] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['/api/audit/team'] });
+      await queryClient.refetchQueries({ queryKey: ['/api/audit/team'] });
       setAddTeamMemberOpen(false);
       setSelectedManagerForTeam("");
       setSelectedWarehouseForTeam("");
