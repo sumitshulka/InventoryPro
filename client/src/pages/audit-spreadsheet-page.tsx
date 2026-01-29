@@ -14,7 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
-import { ArrowLeft, CheckCircle, Clock, Lock, Edit, ShieldCheck, FileText, User } from "lucide-react";
+import { ArrowLeft, CheckCircle, Clock, Lock, Edit, ShieldCheck, FileText, User, Save, X } from "lucide-react";
 
 interface Verification {
   id: number;
@@ -54,6 +54,10 @@ export default function AuditSpreadsheetPage() {
     notes: "",
     overrideNotes: ""
   });
+  
+  // Inline editing state for spreadsheet-like experience
+  const [inlineEdits, setInlineEdits] = useState<Record<number, string>>({});
+  const [editingRowId, setEditingRowId] = useState<number | null>(null);
 
   const sessionId = id ? parseInt(id) : 0;
 
@@ -140,6 +144,66 @@ export default function AuditSpreadsheetPage() {
       });
     }
   });
+
+  // Inline save mutation for quick physical quantity updates
+  const inlineSaveMutation = useMutation({
+    mutationFn: async (data: { verificationId: number; physicalQuantity: number; isOverride: boolean }) => {
+      const endpoint = data.isOverride 
+        ? `/api/audit/verifications/${data.verificationId}/override`
+        : `/api/audit/verifications/${data.verificationId}/confirm`;
+      return await apiRequest("POST", endpoint, {
+        physicalQuantity: data.physicalQuantity,
+        notes: data.isOverride ? "Inline edit by audit manager" : null,
+        overrideNotes: data.isOverride ? "Physical quantity updated via inline edit" : undefined
+      });
+    },
+    onSuccess: () => {
+      toast({
+        title: "Saved",
+        description: "Physical quantity has been updated."
+      });
+      setEditingRowId(null);
+      refetchVerifications();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to save",
+        variant: "destructive"
+      });
+    }
+  });
+
+  const handleInlineEdit = (verificationId: number, currentValue: number | null) => {
+    setEditingRowId(verificationId);
+    setInlineEdits(prev => ({
+      ...prev,
+      [verificationId]: currentValue?.toString() || ""
+    }));
+  };
+
+  const handleInlineSave = (verification: Verification) => {
+    const value = inlineEdits[verification.id];
+    if (value === undefined || value === "") {
+      toast({
+        title: "Error",
+        description: "Please enter a physical quantity",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    const isOverride = verification.status === 'confirmed' && verification.confirmedBy !== user?.id;
+    inlineSaveMutation.mutate({
+      verificationId: verification.id,
+      physicalQuantity: parseInt(value) || 0,
+      isOverride
+    });
+  };
+
+  const handleInlineCancel = () => {
+    setEditingRowId(null);
+  };
 
   const handleConfirmClick = (verification: Verification) => {
     setEditingItem(verification);
@@ -316,7 +380,58 @@ export default function AuditSpreadsheetPage() {
                         <TableCell>{verification.itemName}</TableCell>
                         <TableCell>{verification.batchNumber || '-'}</TableCell>
                         <TableCell className="text-right">
-                          {verification.physicalQuantity !== null ? verification.physicalQuantity : '-'}
+                          {editingRowId === verification.id ? (
+                            <div className="flex items-center gap-1 justify-end">
+                              <Input
+                                type="number"
+                                className="w-24 h-8 text-right"
+                                value={inlineEdits[verification.id] || ""}
+                                onChange={(e) => setInlineEdits(prev => ({
+                                  ...prev,
+                                  [verification.id]: e.target.value
+                                }))}
+                                autoFocus
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') handleInlineSave(verification);
+                                  if (e.key === 'Escape') handleInlineCancel();
+                                }}
+                              />
+                              <Button 
+                                size="sm" 
+                                variant="ghost" 
+                                className="h-8 w-8 p-0 text-green-600"
+                                onClick={() => handleInlineSave(verification)}
+                                disabled={inlineSaveMutation.isPending}
+                              >
+                                <Save className="h-4 w-4" />
+                              </Button>
+                              <Button 
+                                size="sm" 
+                                variant="ghost" 
+                                className="h-8 w-8 p-0 text-gray-500"
+                                onClick={handleInlineCancel}
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          ) : (
+                            <div 
+                              className="flex items-center gap-2 justify-end cursor-pointer hover:bg-muted/50 rounded px-2 py-1"
+                              onClick={() => {
+                                const canEditInline = verification.status === 'pending' || 
+                                  verification.canEdit || 
+                                  user?.role === 'audit_manager';
+                                if (canEditInline) {
+                                  handleInlineEdit(verification.id, verification.physicalQuantity);
+                                }
+                              }}
+                            >
+                              <span>{verification.physicalQuantity !== null ? verification.physicalQuantity : '-'}</span>
+                              {(verification.status === 'pending' || verification.canEdit || user?.role === 'audit_manager') && (
+                                <Edit className="h-3 w-3 text-muted-foreground" />
+                              )}
+                            </div>
+                          )}
                         </TableCell>
                         <TableCell>
                           {verification.status === 'confirmed' ? (
