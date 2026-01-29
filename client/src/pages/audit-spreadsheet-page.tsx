@@ -63,6 +63,10 @@ export default function AuditSpreadsheetPage() {
   // Search and filter state
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  
+  // Audit action logs search and filter state
+  const [logsSearchQuery, setLogsSearchQuery] = useState("");
+  const [logsActionFilter, setLogsActionFilter] = useState<string>("all");
 
   const sessionId = id ? parseInt(id) : 0;
 
@@ -842,12 +846,61 @@ export default function AuditSpreadsheetPage() {
         {user?.role === 'audit_manager' && actionLogs.length > 0 && (
           <Card>
             <CardHeader>
-              <CardTitle>Audit Action Logs</CardTitle>
-              <CardDescription>Complete audit trail of all actions taken</CardDescription>
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                <div>
+                  <CardTitle>Audit Action Logs</CardTitle>
+                  <CardDescription>Complete audit trail of all actions taken</CardDescription>
+                </div>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search by user, notes..."
+                      value={logsSearchQuery}
+                      onChange={(e) => setLogsSearchQuery(e.target.value)}
+                      className="pl-9 w-full sm:w-48"
+                    />
+                  </div>
+                  <Select value={logsActionFilter} onValueChange={setLogsActionFilter}>
+                    <SelectTrigger className="w-full sm:w-36">
+                      <Filter className="h-4 w-4 mr-2" />
+                      <SelectValue placeholder="Action type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Actions</SelectItem>
+                      <SelectItem value="confirm">Confirm</SelectItem>
+                      <SelectItem value="override">Override</SelectItem>
+                      <SelectItem value="lock">Lock</SelectItem>
+                      <SelectItem value="unlock">Unlock</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              {(logsSearchQuery || logsActionFilter !== "all") && (
+                <div className="mt-2 text-sm text-muted-foreground">
+                  Showing {actionLogs.filter((log: any) => {
+                    const matchesSearch = logsSearchQuery === "" || 
+                      log.performerName?.toLowerCase().includes(logsSearchQuery.toLowerCase()) ||
+                      log.notes?.toLowerCase().includes(logsSearchQuery.toLowerCase());
+                    const matchesAction = logsActionFilter === "all" || 
+                      log.actionType?.toLowerCase().includes(logsActionFilter.toLowerCase());
+                    return matchesSearch && matchesAction;
+                  }).length} of {actionLogs.length} logs
+                </div>
+              )}
             </CardHeader>
             <CardContent>
               <div className="space-y-2 max-h-64 overflow-y-auto">
-                {actionLogs.map((log: any) => (
+                {actionLogs
+                  .filter((log: any) => {
+                    const matchesSearch = logsSearchQuery === "" || 
+                      log.performerName?.toLowerCase().includes(logsSearchQuery.toLowerCase()) ||
+                      log.notes?.toLowerCase().includes(logsSearchQuery.toLowerCase());
+                    const matchesAction = logsActionFilter === "all" || 
+                      log.actionType?.toLowerCase().includes(logsActionFilter.toLowerCase());
+                    return matchesSearch && matchesAction;
+                  })
+                  .map((log: any) => (
                   <div key={log.id} className="flex items-start gap-3 p-2 border rounded text-sm">
                     <div className="flex-1">
                       <span className="font-medium">{log.performerName}</span>
