@@ -1042,3 +1042,189 @@ export const insertSalesOrderDispatchItemSchema = createInsertSchema(salesOrderD
 
 export type SalesOrderDispatchItem = typeof salesOrderDispatchItems.$inferSelect;
 export type InsertSalesOrderDispatchItem = z.infer<typeof insertSalesOrderDispatchItemSchema>;
+
+// ==================== AUDIT MANAGEMENT TABLES ====================
+
+// Audit Manager Warehouse Assignments - links audit managers to warehouses they can audit
+export const auditManagerWarehouses = pgTable("audit_manager_warehouses", {
+  id: serial("id").primaryKey(),
+  auditManagerId: integer("audit_manager_id").notNull().references(() => users.id),
+  warehouseId: integer("warehouse_id").notNull().references(() => warehouses.id),
+  assignedBy: integer("assigned_by").notNull().references(() => users.id), // Admin who assigned
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  uniqueManagerWarehouse: unique().on(table.auditManagerId, table.warehouseId),
+  auditManagerWarehousesManagerIdx: index("audit_manager_warehouses_manager_idx").on(table.auditManagerId),
+  auditManagerWarehousesWarehouseIdx: index("audit_manager_warehouses_warehouse_idx").on(table.warehouseId),
+  auditManagerWarehousesActiveIdx: index("audit_manager_warehouses_active_idx").on(table.isActive),
+}));
+
+export const insertAuditManagerWarehouseSchema = createInsertSchema(auditManagerWarehouses).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type AuditManagerWarehouse = typeof auditManagerWarehouses.$inferSelect;
+export type InsertAuditManagerWarehouse = z.infer<typeof insertAuditManagerWarehouseSchema>;
+
+// Audit Team Members - links audit users to audit managers and warehouses
+export const auditTeamMembers = pgTable("audit_team_members", {
+  id: serial("id").primaryKey(),
+  auditUserId: integer("audit_user_id").notNull().references(() => users.id),
+  auditManagerId: integer("audit_manager_id").notNull().references(() => users.id),
+  warehouseId: integer("warehouse_id").notNull().references(() => warehouses.id),
+  assignedBy: integer("assigned_by").notNull().references(() => users.id), // Manager who assigned to team
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  uniqueUserManagerWarehouse: unique().on(table.auditUserId, table.auditManagerId, table.warehouseId),
+  auditTeamMembersUserIdx: index("audit_team_members_user_idx").on(table.auditUserId),
+  auditTeamMembersManagerIdx: index("audit_team_members_manager_idx").on(table.auditManagerId),
+  auditTeamMembersWarehouseIdx: index("audit_team_members_warehouse_idx").on(table.warehouseId),
+  auditTeamMembersActiveIdx: index("audit_team_members_active_idx").on(table.isActive),
+}));
+
+export const insertAuditTeamMemberSchema = createInsertSchema(auditTeamMembers).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type AuditTeamMember = typeof auditTeamMembers.$inferSelect;
+export type InsertAuditTeamMember = z.infer<typeof insertAuditTeamMemberSchema>;
+
+// Audit Sessions - main audit events for a warehouse
+export const auditSessions = pgTable("audit_sessions", {
+  id: serial("id").primaryKey(),
+  auditCode: text("audit_code").notNull().unique(), // e.g., AUD-2025-001
+  warehouseId: integer("warehouse_id").notNull().references(() => warehouses.id),
+  auditManagerId: integer("audit_manager_id").notNull().references(() => users.id),
+  title: text("title").notNull(),
+  description: text("description"),
+  status: text("status").notNull().default("draft"), // draft, in_progress, pending_review, completed, cancelled
+  startDate: timestamp("start_date"),
+  endDate: timestamp("end_date"),
+  completedAt: timestamp("completed_at"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  auditSessionsWarehouseIdx: index("audit_sessions_warehouse_idx").on(table.warehouseId),
+  auditSessionsManagerIdx: index("audit_sessions_manager_idx").on(table.auditManagerId),
+  auditSessionsStatusIdx: index("audit_sessions_status_idx").on(table.status),
+  auditSessionsStartDateIdx: index("audit_sessions_start_date_idx").on(table.startDate),
+}));
+
+export const insertAuditSessionSchema = createInsertSchema(auditSessions).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  startDate: z.preprocess((arg) => {
+    if (typeof arg === 'string' || arg instanceof Date) return new Date(arg);
+    return arg;
+  }, z.date().optional()),
+  endDate: z.preprocess((arg) => {
+    if (typeof arg === 'string' || arg instanceof Date) return new Date(arg);
+    return arg;
+  }, z.date().optional()),
+});
+
+export type AuditSession = typeof auditSessions.$inferSelect;
+export type InsertAuditSession = z.infer<typeof insertAuditSessionSchema>;
+
+// Audit Verifications - individual item verification records during audit
+export const auditVerifications = pgTable("audit_verifications", {
+  id: serial("id").primaryKey(),
+  auditSessionId: integer("audit_session_id").notNull().references(() => auditSessions.id),
+  itemId: integer("item_id").notNull().references(() => items.id),
+  systemQuantity: integer("system_quantity").notNull(), // Quantity in system at time of audit
+  physicalQuantity: integer("physical_quantity"), // Actual counted quantity
+  discrepancy: integer("discrepancy"), // Difference (physical - system)
+  status: text("status").notNull().default("pending"), // pending, verified, discrepancy, resolved
+  verifiedBy: integer("verified_by").references(() => users.id),
+  verifiedAt: timestamp("verified_at"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  auditVerificationsSessionIdx: index("audit_verifications_session_idx").on(table.auditSessionId),
+  auditVerificationsItemIdx: index("audit_verifications_item_idx").on(table.itemId),
+  auditVerificationsStatusIdx: index("audit_verifications_status_idx").on(table.status),
+  auditVerificationsVerifiedByIdx: index("audit_verifications_verified_by_idx").on(table.verifiedBy),
+}));
+
+export const insertAuditVerificationSchema = createInsertSchema(auditVerifications).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  verifiedAt: z.preprocess((arg) => {
+    if (typeof arg === 'string' || arg instanceof Date) return new Date(arg);
+    return arg;
+  }, z.date().optional()),
+});
+
+export type AuditVerification = typeof auditVerifications.$inferSelect;
+export type InsertAuditVerification = z.infer<typeof insertAuditVerificationSchema>;
+
+// Audit Reconciliations - records for resolving discrepancies
+export const auditReconciliations = pgTable("audit_reconciliations", {
+  id: serial("id").primaryKey(),
+  auditVerificationId: integer("audit_verification_id").notNull().references(() => auditVerifications.id),
+  reconciliationType: text("reconciliation_type").notNull(), // adjustment, write_off, transfer_found, damage, theft, other
+  adjustmentQuantity: integer("adjustment_quantity").notNull(),
+  reason: text("reason").notNull(),
+  approvalStatus: text("approval_status").notNull().default("pending"), // pending, approved, rejected
+  reconciledBy: integer("reconciled_by").notNull().references(() => users.id),
+  approvedBy: integer("approved_by").references(() => users.id),
+  approvedAt: timestamp("approved_at"),
+  transactionId: integer("transaction_id").references(() => transactions.id), // Resulting inventory transaction
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  auditReconciliationsVerificationIdx: index("audit_reconciliations_verification_idx").on(table.auditVerificationId),
+  auditReconciliationsTypeIdx: index("audit_reconciliations_type_idx").on(table.reconciliationType),
+  auditReconciliationsApprovalIdx: index("audit_reconciliations_approval_idx").on(table.approvalStatus),
+  auditReconciliationsReconciledByIdx: index("audit_reconciliations_reconciled_by_idx").on(table.reconciledBy),
+}));
+
+export const insertAuditReconciliationSchema = createInsertSchema(auditReconciliations).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  approvedAt: z.preprocess((arg) => {
+    if (typeof arg === 'string' || arg instanceof Date) return new Date(arg);
+    return arg;
+  }, z.date().optional()),
+});
+
+export type AuditReconciliation = typeof auditReconciliations.$inferSelect;
+export type InsertAuditReconciliation = z.infer<typeof insertAuditReconciliationSchema>;
+
+// Audit Approvals - approval workflow for audit check-ins and check-outs
+export const auditApprovals = pgTable("audit_approvals", {
+  id: serial("id").primaryKey(),
+  auditSessionId: integer("audit_session_id").notNull().references(() => auditSessions.id),
+  approvalType: text("approval_type").notNull(), // checkin, checkout, reconciliation, session_complete
+  requestedBy: integer("requested_by").notNull().references(() => users.id),
+  status: text("status").notNull().default("pending"), // pending, approved, rejected
+  approvedBy: integer("approved_by").references(() => users.id),
+  approvedAt: timestamp("approved_at"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  auditApprovalsSessionIdx: index("audit_approvals_session_idx").on(table.auditSessionId),
+  auditApprovalsTypeIdx: index("audit_approvals_type_idx").on(table.approvalType),
+  auditApprovalsStatusIdx: index("audit_approvals_status_idx").on(table.status),
+  auditApprovalsRequestedByIdx: index("audit_approvals_requested_by_idx").on(table.requestedBy),
+}));
+
+export const insertAuditApprovalSchema = createInsertSchema(auditApprovals).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  approvedAt: z.preprocess((arg) => {
+    if (typeof arg === 'string' || arg instanceof Date) return new Date(arg);
+    return arg;
+  }, z.date().optional()),
+});
+
+export type AuditApproval = typeof auditApprovals.$inferSelect;
+export type InsertAuditApproval = z.infer<typeof insertAuditApprovalSchema>;
