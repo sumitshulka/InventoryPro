@@ -58,6 +58,18 @@ import {
   InsertSalesOrderDispatch,
   SalesOrderDispatchItem,
   InsertSalesOrderDispatchItem,
+  AuditManagerWarehouse,
+  InsertAuditManagerWarehouse,
+  AuditTeamMember,
+  InsertAuditTeamMember,
+  AuditSession,
+  InsertAuditSession,
+  AuditVerification,
+  InsertAuditVerification,
+  AuditReconciliation,
+  InsertAuditReconciliation,
+  AuditApproval,
+  InsertAuditApproval,
   users,
   departments,
   locations,
@@ -87,7 +99,13 @@ import {
   salesOrderApprovals,
   salesOrderDispatches,
   salesOrderDispatchItems,
-  organizationSettings
+  organizationSettings,
+  auditManagerWarehouses,
+  auditTeamMembers,
+  auditSessions,
+  auditVerifications,
+  auditReconciliations,
+  auditApprovals
 } from "@shared/schema";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
@@ -1535,6 +1553,199 @@ export class DatabaseStorage implements IStorage {
   async createDispatchItem(item: InsertSalesOrderDispatchItem): Promise<SalesOrderDispatchItem> {
     const [newItem] = await db.insert(salesOrderDispatchItems).values(item).returning();
     return newItem;
+  }
+
+  // ==================== AUDIT MANAGER WAREHOUSE OPERATIONS ====================
+
+  async getAuditManagerWarehouses(managerId: number): Promise<AuditManagerWarehouse[]> {
+    return await db.select().from(auditManagerWarehouses)
+      .where(and(
+        eq(auditManagerWarehouses.auditManagerId, managerId),
+        eq(auditManagerWarehouses.isActive, true)
+      ));
+  }
+
+  async getAllAuditManagerWarehouses(): Promise<AuditManagerWarehouse[]> {
+    return await db.select().from(auditManagerWarehouses)
+      .where(eq(auditManagerWarehouses.isActive, true));
+  }
+
+  async assignWarehouseToAuditManager(data: InsertAuditManagerWarehouse): Promise<AuditManagerWarehouse> {
+    const [assignment] = await db.insert(auditManagerWarehouses).values(data).returning();
+    return assignment;
+  }
+
+  async removeWarehouseFromAuditManager(managerId: number, warehouseId: number): Promise<void> {
+    await db.update(auditManagerWarehouses)
+      .set({ isActive: false })
+      .where(and(
+        eq(auditManagerWarehouses.auditManagerId, managerId),
+        eq(auditManagerWarehouses.warehouseId, warehouseId)
+      ));
+  }
+
+  async getAuditManagersByWarehouse(warehouseId: number): Promise<AuditManagerWarehouse[]> {
+    return await db.select().from(auditManagerWarehouses)
+      .where(and(
+        eq(auditManagerWarehouses.warehouseId, warehouseId),
+        eq(auditManagerWarehouses.isActive, true)
+      ));
+  }
+
+  // ==================== AUDIT TEAM MEMBER OPERATIONS ====================
+
+  async getAuditTeamMembers(managerId: number, warehouseId?: number): Promise<AuditTeamMember[]> {
+    if (warehouseId) {
+      return await db.select().from(auditTeamMembers)
+        .where(and(
+          eq(auditTeamMembers.auditManagerId, managerId),
+          eq(auditTeamMembers.warehouseId, warehouseId),
+          eq(auditTeamMembers.isActive, true)
+        ));
+    }
+    return await db.select().from(auditTeamMembers)
+      .where(and(
+        eq(auditTeamMembers.auditManagerId, managerId),
+        eq(auditTeamMembers.isActive, true)
+      ));
+  }
+
+  async addAuditTeamMember(data: InsertAuditTeamMember): Promise<AuditTeamMember> {
+    const [member] = await db.insert(auditTeamMembers).values(data).returning();
+    return member;
+  }
+
+  async removeAuditTeamMember(id: number): Promise<void> {
+    await db.update(auditTeamMembers)
+      .set({ isActive: false })
+      .where(eq(auditTeamMembers.id, id));
+  }
+
+  async getAuditTeamMemberById(id: number): Promise<AuditTeamMember | undefined> {
+    const [member] = await db.select().from(auditTeamMembers).where(eq(auditTeamMembers.id, id));
+    return member;
+  }
+
+  async getAuditUserAssignments(userId: number): Promise<AuditTeamMember[]> {
+    return await db.select().from(auditTeamMembers)
+      .where(and(
+        eq(auditTeamMembers.auditUserId, userId),
+        eq(auditTeamMembers.isActive, true)
+      ));
+  }
+
+  // ==================== AUDIT SESSION OPERATIONS ====================
+
+  async getAllAuditSessions(): Promise<AuditSession[]> {
+    return await db.select().from(auditSessions)
+      .orderBy(desc(auditSessions.createdAt));
+  }
+
+  async getAuditSessionById(id: number): Promise<AuditSession | undefined> {
+    const [session] = await db.select().from(auditSessions).where(eq(auditSessions.id, id));
+    return session;
+  }
+
+  async getAuditSessionsByWarehouse(warehouseId: number): Promise<AuditSession[]> {
+    return await db.select().from(auditSessions)
+      .where(eq(auditSessions.warehouseId, warehouseId))
+      .orderBy(desc(auditSessions.createdAt));
+  }
+
+  async getAuditSessionsByManager(managerId: number): Promise<AuditSession[]> {
+    return await db.select().from(auditSessions)
+      .where(eq(auditSessions.auditManagerId, managerId))
+      .orderBy(desc(auditSessions.createdAt));
+  }
+
+  async createAuditSession(data: InsertAuditSession): Promise<AuditSession> {
+    const [session] = await db.insert(auditSessions).values(data).returning();
+    return session;
+  }
+
+  async updateAuditSession(id: number, data: Partial<InsertAuditSession>): Promise<AuditSession | undefined> {
+    const [session] = await db.update(auditSessions)
+      .set(data)
+      .where(eq(auditSessions.id, id))
+      .returning();
+    return session;
+  }
+
+  async getNextAuditCode(): Promise<string> {
+    const year = new Date().getFullYear();
+    const result = await db.select({ count: sql<number>`COUNT(*)` }).from(auditSessions);
+    const nextNum = (result[0]?.count || 0) + 1;
+    return `AUD-${year}-${nextNum.toString().padStart(4, '0')}`;
+  }
+
+  // ==================== AUDIT VERIFICATION OPERATIONS ====================
+
+  async getAuditVerificationsBySession(sessionId: number): Promise<AuditVerification[]> {
+    return await db.select().from(auditVerifications)
+      .where(eq(auditVerifications.auditSessionId, sessionId));
+  }
+
+  async getAuditVerificationById(id: number): Promise<AuditVerification | undefined> {
+    const [verification] = await db.select().from(auditVerifications).where(eq(auditVerifications.id, id));
+    return verification;
+  }
+
+  async createAuditVerification(data: InsertAuditVerification): Promise<AuditVerification> {
+    const [verification] = await db.insert(auditVerifications).values(data).returning();
+    return verification;
+  }
+
+  async updateAuditVerification(id: number, data: Partial<InsertAuditVerification>): Promise<AuditVerification | undefined> {
+    const [verification] = await db.update(auditVerifications)
+      .set(data)
+      .where(eq(auditVerifications.id, id))
+      .returning();
+    return verification;
+  }
+
+  // ==================== AUDIT RECONCILIATION OPERATIONS ====================
+
+  async getAuditReconciliationsByVerification(verificationId: number): Promise<AuditReconciliation[]> {
+    return await db.select().from(auditReconciliations)
+      .where(eq(auditReconciliations.auditVerificationId, verificationId));
+  }
+
+  async createAuditReconciliation(data: InsertAuditReconciliation): Promise<AuditReconciliation> {
+    const [reconciliation] = await db.insert(auditReconciliations).values(data).returning();
+    return reconciliation;
+  }
+
+  async updateAuditReconciliation(id: number, data: Partial<InsertAuditReconciliation>): Promise<AuditReconciliation | undefined> {
+    const [reconciliation] = await db.update(auditReconciliations)
+      .set(data)
+      .where(eq(auditReconciliations.id, id))
+      .returning();
+    return reconciliation;
+  }
+
+  // ==================== AUDIT APPROVAL OPERATIONS ====================
+
+  async getAuditApprovalsBySession(sessionId: number): Promise<AuditApproval[]> {
+    return await db.select().from(auditApprovals)
+      .where(eq(auditApprovals.auditSessionId, sessionId));
+  }
+
+  async createAuditApproval(data: InsertAuditApproval): Promise<AuditApproval> {
+    const [approval] = await db.insert(auditApprovals).values(data).returning();
+    return approval;
+  }
+
+  async updateAuditApproval(id: number, data: Partial<InsertAuditApproval>): Promise<AuditApproval | undefined> {
+    const [approval] = await db.update(auditApprovals)
+      .set(data)
+      .where(eq(auditApprovals.id, id))
+      .returning();
+    return approval;
+  }
+
+  async getPendingAuditApprovals(): Promise<AuditApproval[]> {
+    return await db.select().from(auditApprovals)
+      .where(eq(auditApprovals.status, 'pending'));
   }
 }
 
