@@ -31,7 +31,7 @@ export default function Sidebar({ user, isOpen, onClose }: SidebarProps) {
   const hasReportAccess = user?.role === 'admin' || user?.role === 'manager' || user?.isWarehouseOperator;
   
   // Check if user is an audit-only user (should only see audit-related menus)
-  const isAuditOnlyUser = user?.role === 'audit_user';
+  const isAuditOnlyUser = user?.role === 'audit_user' || user?.role === 'audit_manager';
   
   const isActive = (path: string) => {
     return location === path;

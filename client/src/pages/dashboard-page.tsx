@@ -24,15 +24,15 @@ export default function DashboardPage() {
 
   const isEmployeeOnly = user?.role === 'employee' && userOperatedWarehouses.length === 0;
   
-  // For audit_user, redirect to audit dashboard using useEffect
+  // For audit users (both audit_user and audit_manager), redirect to audit dashboard
   useEffect(() => {
-    if (user?.role === 'audit_user') {
+    if (user?.role === 'audit_user' || user?.role === 'audit_manager') {
       setLocation('/audit-dashboard');
     }
   }, [user?.role, setLocation]);
   
-  // Return null while redirecting audit_user
-  if (user?.role === 'audit_user') {
+  // Return null while redirecting audit users
+  if (user?.role === 'audit_user' || user?.role === 'audit_manager') {
     return null;
   }
   

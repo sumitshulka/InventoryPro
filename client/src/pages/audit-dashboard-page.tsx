@@ -319,6 +319,12 @@ export default function AuditDashboardPage() {
     );
   }
 
+  const managerTotalAudits = openAudits.length;
+  const managerTotalItems = openAudits.reduce((sum, a) => sum + a.totalItems, 0);
+  const managerTotalConfirmed = openAudits.reduce((sum, a) => sum + a.confirmedItems, 0);
+  const managerTotalPending = openAudits.reduce((sum, a) => sum + a.pendingItems, 0);
+  const managerOverallProgress = managerTotalItems > 0 ? Math.round((managerTotalConfirmed / managerTotalItems) * 100) : 0;
+
   return (
     <AppLayout>
       <div className="p-8 space-y-6">
@@ -331,7 +337,7 @@ export default function AuditDashboardPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center gap-4">
@@ -359,7 +365,66 @@ export default function AuditDashboardPage() {
             </div>
           </CardContent>
         </Card>
+
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center gap-4">
+              <div className="p-3 bg-orange-100 dark:bg-orange-900 rounded-lg">
+                <FileText className="h-6 w-6 text-orange-600 dark:text-orange-400" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold">{managerTotalAudits}</p>
+                <p className="text-sm text-muted-foreground">Active Audits</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center gap-4">
+              <div className="p-3 bg-purple-100 dark:bg-purple-900 rounded-lg">
+                <Clock className="h-6 w-6 text-purple-600 dark:text-purple-400" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold">{managerOverallProgress}%</p>
+                <p className="text-sm text-muted-foreground">Overall Progress</p>
+              </div>
+            </div>
+            <div className="mt-3 w-full bg-gray-200 rounded-full h-2">
+              <div 
+                className="bg-purple-600 h-2 rounded-full transition-all duration-300" 
+                style={{ width: `${managerOverallProgress}%` }}
+              />
+            </div>
+          </CardContent>
+        </Card>
       </div>
+
+      {managerTotalAudits > 0 && (
+        <Card className="bg-gradient-to-r from-blue-50 to-purple-50 border-blue-200">
+          <CardContent className="p-6">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
+              <div>
+                <p className="text-3xl font-bold text-blue-600">{managerTotalItems}</p>
+                <p className="text-sm text-muted-foreground">Total Items to Audit</p>
+              </div>
+              <div>
+                <p className="text-3xl font-bold text-green-600">{managerTotalConfirmed}</p>
+                <p className="text-sm text-muted-foreground">Items Verified</p>
+              </div>
+              <div>
+                <p className="text-3xl font-bold text-orange-600">{managerTotalPending}</p>
+                <p className="text-sm text-muted-foreground">Items Pending</p>
+              </div>
+              <div>
+                <p className="text-3xl font-bold text-purple-600">{managerOverallProgress}%</p>
+                <p className="text-sm text-muted-foreground">Completion Rate</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {openAudits.length > 0 && (
         <Card>
@@ -374,43 +439,54 @@ export default function AuditDashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {openAudits.map((audit) => (
-                <div 
-                  key={audit.id} 
-                  className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer"
-                  onClick={() => setLocation(`/audit-spreadsheet/${audit.id}`)}
-                >
-                  <div className="flex items-center gap-4">
-                    <div className="p-2 bg-blue-100 rounded-lg">
-                      <ClipboardCheck className="h-5 w-5 text-blue-600" />
+              {openAudits.map((audit) => {
+                const auditProgress = audit.totalItems > 0 ? Math.round((audit.confirmedItems / audit.totalItems) * 100) : 0;
+                return (
+                  <div 
+                    key={audit.id} 
+                    className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer"
+                    onClick={() => setLocation(`/audit-spreadsheet/${audit.id}`)}
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="p-2 bg-blue-100 rounded-lg">
+                        <ClipboardCheck className="h-5 w-5 text-blue-600" />
+                      </div>
+                      <div className="flex-1">
+                        <div className="font-medium">{audit.title}</div>
+                        <div className="text-sm text-muted-foreground">
+                          {audit.auditCode} | {audit.warehouseName}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {format(new Date(audit.startDate), 'MMM dd')} - {format(new Date(audit.endDate), 'MMM dd, yyyy')}
+                        </div>
+                        <div className="mt-2 w-40 bg-gray-200 rounded-full h-1.5">
+                          <div 
+                            className={`h-1.5 rounded-full transition-all duration-300 ${
+                              auditProgress >= 100 ? 'bg-green-500' : auditProgress >= 50 ? 'bg-blue-500' : 'bg-orange-500'
+                            }`}
+                            style={{ width: `${auditProgress}%` }}
+                          />
+                        </div>
+                      </div>
                     </div>
-                    <div>
-                      <div className="font-medium">{audit.title}</div>
-                      <div className="text-sm text-muted-foreground">
-                        {audit.auditCode} | {audit.warehouseName}
+                    <div className="flex items-center gap-4">
+                      <div className="text-right">
+                        <div className="flex items-center gap-2">
+                          <CheckCircle className="h-4 w-4 text-green-500" />
+                          <span className="text-sm font-medium">{auditProgress}%</span>
+                        </div>
+                        <div className="text-xs text-muted-foreground">{audit.confirmedItems}/{audit.totalItems} verified</div>
                       </div>
-                      <div className="text-xs text-muted-foreground">
-                        {format(new Date(audit.startDate), 'MMM dd')} - {format(new Date(audit.endDate), 'MMM dd, yyyy')}
-                      </div>
+                      <Badge variant={audit.status === 'open' ? 'default' : 'secondary'}>
+                        {audit.status === 'open' ? 'Open' : 'In Progress'}
+                      </Badge>
+                      <Button size="sm" variant="outline">
+                        <ArrowRight className="h-4 w-4" />
+                      </Button>
                     </div>
                   </div>
-                  <div className="flex items-center gap-4">
-                    <div className="text-right">
-                      <div className="flex items-center gap-2">
-                        <CheckCircle className="h-4 w-4 text-green-500" />
-                        <span className="text-sm">{audit.confirmedItems}/{audit.totalItems}</span>
-                      </div>
-                      <div className="text-xs text-muted-foreground">Confirmed</div>
-                    </div>
-                    <Badge variant={audit.status === 'open' ? 'default' : 'secondary'}>
-                      {audit.status === 'open' ? 'Open' : 'In Progress'}
-                    </Badge>
-                    <Button size="sm" variant="outline">
-                      <ArrowRight className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </CardContent>
         </Card>
