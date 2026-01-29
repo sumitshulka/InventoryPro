@@ -7611,6 +7611,144 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Start reconciliation for an audit session
+  app.post("/api/audit/sessions/:id/start-reconciliation", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const sessionId = parseInt(req.params.id);
+
+      if (user.role !== 'audit_manager') {
+        return res.status(403).json({ message: "Only audit managers can start reconciliation" });
+      }
+
+      const session = await storage.getAuditSessionById(sessionId);
+      if (!session) {
+        return res.status(404).json({ message: "Audit session not found" });
+      }
+
+      // Check if all items have been verified
+      const verifications = await storage.getAuditVerificationsBySession(sessionId);
+      const pendingCount = verifications.filter(v => v.status === 'pending' || v.physicalQuantity === null).length;
+      
+      if (pendingCount > 0) {
+        return res.status(400).json({ 
+          message: `Cannot start reconciliation. ${pendingCount} items still need physical quantity verification.` 
+        });
+      }
+
+      // Update session status to reconciliation
+      const updated = await storage.updateAuditSession(sessionId, { status: 'reconciliation' });
+
+      // Update each verification with discrepancy and reconciliation status
+      for (const verification of verifications) {
+        const discrepancy = (verification.physicalQuantity || 0) - verification.systemQuantity;
+        let newStatus = 'complete';
+        
+        if (discrepancy < 0) {
+          newStatus = 'short';
+        } else if (discrepancy > 0) {
+          newStatus = 'excess';
+        }
+
+        await storage.updateAuditVerification(verification.id, {
+          discrepancy,
+          status: newStatus
+        });
+      }
+
+      // Log the action
+      await storage.createAuditActionLog({
+        auditSessionId: sessionId,
+        auditVerificationId: null,
+        actionType: 'start_reconciliation',
+        performedBy: user.id,
+        notes: `Reconciliation started by ${user.name}`
+      });
+
+      res.json({ message: "Reconciliation started successfully", session: updated });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get pending transactions for reconciliation (checkouts/check-ins)
+  app.get("/api/audit/sessions/:id/pending-transactions", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const sessionId = parseInt(req.params.id);
+
+      if (!['audit_manager', 'audit_user'].includes(user.role)) {
+        return res.status(403).json({ message: "Only audit managers and users can view pending transactions" });
+      }
+
+      const session = await storage.getAuditSessionById(sessionId);
+      if (!session) {
+        return res.status(404).json({ message: "Audit session not found" });
+      }
+
+      // Get all verifications for this session
+      const verifications = await storage.getAuditVerificationsBySession(sessionId);
+      const itemIds = verifications.map(v => v.itemId);
+
+      // Get all pending transactions for items in this audit
+      const allTransactions = await storage.getAllTransactions();
+      const pendingTransactions = allTransactions.filter(t => 
+        itemIds.includes(t.itemId) &&
+        t.status === 'pending' &&
+        (t.sourceWarehouseId === session.warehouseId || t.destinationWarehouseId === session.warehouseId)
+      );
+
+      // Group by type and item
+      const pendingCheckouts = pendingTransactions.filter(t => t.transactionType === 'issue');
+      const pendingCheckins = pendingTransactions.filter(t => t.transactionType === 'check-in');
+      const pendingTransfers = pendingTransactions.filter(t => t.transactionType === 'transfer');
+
+      // Enrich with item info
+      const enrichedCheckouts = await Promise.all(pendingCheckouts.map(async (t) => {
+        const item = await storage.getItem(t.itemId);
+        const requester = t.requesterId ? await storage.getUser(t.requesterId) : null;
+        return {
+          ...t,
+          itemName: item?.name,
+          itemSku: item?.sku,
+          requesterName: requester?.name
+        };
+      }));
+
+      const enrichedCheckins = await Promise.all(pendingCheckins.map(async (t) => {
+        const item = await storage.getItem(t.itemId);
+        const user = t.userId ? await storage.getUser(t.userId) : null;
+        return {
+          ...t,
+          itemName: item?.name,
+          itemSku: item?.sku,
+          userName: user?.name
+        };
+      }));
+
+      const enrichedTransfers = await Promise.all(pendingTransfers.map(async (t) => {
+        const item = await storage.getItem(t.itemId);
+        const sourceWh = t.sourceWarehouseId ? await storage.getWarehouse(t.sourceWarehouseId) : null;
+        const destWh = t.destinationWarehouseId ? await storage.getWarehouse(t.destinationWarehouseId) : null;
+        return {
+          ...t,
+          itemName: item?.name,
+          itemSku: item?.sku,
+          sourceWarehouseName: sourceWh?.name,
+          destinationWarehouseName: destWh?.name
+        };
+      }));
+
+      res.json({
+        checkouts: enrichedCheckouts,
+        checkins: enrichedCheckins,
+        transfers: enrichedTransfers
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Check warehouse freeze status
   app.get("/api/warehouses/:id/freeze-status", requireAuth, async (req, res) => {
     try {
