@@ -14,7 +14,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
-import { ArrowLeft, CheckCircle, Clock, Lock, Edit, ShieldCheck, FileText, User, Save, X, AlertTriangle, TrendingUp, TrendingDown, PlayCircle, Package } from "lucide-react";
+import { ArrowLeft, CheckCircle, Clock, Lock, Edit, ShieldCheck, FileText, User, Save, X, AlertTriangle, TrendingUp, TrendingDown, PlayCircle, Package, Search, Filter } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface Verification {
   id: number;
@@ -58,6 +59,10 @@ export default function AuditSpreadsheetPage() {
   // Inline editing state for spreadsheet-like experience
   const [inlineEdits, setInlineEdits] = useState<Record<number, string>>({});
   const [editingRowId, setEditingRowId] = useState<number | null>(null);
+  
+  // Search and filter state
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
 
   const sessionId = id ? parseInt(id) : 0;
 
@@ -342,6 +347,18 @@ export default function AuditSpreadsheetPage() {
   // Check if ready for reconciliation (all items have physical qty)
   const allItemsVerified = verifications.length > 0 && verifications.every(v => v.physicalQuantity !== null);
   
+  // Filter verifications based on search and status filter
+  const filteredVerifications = verifications.filter(v => {
+    const matchesSearch = searchQuery === "" || 
+      v.itemCode.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      v.itemName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (v.batchNumber && v.batchNumber.toLowerCase().includes(searchQuery.toLowerCase()));
+    
+    const matchesStatus = statusFilter === "all" || v.status === statusFilter;
+    
+    return matchesSearch && matchesStatus;
+  });
+  
   return (
     <AppLayout>
       <div className="p-6 space-y-6">
@@ -459,14 +476,60 @@ export default function AuditSpreadsheetPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>{isReconciliationMode ? 'Inventory Reconciliation' : 'Inventory Verification'}</CardTitle>
-            <CardDescription>
-              {isReconciliationMode 
-                ? "Review discrepancies between system and physical quantities. Check pending transactions that may explain differences."
-                : "Verify each item's physical quantity against system records. Click on Physical Qty to enter values."
-              }
-              {user?.role === 'audit_manager' && !isReconciliationMode && " As an Audit Manager, you can override locked records."}
-            </CardDescription>
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <div>
+                <CardTitle>{isReconciliationMode ? 'Inventory Reconciliation' : 'Inventory Verification'}</CardTitle>
+                <CardDescription>
+                  {isReconciliationMode 
+                    ? "Review discrepancies between system and physical quantities. Check pending transactions that may explain differences."
+                    : "Verify each item's physical quantity against system records. Click on Physical Qty to enter values."
+                  }
+                  {user?.role === 'audit_manager' && !isReconciliationMode && " As an Audit Manager, you can override locked records."}
+                </CardDescription>
+              </div>
+              
+              {/* Search and Filter Controls */}
+              <div className="flex flex-col sm:flex-row gap-2">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search item code, name, batch..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-9 w-full sm:w-64"
+                  />
+                </div>
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="w-full sm:w-40">
+                    <Filter className="h-4 w-4 mr-2" />
+                    <SelectValue placeholder="Filter status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Status</SelectItem>
+                    {isReconciliationMode ? (
+                      <>
+                        <SelectItem value="complete">Complete</SelectItem>
+                        <SelectItem value="short">Short</SelectItem>
+                        <SelectItem value="excess">Excess</SelectItem>
+                      </>
+                    ) : (
+                      <>
+                        <SelectItem value="pending">Pending</SelectItem>
+                        <SelectItem value="confirmed">Confirmed</SelectItem>
+                      </>
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            
+            {/* Results count */}
+            {(searchQuery || statusFilter !== "all") && (
+              <div className="mt-2 text-sm text-muted-foreground">
+                Showing {filteredVerifications.length} of {verifications.length} items
+                {searchQuery && <span className="ml-1">matching "{searchQuery}"</span>}
+              </div>
+            )}
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
@@ -486,14 +549,16 @@ export default function AuditSpreadsheetPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {verifications.length === 0 ? (
+                  {filteredVerifications.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={isReconciliationMode ? 8 : 8} className="text-center py-8 text-muted-foreground">
-                        No items to verify in this audit.
+                        {verifications.length === 0 
+                          ? "No items to verify in this audit."
+                          : "No items match your search criteria."}
                       </TableCell>
                     </TableRow>
                   ) : (
-                    verifications.map((verification) => (
+                    filteredVerifications.map((verification) => (
                       <TableRow 
                         key={verification.id} 
                         className={

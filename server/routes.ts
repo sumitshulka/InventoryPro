@@ -7460,7 +7460,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const updated = await storage.updateAuditVerification(verificationId, updateData);
 
-      // Log the action
+      // Log the action with physical quantity
       await storage.createAuditActionLog({
         auditSessionId: verification.auditSessionId,
         auditVerificationId: verificationId,
@@ -7468,7 +7468,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         performedBy: user.id,
         previousValues,
         newValues: JSON.stringify(updateData),
-        notes: `Confirmed by ${user.name}`
+        notes: `Confirmed by ${user.name} - Physical Qty: ${physicalQuantity}${batchNumber ? `, Batch: ${batchNumber}` : ''}`
       });
 
       res.json(updated);
@@ -7523,7 +7523,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const updated = await storage.updateAuditVerification(verificationId, updateData);
 
-      // Log the override action
+      // Log the override action with physical quantity
       await storage.createAuditActionLog({
         auditSessionId: verification.auditSessionId,
         auditVerificationId: verificationId,
@@ -7531,7 +7531,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         performedBy: user.id,
         previousValues,
         newValues: JSON.stringify(updateData),
-        notes: `Override by ${user.name}: ${overrideNotes}`
+        notes: `Override by ${user.name} - Physical Qty: ${physicalQuantity}${batchNumber ? `, Batch: ${batchNumber}` : ''}. Reason: ${overrideNotes}`
       });
 
       res.json(updated);
