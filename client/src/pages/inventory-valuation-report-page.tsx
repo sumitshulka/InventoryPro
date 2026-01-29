@@ -64,9 +64,20 @@ export default function InventoryValuationReportPage() {
     queryKey: ['/api/categories'],
   });
 
-  const { data: warehouses = [] } = useQuery({
+  const { data: warehouses = [] } = useQuery<any[]>({
     queryKey: ['/api/warehouses'],
   });
+
+  // Fetch warehouses currently under audit (for masking values)
+  const { data: warehousesUnderAudit = [] } = useQuery<number[]>({
+    queryKey: ["/api/warehouses/under-audit"],
+  });
+
+  // Helper to check if a warehouse (by name) is under audit
+  const isWarehouseUnderAuditByName = (warehouseName: string) => {
+    const warehouse = warehouses.find((w: any) => w.name === warehouseName);
+    return warehouse ? warehousesUnderAudit.includes(warehouse.id) : false;
+  };
 
   const filteredAndSortedData = useMemo(() => {
     let filtered = (inventoryValuation as InventoryValuationItem[]).filter((item) => {
@@ -501,25 +512,49 @@ export default function InventoryValuationReportPage() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {filteredAndSortedData.map((item) => (
-                          <TableRow key={item.id}>
-                            <TableCell className="font-medium">{item.name}</TableCell>
-                            <TableCell>{item.sku}</TableCell>
-                            <TableCell>{item.category}</TableCell>
-                            <TableCell>{item.warehouse}</TableCell>
-                            <TableCell className="text-right">{formatNumberWithCommas(item.currentStock)}</TableCell>
-                            <TableCell>{item.unit}</TableCell>
-                            <TableCell className="text-right">
-                              {formatCurrency(item.unitValue)}
-                            </TableCell>
-                            <TableCell className="text-right font-semibold">
-                              {formatCurrency(item.totalValue)}
-                            </TableCell>
-                            <TableCell>
-                              {item.lastCheckInDate ? format(new Date(item.lastCheckInDate), 'MMM dd, yyyy') : 'N/A'}
-                            </TableCell>
-                          </TableRow>
-                        ))}
+                        {filteredAndSortedData.map((item) => {
+                          const underAudit = isWarehouseUnderAuditByName(item.warehouse);
+                          return (
+                            <TableRow key={item.id}>
+                              <TableCell className="font-medium">{item.name}</TableCell>
+                              <TableCell>{item.sku}</TableCell>
+                              <TableCell>{item.category}</TableCell>
+                              <TableCell>
+                                {item.warehouse}
+                                {underAudit && (
+                                  <span className="ml-2 px-2 py-0.5 bg-amber-100 text-amber-700 rounded text-xs font-medium">
+                                    Under Audit
+                                  </span>
+                                )}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                {underAudit ? (
+                                  <span className="text-gray-400 italic">***</span>
+                                ) : (
+                                  formatNumberWithCommas(item.currentStock)
+                                )}
+                              </TableCell>
+                              <TableCell>{item.unit}</TableCell>
+                              <TableCell className="text-right">
+                                {underAudit ? (
+                                  <span className="text-gray-400 italic">***</span>
+                                ) : (
+                                  formatCurrency(item.unitValue)
+                                )}
+                              </TableCell>
+                              <TableCell className="text-right font-semibold">
+                                {underAudit ? (
+                                  <span className="text-gray-400 italic">***</span>
+                                ) : (
+                                  formatCurrency(item.totalValue)
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                {item.lastCheckInDate ? format(new Date(item.lastCheckInDate), 'MMM dd, yyyy') : 'N/A'}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
                       </TableBody>
                     </Table>
                   </div>
