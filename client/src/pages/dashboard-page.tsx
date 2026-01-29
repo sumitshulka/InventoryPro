@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import AppLayout from "@/components/layout/app-layout";
 import MetricCard from "@/components/dashboard/metric-card";
@@ -23,9 +24,15 @@ export default function DashboardPage() {
 
   const isEmployeeOnly = user?.role === 'employee' && userOperatedWarehouses.length === 0;
   
-  // For audit_user, redirect to audit dashboard
+  // For audit_user, redirect to audit dashboard using useEffect
+  useEffect(() => {
+    if (user?.role === 'audit_user') {
+      setLocation('/audit-dashboard');
+    }
+  }, [user?.role, setLocation]);
+  
+  // Return null while redirecting audit_user
   if (user?.role === 'audit_user') {
-    setLocation('/audit-dashboard');
     return null;
   }
   

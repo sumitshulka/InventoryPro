@@ -146,12 +146,65 @@ export default function AuditDashboardPage() {
   }
 
   if (user?.role === 'audit_user') {
+    const totalAudits = openAudits.length;
+    const totalItemsToAudit = openAudits.reduce((sum, a) => sum + a.totalItems, 0);
+    const totalConfirmed = openAudits.reduce((sum, a) => sum + a.confirmedItems, 0);
+    const overallProgress = totalItemsToAudit > 0 ? Math.round((totalConfirmed / totalItemsToAudit) * 100) : 0;
+    
     return (
       <AppLayout>
         <div className="p-8 space-y-6">
         <div>
           <h1 className="text-3xl font-bold">Audit Dashboard</h1>
           <p className="text-muted-foreground mt-1">Your audit assignments and open audits</p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-blue-100 rounded-lg">
+                  <FileText className="h-6 w-6 text-blue-600" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold">{totalAudits}</p>
+                  <p className="text-sm text-muted-foreground">Active Audits</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-green-100 rounded-lg">
+                  <CheckCircle className="h-6 w-6 text-green-600" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold">{totalConfirmed} / {totalItemsToAudit}</p>
+                  <p className="text-sm text-muted-foreground">Items Verified</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-purple-100 rounded-lg">
+                  <Clock className="h-6 w-6 text-purple-600" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold">{overallProgress}%</p>
+                  <p className="text-sm text-muted-foreground">Overall Progress</p>
+                </div>
+              </div>
+              <div className="mt-3 w-full bg-gray-200 rounded-full h-2">
+                <div 
+                  className="bg-purple-600 h-2 rounded-full transition-all duration-300" 
+                  style={{ width: `${overallProgress}%` }}
+                />
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         {openAudits.length > 0 && (
@@ -167,40 +220,51 @@ export default function AuditDashboardPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {openAudits.map((audit) => (
-                  <div 
-                    key={audit.id} 
-                    className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer"
-                    onClick={() => setLocation(`/audit-spreadsheet/${audit.id}`)}
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className="p-2 bg-blue-100 rounded-lg">
-                        <ClipboardCheck className="h-5 w-5 text-blue-600" />
+                {openAudits.map((audit) => {
+                  const progress = audit.totalItems > 0 ? Math.round((audit.confirmedItems / audit.totalItems) * 100) : 0;
+                  return (
+                    <div 
+                      key={audit.id} 
+                      className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer"
+                      onClick={() => setLocation(`/audit-spreadsheet/${audit.id}`)}
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className="p-2 bg-blue-100 rounded-lg">
+                          <ClipboardCheck className="h-5 w-5 text-blue-600" />
+                        </div>
+                        <div className="flex-1">
+                          <div className="font-medium">{audit.title}</div>
+                          <div className="text-sm text-muted-foreground">
+                            {audit.auditCode} | {audit.warehouseName}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {format(new Date(audit.startDate), 'MMM dd')} - {format(new Date(audit.endDate), 'MMM dd, yyyy')}
+                          </div>
+                          <div className="mt-2 w-40 bg-gray-200 rounded-full h-1.5">
+                            <div 
+                              className={`h-1.5 rounded-full transition-all duration-300 ${
+                                progress >= 100 ? 'bg-green-500' : progress >= 50 ? 'bg-blue-500' : 'bg-orange-500'
+                              }`}
+                              style={{ width: `${progress}%` }}
+                            />
+                          </div>
+                        </div>
                       </div>
-                      <div>
-                        <div className="font-medium">{audit.title}</div>
-                        <div className="text-sm text-muted-foreground">
-                          {audit.auditCode} | {audit.warehouseName}
+                      <div className="flex items-center gap-4">
+                        <div className="text-right">
+                          <div className="flex items-center gap-2">
+                            <CheckCircle className="h-4 w-4 text-green-500" />
+                            <span className="text-sm font-medium">{progress}%</span>
+                          </div>
+                          <div className="text-xs text-muted-foreground">{audit.confirmedItems}/{audit.totalItems} verified</div>
                         </div>
-                        <div className="text-xs text-muted-foreground">
-                          {format(new Date(audit.startDate), 'MMM dd')} - {format(new Date(audit.endDate), 'MMM dd, yyyy')}
-                        </div>
+                        <Button size="sm" variant="outline">
+                          <ArrowRight className="h-4 w-4" />
+                        </Button>
                       </div>
                     </div>
-                    <div className="flex items-center gap-4">
-                      <div className="text-right">
-                        <div className="flex items-center gap-2">
-                          <CheckCircle className="h-4 w-4 text-green-500" />
-                          <span className="text-sm">{audit.confirmedItems}/{audit.totalItems}</span>
-                        </div>
-                        <div className="text-xs text-muted-foreground">Confirmed</div>
-                      </div>
-                      <Button size="sm" variant="outline">
-                        <ArrowRight className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </CardContent>
           </Card>

@@ -69,11 +69,6 @@ export default function AuditReportPage() {
 
   const { data: sessions = [], isLoading: sessionsLoading } = useQuery<AuditSession[]>({
     queryKey: ['/api/audit/sessions/history'],
-    queryFn: async () => {
-      const response = await fetch('/api/audit/sessions/history', { credentials: 'include' });
-      if (!response.ok) throw new Error('Failed to fetch audit sessions');
-      return response.json();
-    },
     enabled: user?.role === 'audit_manager' || user?.role === 'audit_user'
   });
 
@@ -81,11 +76,6 @@ export default function AuditReportPage() {
 
   const { data: verifications = [], isLoading: verificationsLoading } = useQuery<Verification[]>({
     queryKey: ['/api/audit/sessions', selectedSessionId, 'verifications'],
-    queryFn: async () => {
-      const response = await fetch(`/api/audit/sessions/${selectedSessionId}/verifications`, { credentials: 'include' });
-      if (!response.ok) throw new Error('Failed to fetch verifications');
-      return response.json();
-    },
     enabled: !!selectedSessionId
   });
 
