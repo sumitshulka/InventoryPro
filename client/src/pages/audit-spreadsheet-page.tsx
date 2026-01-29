@@ -14,7 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
-import { ArrowLeft, CheckCircle, Clock, Lock, Edit, ShieldCheck, FileText, User, Save, X } from "lucide-react";
+import { ArrowLeft, CheckCircle, Clock, Lock, Edit, ShieldCheck, FileText, User, Save, X, AlertTriangle, TrendingUp, TrendingDown, PlayCircle, Package } from "lucide-react";
 
 interface Verification {
   id: number;
@@ -95,6 +95,46 @@ export default function AuditSpreadsheetPage() {
       return response.json();
     },
     enabled: sessionId > 0 && user?.role === 'audit_manager'
+  });
+
+  // Query for pending transactions (for reconciliation)
+  const { data: pendingTransactions } = useQuery<{
+    checkouts: any[];
+    checkins: any[];
+    transfers: any[];
+  }>({
+    queryKey: ["/api/audit/sessions", sessionId, "pending-transactions"],
+    queryFn: async () => {
+      const response = await fetch(`/api/audit/sessions/${sessionId}/pending-transactions`, {
+        credentials: 'include'
+      });
+      if (!response.ok) return { checkouts: [], checkins: [], transfers: [] };
+      return response.json();
+    },
+    enabled: sessionId > 0 && session?.status === 'reconciliation'
+  });
+
+  // Mutation to start reconciliation
+  const startReconciliationMutation = useMutation({
+    mutationFn: async () => {
+      return await apiRequest("POST", `/api/audit/sessions/${sessionId}/start-reconciliation`, {});
+    },
+    onSuccess: () => {
+      toast({
+        title: "Reconciliation Started",
+        description: "You can now review discrepancies and pending transactions."
+      });
+      refetchVerifications();
+      // Refetch session to update status
+      window.location.reload();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to start reconciliation",
+        variant: "destructive"
+      });
+    }
   });
 
   const confirmMutation = useMutation({
@@ -288,8 +328,19 @@ export default function AuditSpreadsheetPage() {
     );
   }
 
-  const confirmedCount = verifications.filter(v => v.status === 'confirmed').length;
+  // Check if in reconciliation mode
+  const isReconciliationMode = session?.status === 'reconciliation';
+  
+  // Counts based on mode
+  const confirmedCount = isReconciliationMode 
+    ? verifications.filter(v => v.status === 'complete').length
+    : verifications.filter(v => v.status === 'confirmed').length;
   const pendingCount = verifications.filter(v => v.status === 'pending').length;
+  const shortCount = verifications.filter(v => v.status === 'short').length;
+  const excessCount = verifications.filter(v => v.status === 'excess').length;
+  
+  // Check if ready for reconciliation (all items have physical qty)
+  const allItemsVerified = verifications.length > 0 && verifications.every(v => v.physicalQuantity !== null);
   
   return (
     <AppLayout>
@@ -315,46 +366,106 @@ export default function AuditSpreadsheetPage() {
               <span>
                 {session?.startDate && format(new Date(session.startDate), 'MMM dd')} - {session?.endDate && format(new Date(session.endDate), 'MMM dd, yyyy')}
               </span>
+              {isReconciliationMode && (
+                <>
+                  <span>|</span>
+                  <Badge className="bg-purple-100 text-purple-800">Reconciliation Mode</Badge>
+                </>
+              )}
             </div>
           </div>
+          {!isReconciliationMode && allItemsVerified && user?.role === 'audit_manager' && (
+            <Button 
+              onClick={() => startReconciliationMutation.mutate()}
+              disabled={startReconciliationMutation.isPending}
+              className="bg-purple-600 hover:bg-purple-700"
+            >
+              <PlayCircle className="w-4 h-4 mr-2" />
+              {startReconciliationMutation.isPending ? "Starting..." : "Start Reconciliation"}
+            </Button>
+          )}
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Items</CardTitle>
-              <FileText className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{verifications.length}</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Pending</CardTitle>
-              <Clock className="h-4 w-4 text-yellow-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-yellow-600">{pendingCount}</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Confirmed</CardTitle>
-              <CheckCircle className="h-4 w-4 text-green-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-600">{confirmedCount}</div>
-            </CardContent>
-          </Card>
+        {isReconciliationMode ? (
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total Items</CardTitle>
+                <Package className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{verifications.length}</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Matched</CardTitle>
+                <CheckCircle className="h-4 w-4 text-green-500" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-green-600">{confirmedCount}</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Short</CardTitle>
+                <TrendingDown className="h-4 w-4 text-red-500" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-red-600">{shortCount}</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Excess</CardTitle>
+                <TrendingUp className="h-4 w-4 text-orange-500" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-orange-600">{excessCount}</div>
+              </CardContent>
+            </Card>
           </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total Items</CardTitle>
+                <FileText className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{verifications.length}</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Pending</CardTitle>
+                <Clock className="h-4 w-4 text-yellow-500" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-yellow-600">{pendingCount}</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Confirmed</CardTitle>
+                <CheckCircle className="h-4 w-4 text-green-500" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-green-600">{confirmedCount}</div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
 
         <Card>
           <CardHeader>
-            <CardTitle>Inventory Verification</CardTitle>
+            <CardTitle>{isReconciliationMode ? 'Inventory Reconciliation' : 'Inventory Verification'}</CardTitle>
             <CardDescription>
-              Verify each item's physical quantity against system records. Click "Confirm" to lock your verification.
-              {user?.role === 'audit_manager' && " As an Audit Manager, you can override locked records."}
+              {isReconciliationMode 
+                ? "Review discrepancies between system and physical quantities. Check pending transactions that may explain differences."
+                : "Verify each item's physical quantity against system records. Click on Physical Qty to enter values."
+              }
+              {user?.role === 'audit_manager' && !isReconciliationMode && " As an Audit Manager, you can override locked records."}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -366,28 +477,51 @@ export default function AuditSpreadsheetPage() {
                     <TableHead>Item Code</TableHead>
                     <TableHead>Item Name</TableHead>
                     <TableHead>Batch Number</TableHead>
+                    {isReconciliationMode && <TableHead className="text-right">System Qty</TableHead>}
                     <TableHead className="text-right">Physical Qty</TableHead>
+                    {isReconciliationMode && <TableHead className="text-right">Discrepancy</TableHead>}
                     <TableHead>Status</TableHead>
-                    <TableHead>Confirmed By</TableHead>
-                    <TableHead>Actions</TableHead>
+                    {!isReconciliationMode && <TableHead>Confirmed By</TableHead>}
+                    {!isReconciliationMode && <TableHead>Actions</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {verifications.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={isReconciliationMode ? 8 : 8} className="text-center py-8 text-muted-foreground">
                         No items to verify in this audit.
                       </TableCell>
                     </TableRow>
                   ) : (
                     verifications.map((verification) => (
-                      <TableRow key={verification.id} className={verification.status === 'confirmed' ? 'bg-green-50' : ''}>
+                      <TableRow 
+                        key={verification.id} 
+                        className={
+                          isReconciliationMode 
+                            ? verification.status === 'complete' ? 'bg-green-50' 
+                              : verification.status === 'short' ? 'bg-red-50' 
+                              : verification.status === 'excess' ? 'bg-orange-50' 
+                              : ''
+                            : verification.status === 'confirmed' ? 'bg-green-50' : ''
+                        }
+                      >
                         <TableCell className="font-medium">{verification.serialNumber}</TableCell>
                         <TableCell className="font-mono text-sm">{verification.itemCode}</TableCell>
                         <TableCell>{verification.itemName}</TableCell>
                         <TableCell>{verification.batchNumber || '-'}</TableCell>
+                        
+                        {/* System Qty - only in reconciliation mode */}
+                        {isReconciliationMode && (
+                          <TableCell className="text-right font-medium">
+                            {verification.systemQuantity}
+                          </TableCell>
+                        )}
+                        
+                        {/* Physical Qty */}
                         <TableCell className="text-right">
-                          {editingRowId === verification.id ? (
+                          {isReconciliationMode ? (
+                            <span className="font-medium">{verification.physicalQuantity}</span>
+                          ) : editingRowId === verification.id ? (
                             <div className="flex items-center gap-1 justify-end">
                               <Input
                                 type="number"
@@ -440,8 +574,42 @@ export default function AuditSpreadsheetPage() {
                             </div>
                           )}
                         </TableCell>
+                        
+                        {/* Discrepancy - only in reconciliation mode */}
+                        {isReconciliationMode && (
+                          <TableCell className="text-right">
+                            <span className={
+                              verification.discrepancy === 0 ? 'text-green-600 font-medium' 
+                              : (verification.discrepancy || 0) < 0 ? 'text-red-600 font-bold' 
+                              : 'text-orange-600 font-bold'
+                            }>
+                              {verification.discrepancy !== null && verification.discrepancy > 0 ? '+' : ''}
+                              {verification.discrepancy}
+                            </span>
+                          </TableCell>
+                        )}
+                        
+                        {/* Status */}
                         <TableCell>
-                          {verification.status === 'confirmed' ? (
+                          {isReconciliationMode ? (
+                            verification.status === 'complete' ? (
+                              <Badge className="bg-green-100 text-green-800">
+                                <CheckCircle className="w-3 h-3 mr-1" /> Complete
+                              </Badge>
+                            ) : verification.status === 'short' ? (
+                              <Badge className="bg-red-100 text-red-800">
+                                <TrendingDown className="w-3 h-3 mr-1" /> Short
+                              </Badge>
+                            ) : verification.status === 'excess' ? (
+                              <Badge className="bg-orange-100 text-orange-800">
+                                <TrendingUp className="w-3 h-3 mr-1" /> Excess
+                              </Badge>
+                            ) : (
+                              <Badge className="bg-gray-100 text-gray-800">
+                                {verification.status}
+                              </Badge>
+                            )
+                          ) : verification.status === 'confirmed' ? (
                             <Badge className="bg-green-100 text-green-800">
                               <CheckCircle className="w-3 h-3 mr-1" /> Confirmed
                             </Badge>
@@ -451,39 +619,47 @@ export default function AuditSpreadsheetPage() {
                             </Badge>
                           )}
                         </TableCell>
-                        <TableCell>
-                          {verification.confirmerName ? (
-                            <div className="flex items-center gap-1 text-sm">
-                              <User className="w-3 h-3" />
-                              <span>{verification.confirmerName}</span>
-                              {verification.isLocked && <Lock className="w-3 h-3 text-amber-500" />}
-                            </div>
-                          ) : '-'}
-                          {verification.overriderName && (
-                            <div className="text-xs text-amber-600 mt-1">
-                              Overridden by {verification.overriderName}
-                            </div>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {verification.status === 'pending' ? (
-                            <Button size="sm" onClick={() => handleConfirmClick(verification)}>
-                              <CheckCircle className="w-3 h-3 mr-1" /> Confirm
-                            </Button>
-                          ) : verification.canEdit ? (
-                            <Button size="sm" variant="outline" onClick={() => handleConfirmClick(verification)}>
-                              <Edit className="w-3 h-3 mr-1" /> Edit
-                            </Button>
-                          ) : user?.role === 'audit_manager' ? (
-                            <Button size="sm" variant="outline" className="text-amber-600 border-amber-600" onClick={() => handleOverrideClick(verification)}>
-                              <Lock className="w-3 h-3 mr-1" /> Override
-                            </Button>
-                          ) : (
-                            <span className="text-xs text-muted-foreground flex items-center gap-1">
-                              <Lock className="w-3 h-3" /> Locked
-                            </span>
-                          )}
-                        </TableCell>
+                        
+                        {/* Confirmed By - only in verification mode */}
+                        {!isReconciliationMode && (
+                          <TableCell>
+                            {verification.confirmerName ? (
+                              <div className="flex items-center gap-1 text-sm">
+                                <User className="w-3 h-3" />
+                                <span>{verification.confirmerName}</span>
+                                {verification.isLocked && <Lock className="w-3 h-3 text-amber-500" />}
+                              </div>
+                            ) : '-'}
+                            {verification.overriderName && (
+                              <div className="text-xs text-amber-600 mt-1">
+                                Overridden by {verification.overriderName}
+                              </div>
+                            )}
+                          </TableCell>
+                        )}
+                        
+                        {/* Actions - only in verification mode */}
+                        {!isReconciliationMode && (
+                          <TableCell>
+                            {verification.status === 'pending' ? (
+                              <Button size="sm" onClick={() => handleConfirmClick(verification)}>
+                                <CheckCircle className="w-3 h-3 mr-1" /> Confirm
+                              </Button>
+                            ) : verification.canEdit ? (
+                              <Button size="sm" variant="outline" onClick={() => handleConfirmClick(verification)}>
+                                <Edit className="w-3 h-3 mr-1" /> Edit
+                              </Button>
+                            ) : user?.role === 'audit_manager' ? (
+                              <Button size="sm" variant="outline" className="text-amber-600 border-amber-600" onClick={() => handleOverrideClick(verification)}>
+                                <Lock className="w-3 h-3 mr-1" /> Override
+                              </Button>
+                            ) : (
+                              <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                <Lock className="w-3 h-3" /> Locked
+                              </span>
+                            )}
+                          </TableCell>
+                        )}
                       </TableRow>
                     ))
                   )}
@@ -492,6 +668,111 @@ export default function AuditSpreadsheetPage() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Pending Transactions Section - only in reconciliation mode */}
+        {isReconciliationMode && (shortCount > 0 || excessCount > 0) && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5 text-amber-500" />
+                Pending Transactions
+              </CardTitle>
+              <CardDescription>
+                These pending transactions may help explain discrepancies. Approving or processing them could resolve inventory differences.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {shortCount > 0 && (
+                <div className="mb-6">
+                  <h4 className="font-semibold text-red-700 mb-3 flex items-center gap-2">
+                    <TrendingDown className="h-4 w-4" />
+                    Short Items - Check for Pending Checkouts/Issues
+                  </h4>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    Physical count is less than system. There may be pending checkout requests that haven't been approved yet.
+                  </p>
+                  {pendingTransactions?.checkouts && pendingTransactions.checkouts.length > 0 ? (
+                    <div className="space-y-2">
+                      {pendingTransactions.checkouts.map((tx: any) => (
+                        <div key={tx.id} className="flex items-center justify-between p-3 bg-red-50 border border-red-200 rounded">
+                          <div>
+                            <span className="font-medium">{tx.itemName}</span>
+                            <span className="text-muted-foreground ml-2">({tx.itemSku})</span>
+                            <span className="ml-2 text-red-700 font-medium">Qty: {tx.quantity}</span>
+                          </div>
+                          <div className="text-sm text-muted-foreground">
+                            Requested by: {tx.requesterName || 'Unknown'}
+                          </div>
+                        </div>
+                      ))}
+                      <p className="text-sm text-amber-700 mt-2">
+                        Approving these pending checkouts would reduce system quantity to match physical count.
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground italic">No pending checkout requests found for short items.</p>
+                  )}
+                </div>
+              )}
+
+              {excessCount > 0 && (
+                <div>
+                  <h4 className="font-semibold text-orange-700 mb-3 flex items-center gap-2">
+                    <TrendingUp className="h-4 w-4" />
+                    Excess Items - Check for Pending Check-ins
+                  </h4>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    Physical count is more than system. There may be pending check-in entries that haven't been processed yet.
+                  </p>
+                  {pendingTransactions?.checkins && pendingTransactions.checkins.length > 0 ? (
+                    <div className="space-y-2">
+                      {pendingTransactions.checkins.map((tx: any) => (
+                        <div key={tx.id} className="flex items-center justify-between p-3 bg-orange-50 border border-orange-200 rounded">
+                          <div>
+                            <span className="font-medium">{tx.itemName}</span>
+                            <span className="text-muted-foreground ml-2">({tx.itemSku})</span>
+                            <span className="ml-2 text-orange-700 font-medium">Qty: {tx.quantity}</span>
+                          </div>
+                          <div className="text-sm text-muted-foreground">
+                            By: {tx.userName || 'Unknown'}
+                          </div>
+                        </div>
+                      ))}
+                      <p className="text-sm text-amber-700 mt-2">
+                        Processing these pending check-ins would increase system quantity to match physical count.
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground italic">No pending check-in entries found for excess items.</p>
+                  )}
+                </div>
+              )}
+
+              {pendingTransactions?.transfers && pendingTransactions.transfers.length > 0 && (
+                <div className="mt-6">
+                  <h4 className="font-semibold text-blue-700 mb-3 flex items-center gap-2">
+                    <Package className="h-4 w-4" />
+                    Pending Transfers
+                  </h4>
+                  <div className="space-y-2">
+                    {pendingTransactions.transfers.map((tx: any) => (
+                      <div key={tx.id} className="flex items-center justify-between p-3 bg-blue-50 border border-blue-200 rounded">
+                        <div>
+                          <span className="font-medium">{tx.itemName}</span>
+                          <span className="text-muted-foreground ml-2">({tx.itemSku})</span>
+                          <span className="ml-2 text-blue-700 font-medium">Qty: {tx.quantity}</span>
+                        </div>
+                        <div className="text-sm text-muted-foreground">
+                          {tx.sourceWarehouseName} → {tx.destinationWarehouseName}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         {user?.role === 'audit_manager' && actionLogs.length > 0 && (
           <Card>
