@@ -468,20 +468,36 @@ export default function Sidebar({ user, isOpen, onClose }: SidebarProps) {
                   <p className="text-xs font-medium text-gray-500 px-3 py-2">AUDIT</p>
                   <ul>
                     {(user?.role === 'audit_manager' || user?.role === 'audit_user') && (
-                      <li>
-                        <Link 
-                          href="/audit-dashboard"
-                          className={cn(
-                            "flex items-center px-3 py-2 rounded-md",
-                            isActive("/audit-dashboard") 
-                              ? "bg-primary/10 border-l-4 border-primary text-primary" 
-                              : "text-gray-700 hover:text-primary hover:bg-primary/5"
-                          )}
-                        >
-                          <span className="material-icons mr-3">assignment</span>
-                          <span className="whitespace-nowrap">Audit Dashboard</span>
-                        </Link>
-                      </li>
+                      <>
+                        <li>
+                          <Link 
+                            href="/audit-dashboard"
+                            className={cn(
+                              "flex items-center px-3 py-2 rounded-md",
+                              isActive("/audit-dashboard") 
+                                ? "bg-primary/10 border-l-4 border-primary text-primary" 
+                                : "text-gray-700 hover:text-primary hover:bg-primary/5"
+                            )}
+                          >
+                            <span className="material-icons mr-3">assignment</span>
+                            <span className="whitespace-nowrap">Audit Dashboard</span>
+                          </Link>
+                        </li>
+                        <li>
+                          <Link 
+                            href="/audit-history"
+                            className={cn(
+                              "flex items-center px-3 py-2 rounded-md",
+                              isActive("/audit-history") 
+                                ? "bg-primary/10 border-l-4 border-primary text-primary" 
+                                : "text-gray-700 hover:text-primary hover:bg-primary/5"
+                            )}
+                          >
+                            <span className="material-icons mr-3">history</span>
+                            <span className="whitespace-nowrap">Audit Sessions</span>
+                          </Link>
+                        </li>
+                      </>
                     )}
                     {user?.role === 'admin' && (
                       <>

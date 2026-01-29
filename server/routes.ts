@@ -7314,6 +7314,133 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get all audit sessions history for audit managers/users (includes all statuses)
+  app.get("/api/audit/sessions/history", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      
+      if (!['audit_manager', 'audit_user'].includes(user.role)) {
+        return res.status(403).json({ message: "Only audit managers and users can access this endpoint" });
+      }
+
+      let warehouseIds: number[] = [];
+      
+      if (user.role === 'audit_manager') {
+        const assignments = await storage.getAuditManagerWarehouses(user.id);
+        warehouseIds = assignments.map(a => a.warehouseId);
+      } else if (user.role === 'audit_user') {
+        const assignments = await storage.getAuditUserAssignments(user.id);
+        warehouseIds = Array.from(new Set(assignments.map(a => a.warehouseId)));
+      }
+
+      if (warehouseIds.length === 0) {
+        return res.json([]);
+      }
+
+      // Get all sessions for these warehouses (all statuses)
+      const sessions = await storage.getAllAuditSessionsForWarehouses(warehouseIds);
+
+      // Enrich with warehouse info and counts
+      const enrichedSessions = await Promise.all(
+        sessions.map(async (s) => {
+          const warehouse = await storage.getWarehouse(s.warehouseId);
+          const verifications = await storage.getAuditVerificationsBySession(s.id);
+          
+          const confirmedCount = verifications.filter(v => v.status === 'confirmed').length;
+          const completeCount = verifications.filter(v => v.status === 'complete').length;
+          const shortCount = verifications.filter(v => v.status === 'short').length;
+          const excessCount = verifications.filter(v => v.status === 'excess').length;
+          
+          return {
+            ...s,
+            warehouseName: warehouse?.name || 'Unknown',
+            totalItems: verifications.length,
+            confirmedItems: confirmedCount + completeCount,
+            pendingItems: verifications.filter(v => v.status === 'pending').length,
+            completeItems: completeCount,
+            shortItems: shortCount,
+            excessItems: excessCount
+          };
+        })
+      );
+
+      res.json(enrichedSessions);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Download audit session report (CSV)
+  app.get("/api/audit/sessions/:id/report", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const sessionId = parseInt(req.params.id);
+      const format = req.query.format || 'csv';
+
+      const session = await storage.getAuditSessionById(sessionId);
+      if (!session) {
+        return res.status(404).json({ message: "Audit session not found" });
+      }
+
+      // Check access permissions
+      if (user.role === 'audit_manager') {
+        const assignments = await storage.getAuditManagerWarehouses(user.id);
+        if (!assignments.some(a => a.warehouseId === session.warehouseId)) {
+          return res.status(403).json({ message: "You don't have access to this audit" });
+        }
+      } else if (user.role === 'audit_user') {
+        const assignments = await storage.getAuditUserAssignments(user.id);
+        if (!assignments.some(a => a.warehouseId === session.warehouseId)) {
+          return res.status(403).json({ message: "You don't have access to this audit" });
+        }
+      } else if (user.role !== 'admin') {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const verifications = await storage.getAuditVerificationsBySession(sessionId);
+      const warehouse = await storage.getWarehouse(session.warehouseId);
+
+      // Build CSV content
+      const csvHeaders = [
+        'S.No',
+        'Item Code',
+        'Item Name',
+        'Batch Number',
+        'System Quantity',
+        'Physical Quantity',
+        'Discrepancy',
+        'Status',
+        'Notes'
+      ];
+
+      let serialNumber = 1;
+      const csvRows = await Promise.all(verifications.map(async (v) => {
+        const item = await storage.getItem(v.itemId);
+        const discrepancy = v.physicalQuantity !== null ? v.physicalQuantity - v.systemQuantity : null;
+        
+        return [
+          serialNumber++,
+          item?.sku || '',
+          item?.name || '',
+          v.batchNumber || '',
+          v.systemQuantity,
+          v.physicalQuantity !== null ? v.physicalQuantity : '',
+          discrepancy !== null ? discrepancy : '',
+          v.status,
+          v.notes || ''
+        ].map(val => `"${String(val).replace(/"/g, '""')}"`).join(',');
+      }));
+
+      const csvContent = [csvHeaders.join(','), ...csvRows].join('\n');
+
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename="audit-report-${session.auditCode}.csv"`);
+      res.send(csvContent);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Get single audit session details
   app.get("/api/audit/sessions/:id", requireAuth, async (req, res) => {
     try {

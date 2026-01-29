@@ -1893,6 +1893,14 @@ export class DatabaseStorage implements IStorage {
     .innerJoin(items, eq(inventory.itemId, items.id))
     .where(eq(inventory.warehouseId, warehouseId));
   }
+
+  async getAllAuditSessionsForWarehouses(warehouseIds: number[]): Promise<AuditSession[]> {
+    if (warehouseIds.length === 0) return [];
+    
+    return await db.select().from(auditSessions)
+      .where(sql`${auditSessions.warehouseId} IN (${sql.join(warehouseIds.map(id => sql`${id}`), sql`, `)})`)
+      .orderBy(desc(auditSessions.createdAt));
+  }
 }
 
 // Create a global storage instance
