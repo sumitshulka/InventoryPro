@@ -12,7 +12,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useQueryClient } from "@tanstack/react-query";
-import { Loader2 } from "lucide-react";
+import { Loader2, Eye, EyeOff } from "lucide-react";
 
 const loginSchema = z.object({
   usernameOrEmail: z.string().min(1, { message: "Username or email is required" }),
@@ -28,6 +28,7 @@ type ForgotPasswordFormValues = z.infer<typeof forgotPasswordSchema>;
 
 export default function AuthPage() {
   const [activeView, setActiveView] = useState<"login" | "forgot-password">("login");
+  const [showPassword, setShowPassword] = useState(false);
   const { user, loginMutation } = useAuth();
   const [_, setLocation] = useLocation();
   const { toast } = useToast();
@@ -302,13 +303,22 @@ export default function AuthPage() {
                       <Label htmlFor="password" className="text-sm font-medium text-gray-700">
                         Password
                       </Label>
-                      <Input
-                        id="password"
-                        type="password"
-                        placeholder="Enter your password"
-                        className="h-12 text-base"
-                        {...loginForm.register("password")}
-                      />
+                      <div className="relative">
+                        <Input
+                          id="password"
+                          type={showPassword ? "text" : "password"}
+                          placeholder="Enter your password"
+                          className="h-12 text-base pr-12"
+                          {...loginForm.register("password")}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute inset-y-0 right-0 flex items-center pr-4 text-gray-400 hover:text-gray-600"
+                        >
+                          {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                        </button>
+                      </div>
                       {loginForm.formState.errors.password && (
                         <p className="text-sm text-red-500">
                           {loginForm.formState.errors.password.message}
