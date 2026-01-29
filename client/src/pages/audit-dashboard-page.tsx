@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
+import AppLayout from "@/components/layout/app-layout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -104,29 +105,34 @@ export default function AuditDashboardPage() {
 
   if (user?.role !== 'audit_manager' && user?.role !== 'audit_user') {
     return (
-      <div className="p-8">
-        <Card>
-          <CardContent className="p-8 text-center">
-            <ShieldCheck className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-            <h2 className="text-xl font-semibold mb-2">Access Denied</h2>
-            <p className="text-muted-foreground">This dashboard is only for audit managers and audit users.</p>
-          </CardContent>
-        </Card>
-      </div>
+      <AppLayout>
+        <div className="p-8">
+          <Card>
+            <CardContent className="p-8 text-center">
+              <ShieldCheck className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+              <h2 className="text-xl font-semibold mb-2">Access Denied</h2>
+              <p className="text-muted-foreground">This dashboard is only for audit managers and audit users.</p>
+            </CardContent>
+          </Card>
+        </div>
+      </AppLayout>
     );
   }
 
   if (infoLoading) {
     return (
-      <div className="p-8">
-        <div className="text-center py-8 text-muted-foreground">Loading...</div>
-      </div>
+      <AppLayout>
+        <div className="p-8">
+          <div className="text-center py-8 text-muted-foreground">Loading...</div>
+        </div>
+      </AppLayout>
     );
   }
 
   if (user?.role === 'audit_user') {
     return (
-      <div className="p-8 space-y-6">
+      <AppLayout>
+        <div className="p-8 space-y-6">
         <div>
           <h1 className="text-3xl font-bold">Audit Dashboard</h1>
           <p className="text-muted-foreground mt-1">Your audit assignments</p>
@@ -176,12 +182,14 @@ export default function AuditDashboardPage() {
             )}
           </CardContent>
         </Card>
-      </div>
+        </div>
+      </AppLayout>
     );
   }
 
   return (
-    <div className="p-8 space-y-6">
+    <AppLayout>
+      <div className="p-8 space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Audit Dashboard</h1>
@@ -428,6 +436,7 @@ export default function AuditDashboardPage() {
           )}
         </CardContent>
       </Card>
-    </div>
+      </div>
+    </AppLayout>
   );
 }

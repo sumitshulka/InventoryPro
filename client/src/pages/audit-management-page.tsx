@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
+import AppLayout from "@/components/layout/app-layout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -99,15 +100,17 @@ export default function AuditManagementPage() {
 
   if (user?.role !== 'admin') {
     return (
-      <div className="p-8">
-        <Card>
-          <CardContent className="p-8 text-center">
-            <ShieldCheck className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-            <h2 className="text-xl font-semibold mb-2">Access Denied</h2>
-            <p className="text-muted-foreground">Only administrators can access audit management.</p>
-          </CardContent>
-        </Card>
-      </div>
+      <AppLayout>
+        <div className="p-8">
+          <Card>
+            <CardContent className="p-8 text-center">
+              <ShieldCheck className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+              <h2 className="text-xl font-semibold mb-2">Access Denied</h2>
+              <p className="text-muted-foreground">Only administrators can access audit management.</p>
+            </CardContent>
+          </Card>
+        </div>
+      </AppLayout>
     );
   }
 
@@ -123,10 +126,11 @@ export default function AuditManagementPage() {
   };
 
   return (
-    <div className="p-8 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Audit Management</h1>
+    <AppLayout>
+      <div className="p-8 space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">Audit Management</h1>
           <p className="text-muted-foreground mt-1">
             Manage audit managers, audit users, and warehouse assignments
           </p>
@@ -465,6 +469,7 @@ export default function AuditManagementPage() {
           </Card>
         </TabsContent>
       </Tabs>
-    </div>
+      </div>
+    </AppLayout>
   );
 }
