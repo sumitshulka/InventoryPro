@@ -311,6 +311,144 @@ export default function AuditSpreadsheetPage() {
     });
   };
 
+  // Query for completion status (for reconciliation)
+  const { data: canCompleteData, refetch: refetchCanComplete } = useQuery<{
+    canComplete: boolean;
+    allComplete: boolean;
+    hasDiscrepancies: boolean;
+    hasPendingTransactions: boolean;
+    pendingCount: number;
+    discrepancyCount: number;
+    status: string;
+  }>({
+    queryKey: ["/api/audit/sessions", sessionId, "can-complete"],
+    queryFn: async () => {
+      const response = await fetch(`/api/audit/sessions/${sessionId}/can-complete`, {
+        credentials: 'include'
+      });
+      if (!response.ok) return { canComplete: false, allComplete: false, hasDiscrepancies: false, hasPendingTransactions: false, pendingCount: 0, discrepancyCount: 0, status: '' };
+      return response.json();
+    },
+    enabled: sessionId > 0 && session?.status === 'reconciliation'
+  });
+
+  // State for recon dialog
+  const [reconDialogOpen, setReconDialogOpen] = useState(false);
+  const [reconItem, setReconItem] = useState<Verification | null>(null);
+  const [reconType, setReconType] = useState<'checkin' | 'checkout'>('checkin');
+  const [reconQuantity, setReconQuantity] = useState('');
+  const [reconNotes, setReconNotes] = useState('');
+
+  // Mutation for audit recon check-in (for excess items)
+  const reconCheckinMutation = useMutation({
+    mutationFn: async (data: { verificationId: number; quantity: number; notes: string }) => {
+      return await apiRequest("POST", `/api/audit/sessions/${sessionId}/recon-checkin`, data);
+    },
+    onSuccess: () => {
+      toast({
+        title: "Audit Recon Check-in Created",
+        description: "Excess inventory has been added to the system."
+      });
+      setReconDialogOpen(false);
+      setReconItem(null);
+      setReconQuantity('');
+      setReconNotes('');
+      refetchVerifications();
+      refetchCanComplete();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create audit recon check-in",
+        variant: "destructive"
+      });
+    }
+  });
+
+  // Mutation for audit recon check-out (for short items)
+  const reconCheckoutMutation = useMutation({
+    mutationFn: async (data: { verificationId: number; quantity: number; notes: string }) => {
+      return await apiRequest("POST", `/api/audit/sessions/${sessionId}/recon-checkout`, data);
+    },
+    onSuccess: () => {
+      toast({
+        title: "Audit Recon Check-out Created",
+        description: "Missing inventory has been deducted from the system."
+      });
+      setReconDialogOpen(false);
+      setReconItem(null);
+      setReconQuantity('');
+      setReconNotes('');
+      refetchVerifications();
+      refetchCanComplete();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create audit recon check-out",
+        variant: "destructive"
+      });
+    }
+  });
+
+  // Mutation to complete audit
+  const completeAuditMutation = useMutation({
+    mutationFn: async () => {
+      return await apiRequest("POST", `/api/audit/sessions/${sessionId}/complete`, {
+        notes: "Audit completed with all discrepancies resolved"
+      });
+    },
+    onSuccess: () => {
+      toast({
+        title: "Audit Completed",
+        description: "The audit has been completed successfully. All freezes and holds have been released."
+      });
+      window.location.href = '/audit-dashboard';
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to complete audit",
+        variant: "destructive"
+      });
+    }
+  });
+
+  const handleReconEntry = (verification: Verification, type: 'checkin' | 'checkout') => {
+    setReconItem(verification);
+    setReconType(type);
+    setReconQuantity(Math.abs(verification.discrepancy || 0).toString());
+    setReconNotes('');
+    setReconDialogOpen(true);
+  };
+
+  const handleReconSubmit = () => {
+    if (!reconItem) return;
+    const quantity = parseInt(reconQuantity) || 0;
+    if (quantity <= 0) {
+      toast({
+        title: "Invalid Quantity",
+        description: "Please enter a positive quantity.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (reconType === 'checkin') {
+      reconCheckinMutation.mutate({
+        verificationId: reconItem.id,
+        quantity,
+        notes: reconNotes
+      });
+    } else {
+      reconCheckoutMutation.mutate({
+        verificationId: reconItem.id,
+        quantity,
+        notes: reconNotes
+      });
+    }
+  };
+
   if (!['audit_manager', 'audit_user'].includes(user?.role || '')) {
     return (
       <AppLayout>
@@ -550,6 +688,7 @@ export default function AuditSpreadsheetPage() {
                     <TableHead>Status</TableHead>
                     {!isReconciliationMode && <TableHead>Confirmed By</TableHead>}
                     {!isReconciliationMode && <TableHead>Actions</TableHead>}
+                    {isReconciliationMode && user?.role === 'audit_manager' && <TableHead>Recon Actions</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -729,6 +868,37 @@ export default function AuditSpreadsheetPage() {
                             )}
                           </TableCell>
                         )}
+                        
+                        {/* Recon Actions - only in reconciliation mode for audit managers */}
+                        {isReconciliationMode && user?.role === 'audit_manager' && (
+                          <TableCell>
+                            {verification.status === 'short' ? (
+                              <Button 
+                                size="sm" 
+                                variant="outline"
+                                className="text-red-600 border-red-600 hover:bg-red-50"
+                                onClick={() => handleReconEntry(verification, 'checkout')}
+                              >
+                                <TrendingDown className="w-3 h-3 mr-1" /> Recon Out
+                              </Button>
+                            ) : verification.status === 'excess' ? (
+                              <Button 
+                                size="sm" 
+                                variant="outline"
+                                className="text-orange-600 border-orange-600 hover:bg-orange-50"
+                                onClick={() => handleReconEntry(verification, 'checkin')}
+                              >
+                                <TrendingUp className="w-3 h-3 mr-1" /> Recon In
+                              </Button>
+                            ) : verification.status === 'complete' ? (
+                              <span className="text-xs text-green-600 flex items-center gap-1">
+                                <CheckCircle className="w-3 h-3" /> Balanced
+                              </span>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">-</span>
+                            )}
+                          </TableCell>
+                        )}
                       </TableRow>
                     ))
                   )}
@@ -839,6 +1009,94 @@ export default function AuditSpreadsheetPage() {
                   </div>
                 </div>
               )}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Complete Audit Section - only in reconciliation mode */}
+        {isReconciliationMode && (
+          <Card className="border-2 border-green-200">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-green-700">
+                <CheckCircle className="h-5 w-5" />
+                Complete Audit
+              </CardTitle>
+              <CardDescription>
+                Once all discrepancies are resolved, you can complete the audit to release freezes and finalize the session.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="p-3 bg-gray-50 rounded text-center">
+                    <div className="text-2xl font-bold">{verifications.length}</div>
+                    <div className="text-sm text-muted-foreground">Total Items</div>
+                  </div>
+                  <div className="p-3 bg-green-50 rounded text-center">
+                    <div className="text-2xl font-bold text-green-600">
+                      {verifications.filter(v => v.status === 'complete').length}
+                    </div>
+                    <div className="text-sm text-muted-foreground">Balanced</div>
+                  </div>
+                  <div className="p-3 bg-red-50 rounded text-center">
+                    <div className="text-2xl font-bold text-red-600">{shortCount}</div>
+                    <div className="text-sm text-muted-foreground">Short</div>
+                  </div>
+                  <div className="p-3 bg-orange-50 rounded text-center">
+                    <div className="text-2xl font-bold text-orange-600">{excessCount}</div>
+                    <div className="text-sm text-muted-foreground">Excess</div>
+                  </div>
+                </div>
+                
+                {canCompleteData && !canCompleteData.canComplete && (
+                  <div className="p-4 bg-amber-50 border border-amber-200 rounded">
+                    <h4 className="font-medium text-amber-800 mb-2">Cannot Complete Yet</h4>
+                    <ul className="text-sm text-amber-700 space-y-1">
+                      {canCompleteData.hasDiscrepancies && (
+                        <li className="flex items-center gap-2">
+                          <AlertTriangle className="h-4 w-4" />
+                          {canCompleteData.discrepancyCount} item(s) have unresolved discrepancies
+                        </li>
+                      )}
+                      {canCompleteData.hasPendingTransactions && (
+                        <li className="flex items-center gap-2">
+                          <AlertTriangle className="h-4 w-4" />
+                          {canCompleteData.pendingCount} pending transaction(s) need resolution
+                        </li>
+                      )}
+                    </ul>
+                    {user?.role === 'audit_manager' && canCompleteData.hasDiscrepancies && (
+                      <p className="text-sm text-amber-700 mt-2">
+                        Use the Recon Actions in the table above to balance discrepancies.
+                      </p>
+                    )}
+                  </div>
+                )}
+                
+                {canCompleteData?.canComplete && (
+                  <div className="p-4 bg-green-50 border border-green-200 rounded">
+                    <h4 className="font-medium text-green-800 mb-2">Ready to Complete</h4>
+                    <p className="text-sm text-green-700">
+                      All items are balanced and there are no pending transactions. You can now complete the audit.
+                    </p>
+                  </div>
+                )}
+                
+                <Button 
+                  className="w-full bg-green-600 hover:bg-green-700"
+                  disabled={!canCompleteData?.canComplete || completeAuditMutation.isPending}
+                  onClick={() => completeAuditMutation.mutate()}
+                >
+                  {completeAuditMutation.isPending ? (
+                    <>Processing...</>
+                  ) : (
+                    <>
+                      <CheckCircle className="w-4 h-4 mr-2" />
+                      Complete Audit & Release Freezes
+                    </>
+                  )}
+                </Button>
+              </div>
             </CardContent>
           </Card>
         )}
@@ -1031,6 +1289,81 @@ export default function AuditSpreadsheetPage() {
                 className="bg-amber-600 hover:bg-amber-700"
               >
                 {overrideMutation.isPending ? "Overriding..." : "Override Record"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Recon Entry Dialog */}
+        <Dialog open={reconDialogOpen} onOpenChange={setReconDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle className={reconType === 'checkin' ? "text-orange-600" : "text-red-600"}>
+                {reconType === 'checkin' ? 'Audit Recon Check-in (Excess)' : 'Audit Recon Check-out (Short)'}
+              </DialogTitle>
+              <DialogDescription>
+                {reconType === 'checkin' 
+                  ? 'Physical count is higher than system. This will add the excess quantity to inventory.'
+                  : 'Physical count is lower than system. This will deduct the missing quantity from inventory.'}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className={`p-3 rounded text-sm ${reconType === 'checkin' ? 'bg-orange-50 border border-orange-200' : 'bg-red-50 border border-red-200'}`}>
+                <p className="font-medium">Item Details</p>
+                <p className="text-muted-foreground">
+                  {reconItem?.itemCode} - {reconItem?.itemName}
+                </p>
+                <div className="mt-2 grid grid-cols-3 gap-2 text-sm">
+                  <div>
+                    <span className="text-muted-foreground">System Qty:</span> {reconItem?.systemQuantity}
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Physical Qty:</span> {reconItem?.physicalQuantity}
+                  </div>
+                  <div>
+                    <span className={reconType === 'checkin' ? 'text-orange-600 font-bold' : 'text-red-600 font-bold'}>
+                      Discrepancy: {reconItem?.discrepancy && reconItem.discrepancy > 0 ? '+' : ''}{reconItem?.discrepancy}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="reconQuantity">Quantity to {reconType === 'checkin' ? 'Check-in' : 'Check-out'} *</Label>
+                <Input
+                  id="reconQuantity"
+                  type="number"
+                  placeholder={`Enter quantity to ${reconType === 'checkin' ? 'add' : 'deduct'}`}
+                  value={reconQuantity}
+                  onChange={(e) => setReconQuantity(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  {reconType === 'checkin' 
+                    ? 'This will create an audit check-in transaction using the last check-in rate.'
+                    : 'This will create an audit check-out transaction using the last check-out rate.'}
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="reconNotes">Notes (Optional)</Label>
+                <Textarea
+                  id="reconNotes"
+                  placeholder="Any additional notes for this recon entry..."
+                  value={reconNotes}
+                  onChange={(e) => setReconNotes(e.target.value)}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setReconDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleReconSubmit} 
+                disabled={reconCheckinMutation.isPending || reconCheckoutMutation.isPending}
+                className={reconType === 'checkin' ? "bg-orange-600 hover:bg-orange-700" : "bg-red-600 hover:bg-red-700"}
+              >
+                {reconCheckinMutation.isPending || reconCheckoutMutation.isPending 
+                  ? "Processing..." 
+                  : reconType === 'checkin' ? "Create Recon Check-in" : "Create Recon Check-out"}
               </Button>
             </DialogFooter>
           </DialogContent>
