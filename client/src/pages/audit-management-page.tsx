@@ -29,11 +29,11 @@ export default function AuditManagementPage() {
   const [selectedWarehouseForTeam, setSelectedWarehouseForTeam] = useState<string>("");
   const [selectedAuditUser, setSelectedAuditUser] = useState<string>("");
 
-  const { data: auditManagers = [], isLoading: managersLoading } = useQuery<AuditManagerWithWarehouses[]>({
+  const { data: auditManagers = [], isLoading: managersLoading, refetch: refetchManagers } = useQuery<AuditManagerWithWarehouses[]>({
     queryKey: ['/api/audit/managers'],
   });
 
-  const { data: auditUsers = [], isLoading: usersLoading } = useQuery<User[]>({
+  const { data: auditUsers = [], isLoading: usersLoading, refetch: refetchUsers } = useQuery<User[]>({
     queryKey: ['/api/audit/users'],
   });
 
@@ -51,7 +51,7 @@ export default function AuditManagementPage() {
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['/api/audit/managers'] });
-      await queryClient.refetchQueries({ queryKey: ['/api/audit/managers'] });
+      await refetchManagers();
       setAssignWarehouseOpen(false);
       setSelectedWarehouseId("");
       toast({ title: "Warehouse assigned successfully" });
@@ -67,7 +67,7 @@ export default function AuditManagementPage() {
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['/api/audit/managers'] });
-      await queryClient.refetchQueries({ queryKey: ['/api/audit/managers'] });
+      await refetchManagers();
       toast({ title: "Warehouse removed successfully" });
     },
     onError: (error: any) => {
@@ -81,7 +81,8 @@ export default function AuditManagementPage() {
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['/api/audit/team'] });
-      await queryClient.refetchQueries({ queryKey: ['/api/audit/team'] });
+      await queryClient.invalidateQueries({ queryKey: ['/api/audit/managers'] });
+      await refetchManagers();
       setAddTeamMemberOpen(false);
       setSelectedManagerForTeam("");
       setSelectedWarehouseForTeam("");
