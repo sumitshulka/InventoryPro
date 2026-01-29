@@ -1839,7 +1839,7 @@ export class DatabaseStorage implements IStorage {
   async getAuditSessionsForAuditUser(userId: number): Promise<AuditSession[]> {
     // Get team assignments for this audit user
     const assignments = await this.getAuditUserAssignments(userId);
-    const warehouseIds = [...new Set(assignments.map(a => a.warehouseId))];
+    const warehouseIds = Array.from(new Set(assignments.map(a => a.warehouseId)));
     
     if (warehouseIds.length === 0) return [];
     
@@ -1861,7 +1861,6 @@ export class DatabaseStorage implements IStorage {
       itemCode: items.sku,
       itemName: items.name,
       quantity: inventory.quantity,
-      batchNumber: inventory.batchNumber,
     })
     .from(inventory)
     .innerJoin(items, eq(inventory.itemId, items.id))

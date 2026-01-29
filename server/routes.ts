@@ -7146,6 +7146,473 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== AUDIT MANAGEMENT WORKFLOW ROUTES ====================
+
+  // Create a new audit session (Admin only)
+  app.post("/api/audit/sessions", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      if (user.role !== 'admin') {
+        return res.status(403).json({ message: "Only admin can create audit sessions" });
+      }
+
+      const { warehouseId, startDate, endDate, title, description, freezeConfirmed } = req.body;
+
+      if (!warehouseId || !startDate || !endDate || !title) {
+        return res.status(400).json({ message: "Warehouse, start date, end date, and title are required" });
+      }
+
+      if (!freezeConfirmed) {
+        return res.status(400).json({ message: "You must confirm the warehouse freeze to create an audit" });
+      }
+
+      // Check for overlapping audits
+      const existingAudits = await storage.getOpenAuditSessionsForWarehouse(warehouseId);
+      const newStart = new Date(startDate);
+      const newEnd = new Date(endDate);
+
+      for (const audit of existingAudits) {
+        if (audit.startDate && audit.endDate) {
+          const existingStart = new Date(audit.startDate);
+          const existingEnd = new Date(audit.endDate);
+          if ((newStart <= existingEnd && newEnd >= existingStart)) {
+            return res.status(400).json({ 
+              message: `An audit already exists for this warehouse during the selected dates (${audit.auditCode})` 
+            });
+          }
+        }
+      }
+
+      const auditCode = await storage.getNextAuditCode();
+
+      const session = await storage.createAuditSession({
+        auditCode,
+        warehouseId,
+        createdBy: user.id,
+        title,
+        description: description || null,
+        status: 'open',
+        startDate: new Date(startDate),
+        endDate: new Date(endDate),
+        freezeConfirmed: true,
+        auditManagerId: null,
+        notes: null
+      });
+
+      // Create audit action log
+      await storage.createAuditActionLog({
+        auditSessionId: session.id,
+        auditVerificationId: null,
+        actionType: 'create_session',
+        performedBy: user.id,
+        previousValues: null,
+        newValues: JSON.stringify(session),
+        notes: `Audit session created by admin`
+      });
+
+      // Pre-populate verifications with inventory items for this warehouse
+      const inventoryItems = await storage.getInventoryItemsForWarehouse(warehouseId);
+      for (const item of inventoryItems) {
+        await storage.createAuditVerification({
+          auditSessionId: session.id,
+          itemId: item.itemId,
+          batchNumber: null,
+          systemQuantity: item.quantity,
+          physicalQuantity: null,
+          discrepancy: null,
+          status: 'pending',
+          confirmedBy: null,
+          lockedBy: null,
+          overrideBy: null,
+          overrideNotes: null,
+          notes: null
+        });
+      }
+
+      res.status(201).json(session);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get all audit sessions (Admin only - for management)
+  app.get("/api/audit/sessions", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      if (user.role !== 'admin') {
+        return res.status(403).json({ message: "Only admin can view all audit sessions" });
+      }
+
+      const sessions = await storage.getAllAuditSessions();
+      
+      // Enrich with warehouse and creator info
+      const enrichedSessions = await Promise.all(
+        sessions.map(async (s) => {
+          const warehouse = await storage.getWarehouse(s.warehouseId);
+          const creator = s.createdBy ? await storage.getUser(s.createdBy) : null;
+          return {
+            ...s,
+            warehouseName: warehouse?.name || 'Unknown',
+            creatorName: creator?.name || 'Unknown'
+          };
+        })
+      );
+
+      res.json(enrichedSessions);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get open audit sessions for audit managers/users
+  app.get("/api/audit/sessions/open", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      
+      let sessions: any[] = [];
+      
+      if (user.role === 'audit_manager') {
+        sessions = await storage.getAuditSessionsForAuditManager(user.id);
+      } else if (user.role === 'audit_user') {
+        sessions = await storage.getAuditSessionsForAuditUser(user.id);
+      } else {
+        return res.status(403).json({ message: "Only audit managers and users can access this endpoint" });
+      }
+
+      // Enrich with warehouse info
+      const enrichedSessions = await Promise.all(
+        sessions.map(async (s) => {
+          const warehouse = await storage.getWarehouse(s.warehouseId);
+          const verifications = await storage.getAuditVerificationsBySession(s.id);
+          const confirmedCount = verifications.filter(v => v.status === 'confirmed').length;
+          
+          return {
+            ...s,
+            warehouseName: warehouse?.name || 'Unknown',
+            totalItems: verifications.length,
+            confirmedItems: confirmedCount,
+            pendingItems: verifications.length - confirmedCount
+          };
+        })
+      );
+
+      res.json(enrichedSessions);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get single audit session details
+  app.get("/api/audit/sessions/:id", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const sessionId = parseInt(req.params.id);
+
+      const session = await storage.getAuditSessionById(sessionId);
+      if (!session) {
+        return res.status(404).json({ message: "Audit session not found" });
+      }
+
+      // Check access permissions
+      if (user.role === 'audit_manager') {
+        const assignments = await storage.getAuditManagerWarehouses(user.id);
+        if (!assignments.some(a => a.warehouseId === session.warehouseId)) {
+          return res.status(403).json({ message: "You don't have access to this audit" });
+        }
+      } else if (user.role === 'audit_user') {
+        const assignments = await storage.getAuditUserAssignments(user.id);
+        if (!assignments.some(a => a.warehouseId === session.warehouseId)) {
+          return res.status(403).json({ message: "You don't have access to this audit" });
+        }
+      } else if (user.role !== 'admin') {
+        return res.status(403).json({ message: "You don't have access to this audit" });
+      }
+
+      const warehouse = await storage.getWarehouse(session.warehouseId);
+
+      res.json({
+        ...session,
+        warehouseName: warehouse?.name || 'Unknown'
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get verifications for an audit session (spreadsheet data)
+  app.get("/api/audit/sessions/:id/verifications", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const sessionId = parseInt(req.params.id);
+
+      // Only audit managers and audit users can access
+      if (!['audit_manager', 'audit_user'].includes(user.role)) {
+        return res.status(403).json({ message: "Only audit managers and users can access verifications" });
+      }
+
+      const session = await storage.getAuditSessionById(sessionId);
+      if (!session) {
+        return res.status(404).json({ message: "Audit session not found" });
+      }
+
+      // Check warehouse access
+      if (user.role === 'audit_manager') {
+        const assignments = await storage.getAuditManagerWarehouses(user.id);
+        if (!assignments.some(a => a.warehouseId === session.warehouseId)) {
+          return res.status(403).json({ message: "You don't have access to this audit" });
+        }
+      } else if (user.role === 'audit_user') {
+        const assignments = await storage.getAuditUserAssignments(user.id);
+        if (!assignments.some(a => a.warehouseId === session.warehouseId)) {
+          return res.status(403).json({ message: "You don't have access to this audit" });
+        }
+      }
+
+      const verifications = await storage.getAuditVerificationsBySession(sessionId);
+
+      // Enrich with item details and confirmer info
+      const enrichedVerifications = await Promise.all(
+        verifications.map(async (v, index) => {
+          const item = await storage.getItem(v.itemId);
+          const confirmer = v.confirmedBy ? await storage.getUser(v.confirmedBy) : null;
+          const overrider = v.overrideBy ? await storage.getUser(v.overrideBy) : null;
+
+          return {
+            ...v,
+            serialNumber: index + 1,
+            itemCode: item?.sku || 'Unknown',
+            itemName: item?.name || 'Unknown',
+            confirmerName: confirmer?.name || null,
+            overriderName: overrider?.name || null,
+            canEdit: v.lockedBy === user.id || (user.role === 'audit_manager' && v.lockedBy !== null),
+            isLocked: v.lockedBy !== null && v.lockedBy !== user.id && user.role !== 'audit_manager'
+          };
+        })
+      );
+
+      res.json(enrichedVerifications);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Confirm/Update a verification (with locking)
+  app.post("/api/audit/verifications/:id/confirm", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const verificationId = parseInt(req.params.id);
+
+      if (!['audit_manager', 'audit_user'].includes(user.role)) {
+        return res.status(403).json({ message: "Only audit managers and users can confirm verifications" });
+      }
+
+      const verification = await storage.getAuditVerificationById(verificationId);
+      if (!verification) {
+        return res.status(404).json({ message: "Verification not found" });
+      }
+
+      const session = await storage.getAuditSessionById(verification.auditSessionId);
+      if (!session) {
+        return res.status(404).json({ message: "Audit session not found" });
+      }
+
+      // Check if record is locked by another user
+      if (verification.lockedBy && verification.lockedBy !== user.id && user.role !== 'audit_manager') {
+        return res.status(403).json({ message: "This record is locked by another user" });
+      }
+
+      const { batchNumber, physicalQuantity, notes } = req.body;
+
+      const previousValues = JSON.stringify({
+        batchNumber: verification.batchNumber,
+        physicalQuantity: verification.physicalQuantity,
+        notes: verification.notes
+      });
+
+      const discrepancy = physicalQuantity !== null && physicalQuantity !== undefined 
+        ? physicalQuantity - verification.systemQuantity 
+        : null;
+
+      const updateData: any = {
+        batchNumber: batchNumber || null,
+        physicalQuantity: physicalQuantity !== undefined ? physicalQuantity : verification.physicalQuantity,
+        discrepancy,
+        status: 'confirmed',
+        confirmedBy: user.id,
+        confirmedAt: new Date(),
+        lockedBy: user.id,
+        lockedAt: new Date(),
+        notes: notes || verification.notes,
+        updatedAt: new Date()
+      };
+
+      const updated = await storage.updateAuditVerification(verificationId, updateData);
+
+      // Log the action
+      await storage.createAuditActionLog({
+        auditSessionId: verification.auditSessionId,
+        auditVerificationId: verificationId,
+        actionType: 'confirm',
+        performedBy: user.id,
+        previousValues,
+        newValues: JSON.stringify(updateData),
+        notes: `Confirmed by ${user.name}`
+      });
+
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Override a locked verification (Audit Manager only)
+  app.post("/api/audit/verifications/:id/override", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const verificationId = parseInt(req.params.id);
+
+      if (user.role !== 'audit_manager') {
+        return res.status(403).json({ message: "Only audit managers can override verifications" });
+      }
+
+      const verification = await storage.getAuditVerificationById(verificationId);
+      if (!verification) {
+        return res.status(404).json({ message: "Verification not found" });
+      }
+
+      const { batchNumber, physicalQuantity, notes, overrideNotes } = req.body;
+
+      if (!overrideNotes) {
+        return res.status(400).json({ message: "Override notes are required when overriding a record" });
+      }
+
+      const previousValues = JSON.stringify({
+        batchNumber: verification.batchNumber,
+        physicalQuantity: verification.physicalQuantity,
+        notes: verification.notes,
+        confirmedBy: verification.confirmedBy,
+        lockedBy: verification.lockedBy
+      });
+
+      const discrepancy = physicalQuantity !== null && physicalQuantity !== undefined 
+        ? physicalQuantity - verification.systemQuantity 
+        : verification.discrepancy;
+
+      const updateData: any = {
+        batchNumber: batchNumber !== undefined ? batchNumber : verification.batchNumber,
+        physicalQuantity: physicalQuantity !== undefined ? physicalQuantity : verification.physicalQuantity,
+        discrepancy,
+        overrideBy: user.id,
+        overrideAt: new Date(),
+        overrideNotes,
+        notes: notes || verification.notes,
+        updatedAt: new Date()
+      };
+
+      const updated = await storage.updateAuditVerification(verificationId, updateData);
+
+      // Log the override action
+      await storage.createAuditActionLog({
+        auditSessionId: verification.auditSessionId,
+        auditVerificationId: verificationId,
+        actionType: 'override',
+        performedBy: user.id,
+        previousValues,
+        newValues: JSON.stringify(updateData),
+        notes: `Override by ${user.name}: ${overrideNotes}`
+      });
+
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get audit action logs for a session
+  app.get("/api/audit/sessions/:id/logs", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const sessionId = parseInt(req.params.id);
+
+      if (user.role !== 'audit_manager') {
+        return res.status(403).json({ message: "Only audit managers can view audit logs" });
+      }
+
+      const logs = await storage.getAuditActionLogsBySession(sessionId);
+
+      // Enrich with performer info
+      const enrichedLogs = await Promise.all(
+        logs.map(async (log) => {
+          const performer = await storage.getUser(log.performedBy);
+          return {
+            ...log,
+            performerName: performer?.name || 'Unknown'
+          };
+        })
+      );
+
+      res.json(enrichedLogs);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Update audit session status (Admin or Audit Manager)
+  app.patch("/api/audit/sessions/:id", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const sessionId = parseInt(req.params.id);
+
+      if (!['admin', 'audit_manager'].includes(user.role)) {
+        return res.status(403).json({ message: "Only admin or audit manager can update sessions" });
+      }
+
+      const session = await storage.getAuditSessionById(sessionId);
+      if (!session) {
+        return res.status(404).json({ message: "Audit session not found" });
+      }
+
+      const { status, notes, auditManagerId } = req.body;
+      
+      const updateData: any = {};
+      if (status) updateData.status = status;
+      if (notes !== undefined) updateData.notes = notes;
+      if (auditManagerId !== undefined) updateData.auditManagerId = auditManagerId;
+      if (status === 'completed') updateData.completedAt = new Date();
+
+      const updated = await storage.updateAuditSession(sessionId, updateData);
+
+      // Log the action
+      await storage.createAuditActionLog({
+        auditSessionId: sessionId,
+        auditVerificationId: null,
+        actionType: 'update_session',
+        performedBy: user.id,
+        previousValues: JSON.stringify({ status: session.status, notes: session.notes }),
+        newValues: JSON.stringify(updateData),
+        notes: `Session updated by ${user.name}`
+      });
+
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Check warehouse freeze status
+  app.get("/api/warehouses/:id/freeze-status", requireAuth, async (req, res) => {
+    try {
+      const warehouseId = parseInt(req.params.id);
+      const date = req.query.date ? new Date(req.query.date as string) : new Date();
+      
+      const isFrozen = await storage.checkWarehouseFreezeStatus(warehouseId, date);
+      
+      res.json({ warehouseId, date: date.toISOString(), isFrozen });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
