@@ -43,7 +43,7 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { apiRequest, queryClient, invalidateRelatedQueries } from "@/lib/queryClient";
-import { Loader2, Plus, Edit, Users, Trash, RefreshCw, Power, PowerOff } from "lucide-react";
+import { Loader2, Plus, Edit, Users, Trash, RefreshCw, Power, PowerOff, Eye, EyeOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { useLicense } from "@/hooks/use-license";
@@ -70,6 +70,7 @@ export default function UsersManagementPage() {
   const [isEditMode, setIsEditMode] = useState(false);
   const [editUserId, setEditUserId] = useState<number | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [userToDelete, setUserToDelete] = useState<number | null>(null);
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
 
@@ -549,12 +550,22 @@ export default function UsersManagementPage() {
 
                 <div className="space-y-2">
                   <Label htmlFor="password">Password</Label>
-                  <Input
-                    id="password"
-                    type="password"
-                    placeholder={isEditMode ? "Leave blank to keep current password" : "Enter password"}
-                    {...form.register("password")}
-                  />
+                  <div className="relative">
+                    <Input
+                      id="password"
+                      type={showPassword ? "text" : "password"}
+                      placeholder={isEditMode ? "Leave blank to keep current password" : "Enter password"}
+                      {...form.register("password")}
+                      className="pr-10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600"
+                    >
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
                   {form.formState.errors.password && (
                     <p className="text-sm text-red-500">{form.formState.errors.password.message}</p>
                   )}
