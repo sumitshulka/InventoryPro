@@ -70,6 +70,8 @@ import {
   InsertAuditReconciliation,
   AuditApproval,
   InsertAuditApproval,
+  AuditActionLog,
+  InsertAuditActionLog,
   users,
   departments,
   locations,
@@ -105,7 +107,8 @@ import {
   auditSessions,
   auditVerifications,
   auditReconciliations,
-  auditApprovals
+  auditApprovals,
+  auditActionLogs
 } from "@shared/schema";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
@@ -1746,6 +1749,123 @@ export class DatabaseStorage implements IStorage {
   async getPendingAuditApprovals(): Promise<AuditApproval[]> {
     return await db.select().from(auditApprovals)
       .where(eq(auditApprovals.status, 'pending'));
+  }
+
+  // ==================== AUDIT ACTION LOG OPERATIONS ====================
+
+  async createAuditActionLog(data: InsertAuditActionLog): Promise<AuditActionLog> {
+    const [log] = await db.insert(auditActionLogs).values(data).returning();
+    return log;
+  }
+
+  async getAuditActionLogsBySession(sessionId: number): Promise<AuditActionLog[]> {
+    return await db.select().from(auditActionLogs)
+      .where(eq(auditActionLogs.auditSessionId, sessionId))
+      .orderBy(desc(auditActionLogs.performedAt));
+  }
+
+  async getAuditActionLogsByVerification(verificationId: number): Promise<AuditActionLog[]> {
+    return await db.select().from(auditActionLogs)
+      .where(eq(auditActionLogs.auditVerificationId, verificationId))
+      .orderBy(desc(auditActionLogs.performedAt));
+  }
+
+  // ==================== ENHANCED AUDIT SESSION OPERATIONS ====================
+
+  async getOpenAuditSessions(): Promise<AuditSession[]> {
+    return await db.select().from(auditSessions)
+      .where(or(
+        eq(auditSessions.status, 'open'),
+        eq(auditSessions.status, 'in_progress')
+      ))
+      .orderBy(desc(auditSessions.createdAt));
+  }
+
+  async getOpenAuditSessionsForWarehouse(warehouseId: number): Promise<AuditSession[]> {
+    return await db.select().from(auditSessions)
+      .where(and(
+        eq(auditSessions.warehouseId, warehouseId),
+        or(
+          eq(auditSessions.status, 'open'),
+          eq(auditSessions.status, 'in_progress')
+        )
+      ))
+      .orderBy(desc(auditSessions.createdAt));
+  }
+
+  async checkWarehouseFreezeStatus(warehouseId: number, date: Date): Promise<boolean> {
+    const sessions = await db.select().from(auditSessions)
+      .where(and(
+        eq(auditSessions.warehouseId, warehouseId),
+        eq(auditSessions.freezeConfirmed, true),
+        or(
+          eq(auditSessions.status, 'open'),
+          eq(auditSessions.status, 'in_progress')
+        )
+      ));
+    
+    for (const session of sessions) {
+      if (session.startDate && session.endDate) {
+        const startDate = new Date(session.startDate);
+        const endDate = new Date(session.endDate);
+        startDate.setHours(0, 0, 0, 0);
+        endDate.setHours(23, 59, 59, 999);
+        if (date >= startDate && date <= endDate) {
+          return true; // Warehouse is frozen
+        }
+      }
+    }
+    return false;
+  }
+
+  async getAuditSessionsForAuditManager(managerId: number): Promise<AuditSession[]> {
+    // Get warehouses assigned to this audit manager
+    const assignments = await this.getAuditManagerWarehouses(managerId);
+    const warehouseIds = assignments.map(a => a.warehouseId);
+    
+    if (warehouseIds.length === 0) return [];
+    
+    return await db.select().from(auditSessions)
+      .where(and(
+        sql`${auditSessions.warehouseId} IN (${sql.join(warehouseIds.map(id => sql`${id}`), sql`, `)})`,
+        or(
+          eq(auditSessions.status, 'open'),
+          eq(auditSessions.status, 'in_progress')
+        )
+      ))
+      .orderBy(desc(auditSessions.createdAt));
+  }
+
+  async getAuditSessionsForAuditUser(userId: number): Promise<AuditSession[]> {
+    // Get team assignments for this audit user
+    const assignments = await this.getAuditUserAssignments(userId);
+    const warehouseIds = [...new Set(assignments.map(a => a.warehouseId))];
+    
+    if (warehouseIds.length === 0) return [];
+    
+    return await db.select().from(auditSessions)
+      .where(and(
+        sql`${auditSessions.warehouseId} IN (${sql.join(warehouseIds.map(id => sql`${id}`), sql`, `)})`,
+        or(
+          eq(auditSessions.status, 'open'),
+          eq(auditSessions.status, 'in_progress')
+        )
+      ))
+      .orderBy(desc(auditSessions.createdAt));
+  }
+
+  async getInventoryItemsForWarehouse(warehouseId: number): Promise<any[]> {
+    return await db.select({
+      inventoryId: inventory.id,
+      itemId: items.id,
+      itemCode: items.sku,
+      itemName: items.name,
+      quantity: inventory.quantity,
+      batchNumber: inventory.batchNumber,
+    })
+    .from(inventory)
+    .innerJoin(items, eq(inventory.itemId, items.id))
+    .where(eq(inventory.warehouseId, warehouseId));
   }
 }
 
