@@ -149,6 +149,8 @@ export default function UsersManagementPage() {
     onSuccess: async () => {
       // Force immediate cache invalidation and refetch
       await invalidateRelatedQueries('user', isEditMode ? 'update' : 'create');
+      await queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      await refetchUsers();
       toast({
         title: isEditMode ? "User updated" : "User created",
         description: isEditMode
@@ -186,6 +188,8 @@ export default function UsersManagementPage() {
     },
     onSuccess: async () => {
       await invalidateRelatedQueries('user', 'delete');
+      await queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      await refetchUsers();
       toast({
         title: "User deleted",
         description: "The user has been deleted successfully.",
