@@ -462,6 +462,47 @@ export default function Sidebar({ user, isOpen, onClose }: SidebarProps) {
                 </div>
               )}
 
+              {/* AUDIT Section */}
+              {(user?.role === 'admin' || user?.role === 'audit_manager' || user?.role === 'audit_user') && (
+                <div className="mb-4">
+                  <p className="text-xs font-medium text-gray-500 px-3 py-2">AUDIT</p>
+                  <ul>
+                    {(user?.role === 'audit_manager' || user?.role === 'audit_user') && (
+                      <li>
+                        <Link 
+                          href="/audit-dashboard"
+                          className={cn(
+                            "flex items-center px-3 py-2 rounded-md",
+                            isActive("/audit-dashboard") 
+                              ? "bg-primary/10 border-l-4 border-primary text-primary" 
+                              : "text-gray-700 hover:text-primary hover:bg-primary/5"
+                          )}
+                        >
+                          <span className="material-icons mr-3">assignment</span>
+                          <span className="whitespace-nowrap">Audit Dashboard</span>
+                        </Link>
+                      </li>
+                    )}
+                    {user?.role === 'admin' && (
+                      <li>
+                        <Link 
+                          href="/audit-management"
+                          className={cn(
+                            "flex items-center px-3 py-2 rounded-md",
+                            isActive("/audit-management") 
+                              ? "bg-primary/10 border-l-4 border-primary text-primary" 
+                              : "text-gray-700 hover:text-primary hover:bg-primary/5"
+                          )}
+                        >
+                          <span className="material-icons mr-3">verified_user</span>
+                          <span className="whitespace-nowrap">Audit Management</span>
+                        </Link>
+                      </li>
+                    )}
+                  </ul>
+                </div>
+              )}
+
               {/* SYSTEM Section */}
               {user?.role === 'admin' && (
                 <div className="mb-4">

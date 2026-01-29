@@ -53,7 +53,7 @@ const formSchema = z.object({
   password: z.string().optional(),
   name: z.string().min(2, { message: "Name must be at least 2 characters" }),
   email: z.string().email({ message: "Invalid email address" }),
-  role: z.enum(["admin", "manager", "employee"], { message: "Role is required" }),
+  role: z.enum(["admin", "manager", "employee", "audit_manager", "audit_user"], { message: "Role is required" }),
   managerId: z.string().optional(),
   warehouseId: z.string().optional(),
   departmentId: z.string().optional(),
@@ -589,7 +589,7 @@ export default function UsersManagementPage() {
                   <Label htmlFor="role">Role</Label>
                   <Select
                     value={form.watch("role")}
-                    onValueChange={(value) => form.setValue("role", value as "admin" | "manager" | "employee")}
+                    onValueChange={(value) => form.setValue("role", value as "admin" | "manager" | "employee" | "audit_manager" | "audit_user")}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select role" />
@@ -598,6 +598,8 @@ export default function UsersManagementPage() {
                       <SelectItem value="admin">Admin</SelectItem>
                       <SelectItem value="manager">Manager</SelectItem>
                       <SelectItem value="employee">Employee</SelectItem>
+                      <SelectItem value="audit_manager">Audit Manager</SelectItem>
+                      <SelectItem value="audit_user">Audit User</SelectItem>
                     </SelectContent>
                   </Select>
                   {form.formState.errors.role && (
