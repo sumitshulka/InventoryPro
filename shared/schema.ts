@@ -211,8 +211,8 @@ export const insertInventorySchema = createInsertSchema(inventory).pick({
   quantity: true,
 });
 
-// Transaction types (check-in, issue, transfer)
-export type TransactionType = "check-in" | "issue" | "transfer";
+// Transaction types (check-in, issue, transfer, audit_checkin, audit_checkout)
+export type TransactionType = "check-in" | "issue" | "transfer" | "audit_checkin" | "audit_checkout";
 
 // License management schema
 export const licenses = pgTable("licenses", {
@@ -266,10 +266,12 @@ export const transactions = pgTable("transactions", {
   poNumber: text("po_number"),
   deliveryChallanNumber: text("delivery_challan_number"),
   checkInDate: timestamp("check_in_date"),
+  auditSessionId: integer("audit_session_id"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   completedAt: timestamp("completed_at"),
 }, (table) => ({
   transactionsItemIdx: index("transactions_item_idx").on(table.itemId),
+  transactionsAuditSessionIdx: index("transactions_audit_session_idx").on(table.auditSessionId),
   transactionsTypeIdx: index("transactions_type_idx").on(table.transactionType),
   transactionsUserIdx: index("transactions_user_idx").on(table.userId),
   transactionsRequesterIdx: index("transactions_requester_idx").on(table.requesterId),

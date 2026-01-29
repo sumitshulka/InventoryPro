@@ -7890,6 +7890,330 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Create audit recon check-in (for excess items - adds to inventory)
+  app.post("/api/audit/sessions/:id/recon-checkin", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const sessionId = parseInt(req.params.id);
+      
+      if (user.role !== 'audit_manager') {
+        return res.status(403).json({ message: "Only audit managers can create audit recon entries" });
+      }
+      
+      const session = await storage.getAuditSessionById(sessionId);
+      if (!session) {
+        return res.status(404).json({ message: "Audit session not found" });
+      }
+      
+      if (session.status !== 'reconciliation') {
+        return res.status(400).json({ message: "Audit session must be in reconciliation status" });
+      }
+      
+      const { verificationId, quantity, notes } = req.body;
+      
+      if (!verificationId || !quantity || quantity <= 0) {
+        return res.status(400).json({ message: "Invalid verification ID or quantity" });
+      }
+      
+      // Get verification
+      const verification = await storage.getAuditVerificationById(verificationId);
+      if (!verification) {
+        return res.status(404).json({ message: "Verification not found" });
+      }
+      
+      if (verification.auditSessionId !== sessionId) {
+        return res.status(400).json({ message: "Verification does not belong to this session" });
+      }
+      
+      // Get item for transaction details
+      const item = await storage.getItem(verification.itemId);
+      if (!item) {
+        return res.status(404).json({ message: "Item not found" });
+      }
+      
+      // Get last check-in rate for this item
+      const allTransactions = await storage.getAllTransactions();
+      const lastCheckin = allTransactions
+        .filter(t => t.itemId === verification.itemId && t.transactionType === 'check-in' && t.rate)
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
+      
+      const rate = lastCheckin?.rate || '0';
+      
+      // Generate transaction code
+      const transactionCode = `AUD-CI-${sessionId}-${Date.now()}`;
+      
+      // Create audit checkin transaction
+      const transaction = await storage.createTransaction({
+        transactionCode,
+        itemId: verification.itemId,
+        quantity,
+        transactionType: 'audit_checkin',
+        destinationWarehouseId: session.warehouseId,
+        userId: user.id,
+        status: 'completed',
+        rate,
+        auditSessionId: sessionId,
+      });
+      
+      // Update inventory (add quantity)
+      const existingInventory = await storage.getInventoryByItemAndWarehouse(
+        verification.itemId,
+        session.warehouseId
+      );
+      
+      if (existingInventory) {
+        await storage.updateInventory(existingInventory.id, {
+          quantity: existingInventory.quantity + quantity
+        });
+      } else {
+        await storage.createInventory({
+          itemId: verification.itemId,
+          warehouseId: session.warehouseId,
+          quantity
+        });
+      }
+      
+      // Update verification status to complete
+      await storage.updateAuditVerification(verificationId, {
+        status: 'complete',
+        discrepancy: 0
+      });
+      
+      // Log the action
+      await storage.createAuditActionLog({
+        auditSessionId: sessionId,
+        userId: user.id,
+        action: 'audit_checkin',
+        details: {
+          itemId: verification.itemId,
+          itemName: item.name,
+          quantity,
+          rate,
+          transactionId: transaction.id,
+          notes
+        }
+      });
+      
+      res.status(201).json({ 
+        message: "Audit recon check-in created successfully",
+        transaction 
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Create audit recon check-out (for short items - removes from inventory)
+  app.post("/api/audit/sessions/:id/recon-checkout", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const sessionId = parseInt(req.params.id);
+      
+      if (user.role !== 'audit_manager') {
+        return res.status(403).json({ message: "Only audit managers can create audit recon entries" });
+      }
+      
+      const session = await storage.getAuditSessionById(sessionId);
+      if (!session) {
+        return res.status(404).json({ message: "Audit session not found" });
+      }
+      
+      if (session.status !== 'reconciliation') {
+        return res.status(400).json({ message: "Audit session must be in reconciliation status" });
+      }
+      
+      const { verificationId, quantity, notes } = req.body;
+      
+      if (!verificationId || !quantity || quantity <= 0) {
+        return res.status(400).json({ message: "Invalid verification ID or quantity" });
+      }
+      
+      // Get verification
+      const verification = await storage.getAuditVerificationById(verificationId);
+      if (!verification) {
+        return res.status(404).json({ message: "Verification not found" });
+      }
+      
+      if (verification.auditSessionId !== sessionId) {
+        return res.status(400).json({ message: "Verification does not belong to this session" });
+      }
+      
+      // Get item for transaction details
+      const item = await storage.getItem(verification.itemId);
+      if (!item) {
+        return res.status(404).json({ message: "Item not found" });
+      }
+      
+      // Get last checkout rate for this item
+      const allTransactions = await storage.getAllTransactions();
+      const lastCheckout = allTransactions
+        .filter(t => t.itemId === verification.itemId && t.transactionType === 'issue' && t.rate)
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
+      
+      const rate = lastCheckout?.rate || '0';
+      
+      // Generate transaction code
+      const transactionCode = `AUD-CO-${sessionId}-${Date.now()}`;
+      
+      // Create audit checkout transaction
+      const transaction = await storage.createTransaction({
+        transactionCode,
+        itemId: verification.itemId,
+        quantity,
+        transactionType: 'audit_checkout',
+        sourceWarehouseId: session.warehouseId,
+        userId: user.id,
+        status: 'completed',
+        rate,
+        auditSessionId: sessionId,
+      });
+      
+      // Update inventory (remove quantity)
+      const existingInventory = await storage.getInventoryByItemAndWarehouse(
+        verification.itemId,
+        session.warehouseId
+      );
+      
+      if (existingInventory) {
+        const newQuantity = Math.max(0, existingInventory.quantity - quantity);
+        await storage.updateInventory(existingInventory.id, {
+          quantity: newQuantity
+        });
+      }
+      
+      // Update verification status to complete
+      await storage.updateAuditVerification(verificationId, {
+        status: 'complete',
+        discrepancy: 0
+      });
+      
+      // Log the action
+      await storage.createAuditActionLog({
+        auditSessionId: sessionId,
+        userId: user.id,
+        action: 'audit_checkout',
+        details: {
+          itemId: verification.itemId,
+          itemName: item.name,
+          quantity,
+          rate,
+          transactionId: transaction.id,
+          notes
+        }
+      });
+      
+      res.status(201).json({ 
+        message: "Audit recon check-out created successfully",
+        transaction 
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Check if audit can be completed (all items balanced)
+  app.get("/api/audit/sessions/:id/can-complete", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const sessionId = parseInt(req.params.id);
+      
+      if (!['audit_manager', 'audit_user'].includes(user.role)) {
+        return res.status(403).json({ message: "Only audit users can check completion status" });
+      }
+      
+      const session = await storage.getAuditSessionById(sessionId);
+      if (!session) {
+        return res.status(404).json({ message: "Audit session not found" });
+      }
+      
+      const verifications = await storage.getAuditVerificationsBySession(sessionId);
+      
+      // Check if all verifications are complete (no short/excess remaining)
+      const allComplete = verifications.every(v => v.status === 'complete');
+      const hasDiscrepancies = verifications.some(v => v.status === 'short' || v.status === 'excess');
+      
+      // Check for pending transactions
+      const allTransactions = await storage.getAllTransactions();
+      const itemIds = verifications.map(v => v.itemId);
+      const pendingTransactions = allTransactions.filter(t => 
+        itemIds.includes(t.itemId) &&
+        t.status === 'pending' &&
+        (t.sourceWarehouseId === session.warehouseId || t.destinationWarehouseId === session.warehouseId)
+      );
+      
+      const hasPendingTransactions = pendingTransactions.length > 0;
+      
+      res.json({
+        canComplete: allComplete && !hasDiscrepancies && !hasPendingTransactions && session.status === 'reconciliation',
+        allComplete,
+        hasDiscrepancies,
+        hasPendingTransactions,
+        pendingCount: pendingTransactions.length,
+        discrepancyCount: verifications.filter(v => v.status === 'short' || v.status === 'excess').length,
+        status: session.status
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Complete audit session
+  app.post("/api/audit/sessions/:id/complete", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const sessionId = parseInt(req.params.id);
+      
+      if (!['audit_manager', 'audit_user'].includes(user.role)) {
+        return res.status(403).json({ message: "Only audit users can complete audit sessions" });
+      }
+      
+      const session = await storage.getAuditSessionById(sessionId);
+      if (!session) {
+        return res.status(404).json({ message: "Audit session not found" });
+      }
+      
+      if (session.status !== 'reconciliation') {
+        return res.status(400).json({ message: "Only sessions in reconciliation can be completed" });
+      }
+      
+      // Check all verifications are complete
+      const verifications = await storage.getAuditVerificationsBySession(sessionId);
+      const hasDiscrepancies = verifications.some(v => v.status === 'short' || v.status === 'excess');
+      
+      if (hasDiscrepancies) {
+        return res.status(400).json({ 
+          message: "Cannot complete audit with unresolved discrepancies. Use recon check-in/check-out to balance items first." 
+        });
+      }
+      
+      // Update session status to completed
+      await storage.updateAuditSession(sessionId, {
+        status: 'completed',
+        completedAt: new Date(),
+        completedBy: user.id
+      });
+      
+      // Log the completion
+      await storage.createAuditActionLog({
+        auditSessionId: sessionId,
+        userId: user.id,
+        action: 'complete',
+        details: {
+          completedAt: new Date().toISOString(),
+          totalItems: verifications.length,
+          notes: req.body.notes || 'Audit completed successfully'
+        }
+      });
+      
+      res.json({ 
+        message: "Audit session completed successfully. All freezes and holds have been released.",
+        sessionId
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
