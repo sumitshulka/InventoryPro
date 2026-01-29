@@ -6846,6 +6846,306 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== AUDIT MANAGEMENT ROUTES ====================
+
+  // Get all audit managers (admin only)
+  app.get("/api/audit/managers", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      if (user.role !== 'admin') {
+        return res.status(403).json({ message: "Only admins can view audit managers" });
+      }
+
+      const allUsers = await storage.getAllUsers();
+      const auditManagers = allUsers.filter(u => u.role === 'audit_manager' && u.isActive);
+
+      // Enrich with warehouse assignments
+      const enrichedManagers = await Promise.all(auditManagers.map(async (manager) => {
+        const warehouseAssignments = await storage.getAuditManagerWarehouses(manager.id);
+        const warehouses = await Promise.all(
+          warehouseAssignments.map(async (wa) => await storage.getWarehouse(wa.warehouseId))
+        );
+        return {
+          ...manager,
+          assignedWarehouses: warehouses.filter(Boolean)
+        };
+      }));
+
+      res.json(enrichedManagers);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get all audit users (admin only)
+  app.get("/api/audit/users", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      if (user.role !== 'admin') {
+        return res.status(403).json({ message: "Only admins can view audit users" });
+      }
+
+      const allUsers = await storage.getAllUsers();
+      const auditUsers = allUsers.filter(u => u.role === 'audit_user' && u.isActive);
+
+      res.json(auditUsers);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Assign warehouse to audit manager (admin only)
+  app.post("/api/audit/managers/:id/warehouses", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      if (user.role !== 'admin') {
+        return res.status(403).json({ message: "Only admins can assign warehouses to audit managers" });
+      }
+
+      const managerId = parseInt(req.params.id);
+      const { warehouseId } = req.body;
+
+      // Verify user is an audit manager
+      const manager = await storage.getUser(managerId);
+      if (!manager || manager.role !== 'audit_manager') {
+        return res.status(400).json({ message: "User is not an audit manager" });
+      }
+
+      const assignment = await storage.assignWarehouseToAuditManager({
+        auditManagerId: managerId,
+        warehouseId,
+        assignedBy: user.id,
+        isActive: true
+      });
+
+      res.json(assignment);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Remove warehouse from audit manager (admin only)
+  app.delete("/api/audit/managers/:id/warehouses/:warehouseId", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      if (user.role !== 'admin') {
+        return res.status(403).json({ message: "Only admins can remove warehouse assignments" });
+      }
+
+      const managerId = parseInt(req.params.id);
+      const warehouseId = parseInt(req.params.warehouseId);
+
+      await storage.removeWarehouseFromAuditManager(managerId, warehouseId);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get warehouses assigned to audit manager
+  app.get("/api/audit/managers/:id/warehouses", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const managerId = parseInt(req.params.id);
+
+      // Only admin or the manager themselves can view
+      if (user.role !== 'admin' && user.id !== managerId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const assignments = await storage.getAuditManagerWarehouses(managerId);
+      const warehouses = await Promise.all(
+        assignments.map(async (a) => await storage.getWarehouse(a.warehouseId))
+      );
+
+      res.json(warehouses.filter(Boolean));
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get team members for audit manager
+  app.get("/api/audit/team", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      
+      if (user.role !== 'audit_manager' && user.role !== 'admin') {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const warehouseId = req.query.warehouseId ? parseInt(req.query.warehouseId as string) : undefined;
+      const managerId = user.role === 'admin' && req.query.managerId 
+        ? parseInt(req.query.managerId as string) 
+        : user.id;
+
+      const teamMembers = await storage.getAuditTeamMembers(managerId, warehouseId);
+
+      // Enrich with user details
+      const enrichedMembers = await Promise.all(teamMembers.map(async (tm) => {
+        const auditUser = await storage.getUser(tm.auditUserId);
+        const warehouse = await storage.getWarehouse(tm.warehouseId);
+        return {
+          ...tm,
+          user: auditUser,
+          warehouse
+        };
+      }));
+
+      res.json(enrichedMembers);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Add team member (audit manager for their warehouses, or admin)
+  app.post("/api/audit/team", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const { auditUserId, warehouseId } = req.body;
+
+      // Verify the user being added is an audit user
+      const auditUser = await storage.getUser(auditUserId);
+      if (!auditUser || auditUser.role !== 'audit_user') {
+        return res.status(400).json({ message: "User is not an audit user" });
+      }
+
+      let managerId: number;
+
+      if (user.role === 'admin') {
+        // Admin must specify the manager
+        if (!req.body.auditManagerId) {
+          return res.status(400).json({ message: "Manager ID required" });
+        }
+        managerId = req.body.auditManagerId;
+      } else if (user.role === 'audit_manager') {
+        managerId = user.id;
+        
+        // Verify the manager is assigned to this warehouse
+        const managerWarehouses = await storage.getAuditManagerWarehouses(user.id);
+        const isAssigned = managerWarehouses.some(mw => mw.warehouseId === warehouseId);
+        if (!isAssigned) {
+          return res.status(403).json({ message: "You are not assigned to this warehouse" });
+        }
+      } else {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const member = await storage.addAuditTeamMember({
+        auditUserId,
+        auditManagerId: managerId,
+        warehouseId,
+        assignedBy: user.id,
+        isActive: true
+      });
+
+      res.json(member);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Remove team member
+  app.delete("/api/audit/team/:id", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const memberId = parseInt(req.params.id);
+
+      const member = await storage.getAuditTeamMemberById(memberId);
+      if (!member) {
+        return res.status(404).json({ message: "Team member not found" });
+      }
+
+      // Check permission
+      if (user.role !== 'admin' && user.id !== member.auditManagerId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      await storage.removeAuditTeamMember(memberId);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get available audit users (not yet assigned to a warehouse for a manager)
+  app.get("/api/audit/available-users", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      
+      if (user.role !== 'audit_manager' && user.role !== 'admin') {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const warehouseId = req.query.warehouseId ? parseInt(req.query.warehouseId as string) : undefined;
+      const managerId = user.role === 'admin' && req.query.managerId 
+        ? parseInt(req.query.managerId as string) 
+        : user.id;
+
+      // Get all audit users
+      const allUsers = await storage.getAllUsers();
+      const auditUsers = allUsers.filter(u => u.role === 'audit_user' && u.isActive);
+
+      // Get existing team members for this manager/warehouse
+      const existingMembers = await storage.getAuditTeamMembers(managerId, warehouseId);
+      const assignedUserIds = new Set(existingMembers.map(m => m.auditUserId));
+
+      // Filter out already assigned users
+      const availableUsers = auditUsers.filter(u => !assignedUserIds.has(u.id));
+
+      res.json(availableUsers);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get current user's audit role info (for dashboard)
+  app.get("/api/audit/my-info", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+
+      if (user.role === 'audit_manager') {
+        const warehouses = await storage.getAuditManagerWarehouses(user.id);
+        const enrichedWarehouses = await Promise.all(
+          warehouses.map(async (w) => {
+            const warehouse = await storage.getWarehouse(w.warehouseId);
+            const teamMembers = await storage.getAuditTeamMembers(user.id, w.warehouseId);
+            return {
+              ...warehouse,
+              teamCount: teamMembers.length
+            };
+          })
+        );
+
+        res.json({
+          role: 'audit_manager',
+          warehouses: enrichedWarehouses,
+          totalWarehouses: warehouses.length
+        });
+      } else if (user.role === 'audit_user') {
+        const assignments = await storage.getAuditUserAssignments(user.id);
+        const enrichedAssignments = await Promise.all(
+          assignments.map(async (a) => {
+            const warehouse = await storage.getWarehouse(a.warehouseId);
+            const manager = await storage.getUser(a.auditManagerId);
+            return {
+              warehouse,
+              manager: manager ? { id: manager.id, name: manager.name } : null
+            };
+          })
+        );
+
+        res.json({
+          role: 'audit_user',
+          assignments: enrichedAssignments
+        });
+      } else {
+        res.json({ role: user.role, message: "Not an audit role" });
+      }
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
