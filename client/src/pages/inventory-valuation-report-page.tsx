@@ -111,34 +111,43 @@ export default function InventoryValuationReportPage() {
   }, [inventoryValuation, searchTerm, categoryFilter, warehouseFilter, sortBy, sortOrder]);
 
   const totalInventoryValue = useMemo(() => {
-    return filteredAndSortedData.reduce((sum, item) => sum + item.totalValue, 0);
-  }, [filteredAndSortedData]);
+    return filteredAndSortedData
+      .filter(item => !isWarehouseUnderAuditByName(item.warehouse))
+      .reduce((sum, item) => sum + item.totalValue, 0);
+  }, [filteredAndSortedData, warehouses, warehousesUnderAudit]);
 
-  // Summary data - group by item and sum quantities across warehouses
+  // Check if any warehouses in the current filtered data are under audit
+  const hasAuditedWarehouses = useMemo(() => {
+    return filteredAndSortedData.some(item => isWarehouseUnderAuditByName(item.warehouse));
+  }, [filteredAndSortedData, warehouses, warehousesUnderAudit]);
+
+  // Summary data - group by item and sum quantities across warehouses (excluding audited)
   const summaryData = useMemo(() => {
     const itemGroups = new Map();
     
-    filteredAndSortedData.forEach(item => {
-      if (!itemGroups.has(item.sku)) {
-        itemGroups.set(item.sku, {
-          sku: item.sku,
-          name: item.name,
-          category: item.category,
-          unit: item.unit,
-          unitValue: item.unitValue,
-          totalQuantity: 0,
-          totalValue: 0,
-          valuationMethod: item.valuationMethod
-        });
-      }
-      
-      const group = itemGroups.get(item.sku);
-      group.totalQuantity += item.currentStock;
-      group.totalValue += item.totalValue;
-    });
+    filteredAndSortedData
+      .filter(item => !isWarehouseUnderAuditByName(item.warehouse))
+      .forEach(item => {
+        if (!itemGroups.has(item.sku)) {
+          itemGroups.set(item.sku, {
+            sku: item.sku,
+            name: item.name,
+            category: item.category,
+            unit: item.unit,
+            unitValue: item.unitValue,
+            totalQuantity: 0,
+            totalValue: 0,
+            valuationMethod: item.valuationMethod
+          });
+        }
+        
+        const group = itemGroups.get(item.sku);
+        group.totalQuantity += item.currentStock;
+        group.totalValue += item.totalValue;
+      });
     
     return Array.from(itemGroups.values()).sort((a, b) => a.name.localeCompare(b.name));
-  }, [filteredAndSortedData]);
+  }, [filteredAndSortedData, warehouses, warehousesUnderAudit]);
 
   const handleSort = (column: string) => {
     if (sortBy === column) {
@@ -232,6 +241,7 @@ export default function InventoryValuationReportPage() {
               </div>
               <p className="text-xs text-muted-foreground">
                 Based on {valuationMethod.toLowerCase()}
+                {hasAuditedWarehouses && " (excludes audited warehouses)"}
               </p>
             </CardContent>
           </Card>
@@ -243,14 +253,24 @@ export default function InventoryValuationReportPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {filteredAndSortedData.length > 0 ? formatCurrency(totalInventoryValue / filteredAndSortedData.reduce((sum, item) => sum + item.currentStock, 0)) : formatCurrency(0)}
+                {filteredAndSortedData.filter(item => !isWarehouseUnderAuditByName(item.warehouse)).length > 0 
+                  ? formatCurrency(totalInventoryValue / filteredAndSortedData.filter(item => !isWarehouseUnderAuditByName(item.warehouse)).reduce((sum, item) => sum + item.currentStock, 0)) 
+                  : formatCurrency(0)}
               </div>
               <p className="text-xs text-muted-foreground">
                 Per unit across all items
+                {hasAuditedWarehouses && " (excludes audited)"}
               </p>
             </CardContent>
           </Card>
         </div>
+
+        {hasAuditedWarehouses && (
+          <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-sm">
+            <span className="font-medium">Note:</span>
+            Some warehouses are currently under audit. Values from audited warehouses are masked (***) in the detailed view and excluded from summary totals.
+          </div>
+        )}
 
         {/* Filters */}
         <Card>

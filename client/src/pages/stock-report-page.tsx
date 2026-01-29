@@ -108,40 +108,45 @@ export default function StockReportPage() {
       })
     : [];
 
-  // Calculate totals for each item across all warehouses
+  // Calculate totals for each item across all warehouses (excluding audited warehouses)
   const calculateTotals = () => {
     if (!inventoryReport) return [];
     
     const totals = new Map();
     
-    inventoryReport.forEach((item: any) => {
-      const itemId = item.itemId;
-      if (!totals.has(itemId)) {
-        totals.set(itemId, {
-          item: item.item,
-          totalQuantity: 0,
-          warehouses: [],
-          isLowStock: false
+    inventoryReport
+      .filter((item: any) => !isWarehouseUnderAudit(item.warehouseId))
+      .forEach((item: any) => {
+        const itemId = item.itemId;
+        if (!totals.has(itemId)) {
+          totals.set(itemId, {
+            item: item.item,
+            totalQuantity: 0,
+            warehouses: [],
+            isLowStock: false
+          });
+        }
+        
+        const itemTotal = totals.get(itemId);
+        itemTotal.totalQuantity += item.quantity;
+        itemTotal.warehouses.push({
+          warehouse: item.warehouse,
+          quantity: item.quantity
         });
-      }
-      
-      const itemTotal = totals.get(itemId);
-      itemTotal.totalQuantity += item.quantity;
-      itemTotal.warehouses.push({
-        warehouse: item.warehouse,
-        quantity: item.quantity
+        
+        // If any warehouse is low on stock, mark the item as low stock
+        if (item.isLowStock) {
+          itemTotal.isLowStock = true;
+        }
       });
-      
-      // If any warehouse is low on stock, mark the item as low stock
-      if (item.isLowStock) {
-        itemTotal.isLowStock = true;
-      }
-    });
     
     return Array.from(totals.values());
   };
   
   const itemTotals = calculateTotals();
+
+  // Check if any warehouses are under audit
+  const hasAuditedWarehouses = warehousesUnderAudit.length > 0;
 
   if (inventoryLoading || warehousesLoading || categoriesLoading) {
     return (
@@ -223,6 +228,13 @@ export default function StockReportPage() {
           </CardContent>
         </Card>
       </div>
+
+      {hasAuditedWarehouses && (
+        <div className="flex items-center gap-2 p-3 mb-6 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-sm">
+          <span className="font-medium">Note:</span>
+          Some warehouses are currently under audit. Values from audited warehouses are masked (***) in the table and excluded from summary totals.
+        </div>
+      )}
 
       {/* Filter Controls */}
       <Card className="mb-6">
