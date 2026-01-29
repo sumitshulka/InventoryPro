@@ -1855,7 +1855,8 @@ export class DatabaseStorage implements IStorage {
         sql`${auditSessions.warehouseId} IN (${sql.join(warehouseIds.map(id => sql`${id}`), sql`, `)})`,
         or(
           eq(auditSessions.status, 'open'),
-          eq(auditSessions.status, 'in_progress')
+          eq(auditSessions.status, 'in_progress'),
+          eq(auditSessions.status, 'reconciliation')
         )
       ))
       .orderBy(desc(auditSessions.createdAt));
@@ -1873,7 +1874,8 @@ export class DatabaseStorage implements IStorage {
         sql`${auditSessions.warehouseId} IN (${sql.join(warehouseIds.map(id => sql`${id}`), sql`, `)})`,
         or(
           eq(auditSessions.status, 'open'),
-          eq(auditSessions.status, 'in_progress')
+          eq(auditSessions.status, 'in_progress'),
+          eq(auditSessions.status, 'reconciliation')
         )
       ))
       .orderBy(desc(auditSessions.createdAt));
