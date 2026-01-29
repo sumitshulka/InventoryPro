@@ -30,6 +30,9 @@ export default function Sidebar({ user, isOpen, onClose }: SidebarProps) {
   // Check if user has access to reports
   const hasReportAccess = user?.role === 'admin' || user?.role === 'manager' || user?.isWarehouseOperator;
   
+  // Check if user is an audit-only user (should only see audit-related menus)
+  const isAuditOnlyUser = user?.role === 'audit_user';
+  
   const isActive = (path: string) => {
     return location === path;
   };
@@ -84,186 +87,190 @@ export default function Sidebar({ user, isOpen, onClose }: SidebarProps) {
           {/* Navigation */}
           <nav className="flex-1">
             <div className="space-y-1">
-              {/* MAIN Section */}
-              <div className="mb-4">
-                <p className="text-xs font-medium text-gray-500 px-3 py-2">MAIN</p>
-                <ul>
-                  <li>
-                    <Link 
-                      href="/"
-                      className={cn(
-                        "flex items-center px-3 py-2 rounded-md",
-                        isActive("/") 
-                          ? "bg-primary/10 border-l-4 border-primary text-primary" 
-                          : "text-gray-700 hover:text-primary hover:bg-primary/5"
-                      )}
-                    >
-                      <span className="material-icons mr-3">dashboard</span>
-                      <span className="whitespace-nowrap">Dashboard</span>
-                    </Link>
-                  </li>
+              {/* MAIN Section - Hidden for audit_user */}
+              {!isAuditOnlyUser && (
+                <div className="mb-4">
+                  <p className="text-xs font-medium text-gray-500 px-3 py-2">MAIN</p>
+                  <ul>
+                    <li>
+                      <Link 
+                        href="/"
+                        className={cn(
+                          "flex items-center px-3 py-2 rounded-md",
+                          isActive("/") 
+                            ? "bg-primary/10 border-l-4 border-primary text-primary" 
+                            : "text-gray-700 hover:text-primary hover:bg-primary/5"
+                        )}
+                      >
+                        <span className="material-icons mr-3">dashboard</span>
+                        <span className="whitespace-nowrap">Dashboard</span>
+                      </Link>
+                    </li>
 
-                  {hasInventoryAccess && (
+                    {hasInventoryAccess && (
+                      <li>
+                        <Link 
+                          href="/inventory"
+                          className={cn(
+                            "flex items-center px-3 py-2 rounded-md",
+                            isActive("/inventory") 
+                              ? "bg-primary/10 border-l-4 border-primary text-primary" 
+                              : "text-gray-700 hover:text-primary hover:bg-primary/5"
+                          )}
+                        >
+                          <span className="material-icons mr-3">inventory_2</span>
+                          <span className="whitespace-nowrap">Inventory</span>
+                        </Link>
+                      </li>
+                    )}
                     <li>
                       <Link 
-                        href="/inventory"
+                        href="/items"
                         className={cn(
                           "flex items-center px-3 py-2 rounded-md",
-                          isActive("/inventory") 
+                          isActive("/items") 
                             ? "bg-primary/10 border-l-4 border-primary text-primary" 
                             : "text-gray-700 hover:text-primary hover:bg-primary/5"
                         )}
                       >
-                        <span className="material-icons mr-3">inventory_2</span>
-                        <span className="whitespace-nowrap">Inventory</span>
+                        <span className="material-icons mr-3">category</span>
+                        <span className="whitespace-nowrap">Items</span>
                       </Link>
                     </li>
-                  )}
-                  <li>
-                    <Link 
-                      href="/items"
-                      className={cn(
-                        "flex items-center px-3 py-2 rounded-md",
-                        isActive("/items") 
-                          ? "bg-primary/10 border-l-4 border-primary text-primary" 
-                          : "text-gray-700 hover:text-primary hover:bg-primary/5"
-                      )}
-                    >
-                      <span className="material-icons mr-3">category</span>
-                      <span className="whitespace-nowrap">Items</span>
-                    </Link>
-                  </li>
-                  {hasInventoryAccess && (
-                    <li>
-                      <Link 
-                        href="/warehouses"
-                        className={cn(
-                          "flex items-center px-3 py-2 rounded-md",
-                          isActive("/warehouses") 
-                            ? "bg-primary/10 border-l-4 border-primary text-primary" 
-                            : "text-gray-700 hover:text-primary hover:bg-primary/5"
-                        )}
-                      >
-                        <span className="material-icons mr-3">warehouse</span>
-                        <span className="whitespace-nowrap">Warehouses</span>
-                      </Link>
-                    </li>
-                  )}
-                </ul>
-              </div>
+                    {hasInventoryAccess && (
+                      <li>
+                        <Link 
+                          href="/warehouses"
+                          className={cn(
+                            "flex items-center px-3 py-2 rounded-md",
+                            isActive("/warehouses") 
+                              ? "bg-primary/10 border-l-4 border-primary text-primary" 
+                              : "text-gray-700 hover:text-primary hover:bg-primary/5"
+                          )}
+                        >
+                          <span className="material-icons mr-3">warehouse</span>
+                          <span className="whitespace-nowrap">Warehouses</span>
+                        </Link>
+                      </li>
+                    )}
+                  </ul>
+                </div>
+              )}
 
-              {/* OPERATIONS Section */}
-              <div className="mb-4">
-                <p className="text-xs font-medium text-gray-500 px-3 py-2">OPERATIONS</p>
-                <ul>
-                  {hasCheckInPermission && (
+              {/* OPERATIONS Section - Hidden for audit_user */}
+              {!isAuditOnlyUser && (
+                <div className="mb-4">
+                  <p className="text-xs font-medium text-gray-500 px-3 py-2">OPERATIONS</p>
+                  <ul>
+                    {hasCheckInPermission && (
+                      <li>
+                        <Link 
+                          href="/check-in"
+                          className={cn(
+                            "flex items-center px-3 py-2 rounded-md",
+                            isActive("/check-in") 
+                              ? "bg-primary/10 border-l-4 border-primary text-primary" 
+                              : "text-gray-700 hover:text-primary hover:bg-primary/5"
+                          )}
+                        >
+                          <span className="material-icons mr-3">input</span>
+                          <span className="whitespace-nowrap">Check In</span>
+                        </Link>
+                      </li>
+                    )}
                     <li>
                       <Link 
-                        href="/check-in"
+                        href="/requests"
                         className={cn(
                           "flex items-center px-3 py-2 rounded-md",
-                          isActive("/check-in") 
+                          isActive("/requests") 
                             ? "bg-primary/10 border-l-4 border-primary text-primary" 
                             : "text-gray-700 hover:text-primary hover:bg-primary/5"
                         )}
                       >
-                        <span className="material-icons mr-3">input</span>
-                        <span className="whitespace-nowrap">Check In</span>
+                        <span className="material-icons mr-3">output</span>
+                        <span className="whitespace-nowrap">{isRegularEmployee ? "Request Items" : "Check Out"}</span>
                       </Link>
                     </li>
-                  )}
-                  <li>
-                    <Link 
-                      href="/requests"
-                      className={cn(
-                        "flex items-center px-3 py-2 rounded-md",
-                        isActive("/requests") 
-                          ? "bg-primary/10 border-l-4 border-primary text-primary" 
-                          : "text-gray-700 hover:text-primary hover:bg-primary/5"
-                      )}
-                    >
-                      <span className="material-icons mr-3">output</span>
-                      <span className="whitespace-nowrap">{isRegularEmployee ? "Request Items" : "Check Out"}</span>
-                    </Link>
-                  </li>
-                  {hasInventoryAccess && (
+                    {hasInventoryAccess && (
+                      <li>
+                        <Link 
+                          href="/transfers"
+                          className={cn(
+                            "flex items-center px-3 py-2 rounded-md",
+                            isActive("/transfers") 
+                              ? "bg-primary/10 border-l-4 border-primary text-primary" 
+                              : "text-gray-700 hover:text-primary hover:bg-primary/5"
+                          )}
+                        >
+                          <span className="material-icons mr-3">compare_arrows</span>
+                          <span className="whitespace-nowrap">Transfers</span>
+                        </Link>
+                      </li>
+                    )}
                     <li>
                       <Link 
-                        href="/transfers"
+                        href="/my-requests"
                         className={cn(
                           "flex items-center px-3 py-2 rounded-md",
-                          isActive("/transfers") 
+                          isActive("/my-requests") 
                             ? "bg-primary/10 border-l-4 border-primary text-primary" 
                             : "text-gray-700 hover:text-primary hover:bg-primary/5"
                         )}
                       >
-                        <span className="material-icons mr-3">compare_arrows</span>
-                        <span className="whitespace-nowrap">Transfers</span>
+                        <span className="material-icons mr-3">receipt_long</span>
+                        <span className="whitespace-nowrap">My Requests</span>
                       </Link>
                     </li>
-                  )}
-                  <li>
-                    <Link 
-                      href="/my-requests"
-                      className={cn(
-                        "flex items-center px-3 py-2 rounded-md",
-                        isActive("/my-requests") 
-                          ? "bg-primary/10 border-l-4 border-primary text-primary" 
-                          : "text-gray-700 hover:text-primary hover:bg-primary/5"
-                      )}
-                    >
-                      <span className="material-icons mr-3">receipt_long</span>
-                      <span className="whitespace-nowrap">My Requests</span>
-                    </Link>
-                  </li>
-                  {hasInventoryAccess && (
+                    {hasInventoryAccess && (
+                      <li>
+                        <Link 
+                          href="/rejected-goods"
+                          className={cn(
+                            "flex items-center px-3 py-2 rounded-md",
+                            isActive("/rejected-goods") 
+                              ? "bg-primary/10 border-l-4 border-primary text-primary" 
+                              : "text-gray-700 hover:text-primary hover:bg-primary/5"
+                          )}
+                        >
+                          <span className="material-icons mr-3">block</span>
+                          <span className="whitespace-nowrap">Rejected Goods</span>
+                        </Link>
+                      </li>
+                    )}
                     <li>
                       <Link 
-                        href="/rejected-goods"
+                        href="/issues"
                         className={cn(
                           "flex items-center px-3 py-2 rounded-md",
-                          isActive("/rejected-goods") 
+                          isActive("/issues") 
                             ? "bg-primary/10 border-l-4 border-primary text-primary" 
                             : "text-gray-700 hover:text-primary hover:bg-primary/5"
                         )}
                       >
-                        <span className="material-icons mr-3">block</span>
-                        <span className="whitespace-nowrap">Rejected Goods</span>
+                        <span className="material-icons mr-3">notifications</span>
+                        <span className="whitespace-nowrap">Notification Center</span>
                       </Link>
                     </li>
-                  )}
-                  <li>
-                    <Link 
-                      href="/issues"
-                      className={cn(
-                        "flex items-center px-3 py-2 rounded-md",
-                        isActive("/issues") 
-                          ? "bg-primary/10 border-l-4 border-primary text-primary" 
-                          : "text-gray-700 hover:text-primary hover:bg-primary/5"
-                      )}
-                    >
-                      <span className="material-icons mr-3">notifications</span>
-                      <span className="whitespace-nowrap">Notification Center</span>
-                    </Link>
-                  </li>
-                  {(user?.role === 'admin' || user?.role === 'manager') && (
-                    <li>
-                      <Link 
-                        href="/approvals"
-                        className={cn(
-                          "flex items-center px-3 py-2 rounded-md",
-                          isActive("/approvals") 
-                            ? "bg-primary/10 border-l-4 border-primary text-primary" 
-                            : "text-gray-700 hover:text-primary hover:bg-primary/5"
-                        )}
-                      >
-                        <span className="material-icons mr-3">approval</span>
-                        <span className="whitespace-nowrap">Approvals</span>
-                      </Link>
-                    </li>
-                  )}
-                </ul>
-              </div>
+                    {(user?.role === 'admin' || user?.role === 'manager') && (
+                      <li>
+                        <Link 
+                          href="/approvals"
+                          className={cn(
+                            "flex items-center px-3 py-2 rounded-md",
+                            isActive("/approvals") 
+                              ? "bg-primary/10 border-l-4 border-primary text-primary" 
+                              : "text-gray-700 hover:text-primary hover:bg-primary/5"
+                          )}
+                        >
+                          <span className="material-icons mr-3">approval</span>
+                          <span className="whitespace-nowrap">Approvals</span>
+                        </Link>
+                      </li>
+                    )}
+                  </ul>
+                </div>
+              )}
 
               {/* SALES Section */}
               {hasInventoryAccess && (
@@ -495,6 +502,20 @@ export default function Sidebar({ user, isOpen, onClose }: SidebarProps) {
                           >
                             <span className="material-icons mr-3">history</span>
                             <span className="whitespace-nowrap">Audit Sessions</span>
+                          </Link>
+                        </li>
+                        <li>
+                          <Link 
+                            href="/audit-report"
+                            className={cn(
+                              "flex items-center px-3 py-2 rounded-md",
+                              isActive("/audit-report") 
+                                ? "bg-primary/10 border-l-4 border-primary text-primary" 
+                                : "text-gray-700 hover:text-primary hover:bg-primary/5"
+                            )}
+                          >
+                            <span className="material-icons mr-3">summarize</span>
+                            <span className="whitespace-nowrap">Audit Report</span>
                           </Link>
                         </li>
                       </>

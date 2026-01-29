@@ -40,6 +40,7 @@ import AuditDashboardPage from "@/pages/audit-dashboard-page";
 import AuditSessionsPage from "@/pages/audit-sessions-page";
 import AuditSpreadsheetPage from "@/pages/audit-spreadsheet-page";
 import AuditHistoryPage from "@/pages/audit-history-page";
+import AuditReportPage from "@/pages/audit-report-page";
 import { ProtectedRoute } from "./lib/protected-route";
 
 function Router() {
@@ -94,6 +95,7 @@ function Router() {
           <ProtectedRoute path="/audit-dashboard" component={AuditDashboardPage} />
           <ProtectedRoute path="/audit-sessions" component={AuditSessionsPage} />
           <ProtectedRoute path="/audit-history" component={AuditHistoryPage} />
+          <ProtectedRoute path="/audit-report" component={AuditReportPage} />
           <ProtectedRoute path="/audit-spreadsheet/:id" component={AuditSpreadsheetPage} />
           <Route component={NotFound} />
         </Switch>

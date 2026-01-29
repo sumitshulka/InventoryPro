@@ -23,6 +23,12 @@ export default function DashboardPage() {
 
   const isEmployeeOnly = user?.role === 'employee' && userOperatedWarehouses.length === 0;
   
+  // For audit_user, redirect to audit dashboard
+  if (user?.role === 'audit_user') {
+    setLocation('/audit-dashboard');
+    return null;
+  }
+  
   // For employees only, redirect to simplified dashboard
   if (isEmployeeOnly) {
     return <EmployeeDashboard />;
