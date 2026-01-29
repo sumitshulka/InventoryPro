@@ -63,6 +63,13 @@ export default function AuditSpreadsheetPage() {
 
   const { data: session, isLoading: sessionLoading } = useQuery<any>({
     queryKey: ["/api/audit/sessions", sessionId],
+    queryFn: async () => {
+      const response = await fetch(`/api/audit/sessions/${sessionId}`, {
+        credentials: 'include'
+      });
+      if (!response.ok) throw new Error('Failed to fetch session');
+      return response.json();
+    },
     enabled: sessionId > 0
   });
 
