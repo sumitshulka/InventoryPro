@@ -8440,10 +8440,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      // Update verification status to complete
+      // Update verification status to complete (preserve original discrepancy for audit trail)
       await storage.updateAuditVerification(verificationId, {
-        status: 'complete',
-        discrepancy: 0
+        status: 'complete'
+        // NOTE: discrepancy is NOT reset - preserved for variance report
       });
       
       // Log the action
@@ -8549,10 +8549,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      // Update verification status to complete
+      // Update verification status to complete (preserve original discrepancy for audit trail)
       await storage.updateAuditVerification(verificationId, {
-        status: 'complete',
-        discrepancy: 0
+        status: 'complete'
+        // NOTE: discrepancy is NOT reset - preserved for variance report
       });
       
       // Log the action
