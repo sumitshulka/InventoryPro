@@ -90,14 +90,26 @@ export default function AuditReportPage() {
     enabled: !!selectedSessionId
   });
 
-  const reportableSessions = sessions.filter(session => 
-    session.status === 'reconciliation' || session.status === 'completed'
-  );
+  // Admin can only view reports for completed audits
+  // Audit managers and audit users can view reconciliation and completed
+  const reportableSessions = sessions.filter(session => {
+    if (user?.role === 'admin') {
+      return session.status === 'completed';
+    }
+    return session.status === 'reconciliation' || session.status === 'completed';
+  });
 
   const filteredSessions = reportableSessions.filter(session => {
     if (statusFilter === "all") return true;
     return session.status === statusFilter;
   });
+  
+  // Check if selected session is valid for viewing reports
+  const canViewReports = selectedSession && (
+    user?.role === 'admin' 
+      ? selectedSession.status === 'completed' 
+      : selectedSession.status === 'reconciliation' || selectedSession.status === 'completed'
+  );
 
   const varianceItems = verifications.filter(v => v.discrepancy !== null && v.discrepancy !== 0);
   const shortItems = varianceItems.filter(v => v.discrepancy! < 0);
@@ -216,7 +228,9 @@ export default function AuditReportPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Status</SelectItem>
-                    <SelectItem value="reconciliation">Reconciliation</SelectItem>
+                    {user?.role !== 'admin' && (
+                      <SelectItem value="reconciliation">Reconciliation</SelectItem>
+                    )}
                     <SelectItem value="completed">Completed</SelectItem>
                   </SelectContent>
                 </Select>
@@ -247,12 +261,32 @@ export default function AuditReportPage() {
             )}
             
             {!sessionsLoading && reportableSessions.length === 0 && (
-              <div className="text-center py-4 text-muted-foreground">No audit sessions with Reconciliation or Completed status found.</div>
+              <div className="text-center py-4 text-muted-foreground">
+                {user?.role === 'admin' 
+                  ? "No completed audit sessions found. Reports are only available for audits that have been completed."
+                  : "No audit sessions with Reconciliation or Completed status found."
+                }
+              </div>
             )}
           </CardContent>
         </Card>
 
-        {selectedSession && (
+        {selectedSession && !canViewReports && (
+          <Card className="border-yellow-200 bg-yellow-50">
+            <CardContent className="p-8 text-center">
+              <AlertTriangle className="h-12 w-12 mx-auto text-yellow-600 mb-4" />
+              <h2 className="text-xl font-semibold mb-2">Audit Not Completed</h2>
+              <p className="text-muted-foreground">
+                Reports are only available for completed audit sessions. This audit is currently in "{selectedSession.status}" status.
+              </p>
+              <p className="text-muted-foreground mt-2">
+                Please wait until the Audit Manager completes the audit and releases the warehouse freeze.
+              </p>
+            </CardContent>
+          </Card>
+        )}
+
+        {selectedSession && canViewReports && (
           <>
             <Card>
               <CardHeader>
