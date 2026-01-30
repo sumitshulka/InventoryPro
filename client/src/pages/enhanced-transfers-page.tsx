@@ -55,8 +55,10 @@ import {
   MapPin,
   Phone,
   FileText,
-  Warehouse
+  Warehouse,
+  AlertTriangle
 } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { formatDateTime, getStatusColor } from "@/lib/utils";
@@ -148,6 +150,11 @@ export default function EnhancedTransfersPage() {
     queryKey: ["/api/warehouses", refreshKey],
   });
 
+  // Query for warehouses under active audit (frozen)
+  const { data: warehousesUnderAudit = [] } = useQuery<number[]>({
+    queryKey: ["/api/warehouses/under-audit"],
+  });
+
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -168,6 +175,17 @@ export default function EnhancedTransfersPage() {
     control: form.control,
     name: "items",
   });
+
+  // Watch warehouse selections to check if they're under audit
+  const selectedSourceWarehouseId = form.watch("sourceWarehouseId");
+  const selectedDestWarehouseId = form.watch("destinationWarehouseId");
+  const isSourceFrozen = Boolean(selectedSourceWarehouseId && warehousesUnderAudit.includes(parseInt(selectedSourceWarehouseId)));
+  const isDestFrozen = Boolean(selectedDestWarehouseId && warehousesUnderAudit.includes(parseInt(selectedDestWarehouseId)));
+  const isAnyWarehouseFrozen = isSourceFrozen || isDestFrozen;
+  const frozenWarehouseNames = [
+    isSourceFrozen ? (warehouses as any)?.find((w: any) => w.id === parseInt(selectedSourceWarehouseId))?.name : null,
+    isDestFrozen ? (warehouses as any)?.find((w: any) => w.id === parseInt(selectedDestWarehouseId))?.name : null,
+  ].filter(Boolean).join(" and ");
 
   const receiptForm = useForm<ReceiptFormValues>({
     resolver: zodResolver(receiptSchema),
@@ -1059,6 +1077,17 @@ export default function EnhancedTransfersPage() {
                 </div>
               </div>
 
+              {isAnyWarehouseFrozen && (
+                <Alert variant="destructive" className="border-red-300 bg-red-50">
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertTitle>Warehouse Under Audit</AlertTitle>
+                  <AlertDescription>
+                    {frozenWarehouseNames || "Selected warehouse"} {isSourceFrozen && isDestFrozen ? "are" : "is"} currently under physical audit. 
+                    Transfers are not allowed until the audit is completed and the warehouse freeze is released.
+                  </AlertDescription>
+                </Alert>
+              )}
+
               <DialogFooter>
                 <Button
                   type="button"
@@ -1069,13 +1098,15 @@ export default function EnhancedTransfersPage() {
                 </Button>
                 <Button
                   type="submit"
-                  disabled={createTransferMutation.isPending}
+                  disabled={createTransferMutation.isPending || isAnyWarehouseFrozen}
                 >
                   {createTransferMutation.isPending ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       Creating...
                     </>
+                  ) : isAnyWarehouseFrozen ? (
+                    "Transfer Blocked - Warehouse Under Audit"
                   ) : (
                     "Create Transfer"
                   )}

@@ -39,7 +39,8 @@ import {
   TabsTrigger,
 } from "@/components/ui/tabs";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Loader2, Plus, CheckCircle, X, Eye, Download, RefreshCw } from "lucide-react";
+import { Loader2, Plus, CheckCircle, X, Eye, Download, RefreshCw, AlertTriangle } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { formatDateTime, getStatusColor } from "@/lib/utils";
@@ -85,6 +86,11 @@ export default function RequestsPage() {
     queryKey: ["/api/warehouses"],
   });
 
+  // Query for warehouses under active audit (frozen)
+  const { data: warehousesUnderAudit = [] } = useQuery<number[]>({
+    queryKey: ["/api/warehouses/under-audit"],
+  });
+
   const { data: users, isLoading: usersLoading, refetch: refetchUsers } = useQuery({
     queryKey: ["/api/users"],
   });
@@ -107,6 +113,13 @@ export default function RequestsPage() {
     control: form.control,
     name: "items",
   });
+
+  // Watch warehouse selection to check if it's under audit
+  const selectedWarehouseId = form.watch("warehouseId");
+  const isWarehouseFrozen = Boolean(selectedWarehouseId && warehousesUnderAudit.includes(parseInt(selectedWarehouseId)));
+  const frozenWarehouseName = isWarehouseFrozen 
+    ? (warehouses as any)?.find((w: any) => w.id === parseInt(selectedWarehouseId))?.name 
+    : null;
 
   const createRequestMutation = useMutation({
     mutationFn: async (data: FormValues) => {
@@ -537,6 +550,17 @@ export default function RequestsPage() {
               </div>
             </div>
 
+            {isWarehouseFrozen && (
+              <Alert variant="destructive" className="border-red-300 bg-red-50">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertTitle>Warehouse Under Audit</AlertTitle>
+                <AlertDescription>
+                  {frozenWarehouseName || "Selected warehouse"} is currently under physical audit. 
+                  Requests from this warehouse are not allowed until the audit is completed.
+                </AlertDescription>
+              </Alert>
+            )}
+
             <DialogFooter>
               <Button
                 type="button"
@@ -547,13 +571,15 @@ export default function RequestsPage() {
               </Button>
               <Button
                 type="submit"
-                disabled={createRequestMutation.isPending}
+                disabled={createRequestMutation.isPending || isWarehouseFrozen}
               >
                 {createRequestMutation.isPending ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Submitting...
                   </>
+                ) : isWarehouseFrozen ? (
+                  "Request Blocked - Warehouse Under Audit"
                 ) : (
                   "Submit Request"
                 )}
