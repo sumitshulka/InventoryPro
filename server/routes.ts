@@ -8271,16 +8271,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Log the action
       await storage.createAuditActionLog({
         auditSessionId: sessionId,
-        userId: user.id,
-        action: 'audit_checkin',
-        details: {
+        auditVerificationId: verificationId,
+        actionType: 'audit_checkin',
+        performedBy: user.id,
+        newValues: JSON.stringify({
           itemId: verification.itemId,
           itemName: item.name,
           quantity,
           rate,
           transactionId: transaction.id,
           notes
-        }
+        })
       });
       
       res.status(201).json({ 
@@ -8379,16 +8380,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Log the action
       await storage.createAuditActionLog({
         auditSessionId: sessionId,
-        userId: user.id,
-        action: 'audit_checkout',
-        details: {
+        auditVerificationId: verificationId,
+        actionType: 'audit_checkout',
+        performedBy: user.id,
+        newValues: JSON.stringify({
           itemId: verification.itemId,
           itemName: item.name,
           quantity,
           rate,
           transactionId: transaction.id,
           notes
-        }
+        })
       });
       
       res.status(201).json({ 
@@ -8486,13 +8488,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Log the completion
       await storage.createAuditActionLog({
         auditSessionId: sessionId,
-        userId: user.id,
-        action: 'complete',
-        details: {
+        auditVerificationId: null,
+        actionType: 'complete',
+        performedBy: user.id,
+        newValues: JSON.stringify({
           completedAt: new Date().toISOString(),
           totalItems: verifications.length,
           notes: req.body.notes || 'Audit completed successfully'
-        }
+        })
       });
       
       res.json({ 
