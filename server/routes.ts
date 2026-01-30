@@ -7298,14 +7298,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         sessions.map(async (s) => {
           const warehouse = await storage.getWarehouse(s.warehouseId);
           const verifications = await storage.getAuditVerificationsBySession(s.id);
-          const confirmedCount = verifications.filter(v => v.status === 'confirmed').length;
+          // Count all verified items (confirmed, complete, short, excess - anything not pending)
+          const verifiedCount = verifications.filter(v => 
+            v.status === 'confirmed' || v.status === 'complete' || v.status === 'short' || v.status === 'excess'
+          ).length;
+          const pendingCount = verifications.filter(v => v.status === 'pending').length;
           
           return {
             ...s,
             warehouseName: warehouse?.name || 'Unknown',
             totalItems: verifications.length,
-            confirmedItems: confirmedCount,
-            pendingItems: verifications.length - confirmedCount
+            confirmedItems: verifiedCount,
+            pendingItems: pendingCount
           };
         })
       );
