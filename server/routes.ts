@@ -7840,6 +7840,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Update notes for a verification (Audit Manager or original confirmer)
+  app.post("/api/audit/verifications/:id/update-notes", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const verificationId = parseInt(req.params.id);
+
+      if (!['audit_manager', 'audit_user'].includes(user.role)) {
+        return res.status(403).json({ message: "Only audit managers and audit users can update notes" });
+      }
+
+      const verification = await storage.getAuditVerificationById(verificationId);
+      if (!verification) {
+        return res.status(404).json({ message: "Verification not found" });
+      }
+
+      // Check if user can edit (either audit_manager or the confirmer)
+      if (user.role === 'audit_user' && verification.confirmedBy && verification.confirmedBy !== user.id) {
+        return res.status(403).json({ message: "You can only edit notes for items you confirmed" });
+      }
+
+      const { notes } = req.body;
+
+      const updated = await storage.updateAuditVerification(verificationId, {
+        notes: notes || null,
+        updatedAt: new Date()
+      });
+
+      // Log the notes update action
+      await storage.createAuditActionLog({
+        auditSessionId: verification.auditSessionId,
+        auditVerificationId: verificationId,
+        actionType: 'update_notes',
+        performedBy: user.id,
+        previousValues: JSON.stringify({ notes: verification.notes }),
+        newValues: JSON.stringify({ notes: notes }),
+        notes: 'Notes updated'
+      });
+
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Override a locked verification (Audit Manager only)
   app.post("/api/audit/verifications/:id/override", requireAuth, async (req, res) => {
     try {

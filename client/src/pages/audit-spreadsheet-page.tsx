@@ -49,6 +49,7 @@ export default function AuditSpreadsheetPage() {
   const [editingItem, setEditingItem] = useState<Verification | null>(null);
   const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
   const [isOverrideDialogOpen, setIsOverrideDialogOpen] = useState(false);
+  const [isNotesDialogOpen, setIsNotesDialogOpen] = useState(false);
   const [formData, setFormData] = useState({
     batchNumber: "",
     physicalQuantity: "",
@@ -59,6 +60,8 @@ export default function AuditSpreadsheetPage() {
   // Inline editing state for spreadsheet-like experience
   const [inlineEdits, setInlineEdits] = useState<Record<number, string>>({});
   const [editingRowId, setEditingRowId] = useState<number | null>(null);
+  const [editingNotesId, setEditingNotesId] = useState<number | null>(null);
+  const [editingNotesValue, setEditingNotesValue] = useState<string>("");
   
   // Search and filter state
   const [searchQuery, setSearchQuery] = useState("");
@@ -229,6 +232,45 @@ export default function AuditSpreadsheetPage() {
       });
     }
   });
+
+  const updateNotesMutation = useMutation({
+    mutationFn: async (data: { verificationId: number; notes: string }) => {
+      return await apiRequest("POST", `/api/audit/verifications/${data.verificationId}/update-notes`, {
+        notes: data.notes
+      });
+    },
+    onSuccess: () => {
+      toast({
+        title: "Notes Updated",
+        description: "Reason/notes have been saved."
+      });
+      setIsNotesDialogOpen(false);
+      setEditingNotesId(null);
+      setEditingNotesValue("");
+      refetchVerifications();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update notes",
+        variant: "destructive"
+      });
+    }
+  });
+
+  const handleEditNotes = (verification: Verification) => {
+    setEditingNotesId(verification.id);
+    setEditingNotesValue(verification.notes || "");
+    setIsNotesDialogOpen(true);
+  };
+
+  const handleSaveNotes = () => {
+    if (editingNotesId === null) return;
+    updateNotesMutation.mutate({
+      verificationId: editingNotesId,
+      notes: editingNotesValue
+    });
+  };
 
   const handleInlineEdit = (verificationId: number, currentValue: number | null) => {
     setEditingRowId(verificationId);
@@ -800,15 +842,22 @@ export default function AuditSpreadsheetPage() {
                         
                         {/* Reason/Notes */}
                         <TableCell className="max-w-[200px]">
-                          {verification.notes ? (
-                            <span className="text-sm text-muted-foreground truncate block" title={verification.notes}>
-                              {verification.notes}
-                            </span>
-                          ) : (
-                            <span className="text-xs text-muted-foreground italic">
-                              {verification.status === 'pending' ? '-' : 'No reason provided'}
-                            </span>
-                          )}
+                          <div 
+                            className="flex items-center gap-1 cursor-pointer hover:bg-muted/50 rounded px-2 py-1 min-h-[32px]"
+                            onClick={() => handleEditNotes(verification)}
+                            title="Click to add/edit reason"
+                          >
+                            {verification.notes ? (
+                              <span className="text-sm truncate block flex-1" title={verification.notes}>
+                                {verification.notes}
+                              </span>
+                            ) : (
+                              <span className="text-xs text-muted-foreground italic flex-1">
+                                {verification.status === 'pending' ? 'Click to add' : 'Click to add reason'}
+                              </span>
+                            )}
+                            <Edit className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                          </div>
                         </TableCell>
                         
                         {/* Status */}
@@ -1382,6 +1431,37 @@ export default function AuditSpreadsheetPage() {
                 {reconCheckinMutation.isPending || reconCheckoutMutation.isPending 
                   ? "Processing..." 
                   : reconType === 'checkin' ? "Create Recon Check-in" : "Create Recon Check-out"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={isNotesDialogOpen} onOpenChange={setIsNotesDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Add/Edit Reason/Notes</DialogTitle>
+              <DialogDescription>
+                Provide a reason for any discrepancy or additional notes for this item.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="editNotes">Reason/Notes</Label>
+                <Textarea
+                  id="editNotes"
+                  placeholder="e.g., Damaged items found, Missing stock - possible theft, Extra units from previous order, etc."
+                  value={editingNotesValue}
+                  onChange={(e) => setEditingNotesValue(e.target.value)}
+                  className="min-h-[120px]"
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsNotesDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleSaveNotes} disabled={updateNotesMutation.isPending}>
+                {updateNotesMutation.isPending ? "Saving..." : "Save Notes"}
               </Button>
             </DialogFooter>
           </DialogContent>
