@@ -319,9 +319,16 @@ export default function AuditReportPage() {
                       <AlertTriangle className="h-4 w-4" />
                       Variance Report
                     </TabsTrigger>
-                    <TabsTrigger value="final" className="flex items-center gap-2">
+                    <TabsTrigger 
+                      value="final" 
+                      className="flex items-center gap-2"
+                      disabled={selectedSession.status !== 'completed'}
+                    >
                       <FileCheck className="h-4 w-4" />
                       Final Audit Report
+                      {selectedSession.status !== 'completed' && (
+                        <span className="text-xs text-muted-foreground ml-1">(Complete audit first)</span>
+                      )}
                     </TabsTrigger>
                   </TabsList>
 
@@ -501,6 +508,18 @@ export default function AuditReportPage() {
                   </TabsContent>
 
                   <TabsContent value="final">
+                    {selectedSession.status !== 'completed' ? (
+                      <div className="text-center py-12 border rounded-lg bg-muted/30">
+                        <FileCheck className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                        <h3 className="text-lg font-semibold mb-2">Final Report Not Available</h3>
+                        <p className="text-muted-foreground">
+                          The Final Audit Report can only be generated after the audit is completed.
+                        </p>
+                        <p className="text-sm text-muted-foreground mt-2">
+                          Current status: <span className="font-medium">{selectedSession.status}</span>
+                        </p>
+                      </div>
+                    ) : (
                     <div className="space-y-4">
                       <div className="flex justify-between items-center">
                         <div>
@@ -566,6 +585,7 @@ export default function AuditReportPage() {
                         </div>
                       )}
                     </div>
+                    )}
                   </TabsContent>
                 </Tabs>
               </CardContent>

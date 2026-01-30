@@ -7611,6 +7611,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Audit session not found" });
       }
 
+      // Final audit report can only be generated for completed audits
+      if (session.status !== 'completed') {
+        return res.status(400).json({ message: "Final Audit Report can only be generated for completed audits" });
+      }
+
       if (user.role === 'audit_manager') {
         const assignments = await storage.getAuditManagerWarehouses(user.id);
         if (!assignments.some(a => a.warehouseId === session.warehouseId)) {
