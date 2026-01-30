@@ -114,7 +114,7 @@ import session from "express-session";
 import connectPg from "connect-pg-simple";
 import createMemoryStore from "memorystore";
 import { db, pool } from "./db";
-import { eq, and, desc, or, ne, sql } from "drizzle-orm";
+import { eq, and, desc, or, ne, sql, inArray } from "drizzle-orm";
 
 const MemoryStore = createMemoryStore(session);
 const PostgresSessionStore = connectPg(session);
@@ -260,6 +260,9 @@ export interface IStorage {
   // Dispatch Items operations
   getDispatchItemsByDispatch(dispatchId: number): Promise<SalesOrderDispatchItem[]>;
   createDispatchItem(item: InsertSalesOrderDispatchItem): Promise<SalesOrderDispatchItem>;
+
+  // Audit operations
+  getActiveAuditForWarehouse(warehouseId: number): Promise<AuditSession | undefined>;
 
   // Session store
   sessionStore: session.Store;
@@ -1653,6 +1656,16 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(auditSessions)
       .where(eq(auditSessions.warehouseId, warehouseId))
       .orderBy(desc(auditSessions.createdAt));
+  }
+
+  async getActiveAuditForWarehouse(warehouseId: number): Promise<AuditSession | undefined> {
+    const [session] = await db.select().from(auditSessions)
+      .where(and(
+        eq(auditSessions.warehouseId, warehouseId),
+        inArray(auditSessions.status, ['open', 'in_progress', 'reconciliation'])
+      ))
+      .limit(1);
+    return session;
   }
 
   async getAuditSessionsByManager(managerId: number): Promise<AuditSession[]> {

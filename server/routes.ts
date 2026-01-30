@@ -1046,6 +1046,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const transactionData = parseResult.data;
       
+      // Check if warehouse is under active audit (freeze check)
+      const warehouseIdToCheck = transactionData.transactionType === 'check-in' 
+        ? transactionData.destinationWarehouseId 
+        : transactionData.transactionType === 'issue' 
+          ? transactionData.sourceWarehouseId 
+          : null;
+      
+      if (warehouseIdToCheck) {
+        const activeAudit = await storage.getActiveAuditForWarehouse(warehouseIdToCheck);
+        if (activeAudit) {
+          const actionType = transactionData.transactionType === 'check-in' ? 'Checkins' : 'Checkouts';
+          return res.status(400).json({ 
+            message: `Warehouse is under physical audit. ${actionType} can happen only after audit is completed.`
+          });
+        }
+      }
+      
+      // For transfer transactions, check both source and destination warehouses
+      if (transactionData.transactionType === 'transfer') {
+        if (transactionData.sourceWarehouseId) {
+          const sourceAudit = await storage.getActiveAuditForWarehouse(transactionData.sourceWarehouseId);
+          if (sourceAudit) {
+            return res.status(400).json({ 
+              message: "Warehouse is under physical audit. Transfers can happen only after audit is completed."
+            });
+          }
+        }
+        if (transactionData.destinationWarehouseId) {
+          const destAudit = await storage.getActiveAuditForWarehouse(transactionData.destinationWarehouseId);
+          if (destAudit) {
+            return res.status(400).json({ 
+              message: "Warehouse is under physical audit. Transfers can happen only after audit is completed."
+            });
+          }
+        }
+      }
+      
       // Generate transaction code
       const transactionCode = `TRX-${(await storage.getAllTransactions()).length + 873}`; // Start from where sample data left off
       
@@ -3426,6 +3463,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      // Check if source or destination warehouse is under active audit
+      const destinationWarehouseId = parseInt(req.body.destinationWarehouseId);
+      
+      const sourceAudit = await storage.getActiveAuditForWarehouse(sourceWarehouseId);
+      if (sourceAudit) {
+        return res.status(400).json({ 
+          message: "Warehouse is under physical audit. Transfers can happen only after audit is completed."
+        });
+      }
+      
+      const destAudit = await storage.getActiveAuditForWarehouse(destinationWarehouseId);
+      if (destAudit) {
+        return res.status(400).json({ 
+          message: "Warehouse is under physical audit. Transfers can happen only after audit is completed."
+        });
+      }
+      
       // Generate unique transfer code
       const allTransfers = await storage.getAllTransfers();
       const transferCode = `TRF-${String(allTransfers.length + 1).padStart(4, '0')}`;
