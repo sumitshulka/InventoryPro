@@ -12,9 +12,9 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
-import { ArrowLeft, CheckCircle, Clock, Lock, Edit, ShieldCheck, FileText, User, Save, X, AlertTriangle, TrendingUp, TrendingDown, PlayCircle, Package, Search, Filter } from "lucide-react";
+import { ArrowLeft, CheckCircle, Clock, Lock, Edit, ShieldCheck, FileText, User, Save, X, AlertTriangle, TrendingUp, TrendingDown, PlayCircle, Package, Search, Filter, Loader2 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface Verification {
@@ -451,6 +451,31 @@ export default function AuditSpreadsheetPage() {
       toast({
         title: "Error",
         description: error.message || "Failed to complete audit",
+        variant: "destructive"
+      });
+    }
+  });
+
+  // Mutation to approve pending checkout during reconciliation
+  const approvePendingCheckoutMutation = useMutation({
+    mutationFn: async (transactionId: number) => {
+      return await apiRequest("POST", `/api/audit/sessions/${sessionId}/approve-pending-checkout`, {
+        transactionId
+      });
+    },
+    onSuccess: (data: any) => {
+      toast({
+        title: "Checkout Approved",
+        description: data.message || "Pending checkout has been approved and system quantity updated."
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/audit/sessions", sessionId, "verifications"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/audit/sessions", sessionId, "pending-transactions"] });
+      refetchCanComplete();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to approve pending checkout",
         variant: "destructive"
       });
     }
@@ -1035,14 +1060,28 @@ export default function AuditSpreadsheetPage() {
                             <span className="font-medium">{tx.itemName}</span>
                             <span className="text-muted-foreground ml-2">({tx.itemSku})</span>
                             <span className="ml-2 text-red-700 font-medium">Qty: {tx.quantity}</span>
+                            <span className="text-sm text-muted-foreground ml-2">
+                              (Requested by: {tx.requesterName || 'Unknown'})
+                            </span>
                           </div>
-                          <div className="text-sm text-muted-foreground">
-                            Requested by: {tx.requesterName || 'Unknown'}
-                          </div>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="bg-green-50 border-green-300 text-green-700 hover:bg-green-100"
+                            onClick={() => approvePendingCheckoutMutation.mutate(tx.id)}
+                            disabled={approvePendingCheckoutMutation.isPending}
+                          >
+                            {approvePendingCheckoutMutation.isPending ? (
+                              <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                            ) : (
+                              <CheckCircle className="h-4 w-4 mr-1" />
+                            )}
+                            Approve Checkout
+                          </Button>
                         </div>
                       ))}
                       <p className="text-sm text-amber-700 mt-2">
-                        Approving these pending checkouts would reduce system quantity to match physical count.
+                        Approving these pending checkouts will reduce system quantity to match physical count and clear the discrepancy.
                       </p>
                     </div>
                   ) : (

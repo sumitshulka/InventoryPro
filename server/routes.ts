@@ -8343,6 +8343,129 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Approve pending checkout during audit reconciliation (Audit Manager only)
+  app.post("/api/audit/sessions/:id/approve-pending-checkout", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const sessionId = parseInt(req.params.id);
+      const { transactionId } = req.body;
+
+      // Only audit managers can approve pending checkouts during reconciliation
+      if (user.role !== 'audit_manager') {
+        return res.status(403).json({ message: "Only audit managers can approve pending checkouts during audit" });
+      }
+
+      const session = await storage.getAuditSessionById(sessionId);
+      if (!session) {
+        return res.status(404).json({ message: "Audit session not found" });
+      }
+
+      if (session.status !== 'reconciliation') {
+        return res.status(400).json({ message: "Can only approve pending checkouts during reconciliation phase" });
+      }
+
+      // Verify audit manager has access to this warehouse
+      const assignments = await storage.getAuditManagerWarehouses(user.id);
+      if (!assignments.some(a => a.warehouseId === session.warehouseId)) {
+        return res.status(403).json({ message: "You don't have access to this audit session" });
+      }
+
+      // Get the pending transaction
+      const transaction = await storage.getTransaction(transactionId);
+      if (!transaction) {
+        return res.status(404).json({ message: "Transaction not found" });
+      }
+
+      if (transaction.status !== 'pending') {
+        return res.status(400).json({ message: "Transaction is not pending" });
+      }
+
+      if (transaction.transactionType !== 'issue') {
+        return res.status(400).json({ message: "Only checkout (issue) transactions can be approved here" });
+      }
+
+      // Verify this transaction is for an item in this audit
+      const verifications = await storage.getAuditVerificationsBySession(sessionId);
+      const verification = verifications.find(v => v.itemId === transaction.itemId);
+      if (!verification) {
+        return res.status(400).json({ message: "This transaction is not for an item in this audit session" });
+      }
+
+      // Approve the transaction - update status to completed
+      await storage.updateTransaction(transactionId, { status: 'completed' });
+
+      // Update the request if exists
+      if (transaction.requestId) {
+        const request = await storage.getRequest(transaction.requestId);
+        if (request) {
+          await storage.updateRequest(transaction.requestId, { status: 'approved' });
+        }
+      }
+
+      // Update any pending approval records
+      const approvals = await storage.getRequestApprovalsByRequest(transaction.requestId || 0);
+      const pendingApproval = approvals.find(a => a.status === 'pending');
+      if (pendingApproval) {
+        await storage.updateRequestApproval(pendingApproval.id, { 
+          status: 'approved',
+          actionDate: new Date()
+        });
+      }
+
+      // Deduct from inventory
+      const inventory = await storage.getInventoryByItemAndWarehouse(
+        transaction.itemId,
+        transaction.sourceWarehouseId!
+      );
+      
+      if (inventory) {
+        const newQuantity = Math.max(0, inventory.quantity - transaction.quantity);
+        await storage.updateInventory(inventory.id, { quantity: newQuantity });
+      }
+
+      // Update the verification's system quantity to reflect the approved checkout
+      // This updates the "expected" system quantity after the checkout is processed
+      const newSystemQty = verification.systemQuantity - transaction.quantity;
+      await storage.updateAuditVerification(verification.id, {
+        systemQuantity: newSystemQty,
+        // Recalculate discrepancy based on new system quantity
+        discrepancy: verification.physicalQuantity !== null 
+          ? verification.physicalQuantity - newSystemQty 
+          : null,
+        // Update status based on new discrepancy
+        status: verification.physicalQuantity !== null
+          ? (verification.physicalQuantity === newSystemQty ? 'complete' 
+             : verification.physicalQuantity < newSystemQty ? 'short' : 'excess')
+          : verification.status
+      });
+
+      // Log the action
+      await storage.createAuditActionLog({
+        auditSessionId: sessionId,
+        auditVerificationId: verification.id,
+        actionType: 'approve_pending_checkout',
+        performedBy: user.id,
+        newValues: JSON.stringify({
+          transactionId,
+          itemId: transaction.itemId,
+          quantity: transaction.quantity,
+          previousSystemQty: verification.systemQuantity,
+          newSystemQty
+        })
+      });
+
+      const item = await storage.getItem(transaction.itemId);
+      res.json({ 
+        message: `Pending checkout for ${item?.name || 'item'} approved successfully`,
+        newSystemQuantity: newSystemQty,
+        verificationId: verification.id
+      });
+    } catch (error: any) {
+      console.error('Approve pending checkout error:', error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Check warehouse freeze status
   app.get("/api/warehouses/:id/freeze-status", requireAuth, async (req, res) => {
     try {
