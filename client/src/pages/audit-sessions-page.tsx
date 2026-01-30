@@ -31,6 +31,14 @@ const createAuditSchema = z.object({
   freezeConfirmed: z.boolean().refine(val => val === true, {
     message: "You must confirm the warehouse freeze to proceed"
   })
+}).refine((data) => {
+  if (data.startDate && data.endDate) {
+    return new Date(data.endDate) >= new Date(data.startDate);
+  }
+  return true;
+}, {
+  message: "End date must be on or after the start date",
+  path: ["endDate"]
 });
 
 type CreateAuditForm = z.infer<typeof createAuditSchema>;

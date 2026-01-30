@@ -7234,10 +7234,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "You must confirm the warehouse freeze to create an audit" });
       }
 
-      // Check for overlapping audits
-      const existingAudits = await storage.getOpenAuditSessionsForWarehouse(warehouseId);
+      // Validate end date is after start date
       const newStart = new Date(startDate);
       const newEnd = new Date(endDate);
+      
+      if (newEnd < newStart) {
+        return res.status(400).json({ message: "End date must be on or after the start date" });
+      }
+
+      // Check for overlapping audits
+      const existingAudits = await storage.getOpenAuditSessionsForWarehouse(warehouseId);
 
       for (const audit of existingAudits) {
         if (audit.startDate && audit.endDate) {
