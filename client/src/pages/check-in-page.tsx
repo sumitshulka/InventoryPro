@@ -17,7 +17,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Loader2, CalendarIcon, Plus, Trash2, Package } from "lucide-react";
+import { Loader2, CalendarIcon, Plus, Trash2, Package, AlertTriangle } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { useCurrency } from "@/hooks/use-currency";
@@ -95,6 +96,11 @@ export default function CheckInPage() {
     enabled: !!user?.id,
   });
 
+  // Query for warehouses under active audit (frozen)
+  const { data: warehousesUnderAudit = [] } = useQuery<number[]>({
+    queryKey: ["/api/warehouses/under-audit"],
+  });
+
   const { data: checkInTransactions = [], isLoading: transactionsLoading } = useQuery<Array<{
     id: number;
     transactionCode: string;
@@ -155,6 +161,13 @@ export default function CheckInPage() {
     control: form.control,
     name: "items"
   });
+
+  // Watch destination warehouse to check if it's under audit
+  const selectedWarehouseId = form.watch("destinationWarehouseId");
+  const isWarehouseFrozen = Boolean(selectedWarehouseId && warehousesUnderAudit.includes(parseInt(selectedWarehouseId)));
+  const frozenWarehouseName = isWarehouseFrozen 
+    ? warehouses.find(w => w.id === parseInt(selectedWarehouseId))?.name 
+    : null;
 
   const checkInMutation = useMutation({
     mutationFn: async (values: FormValues) => {
@@ -403,6 +416,17 @@ export default function CheckInPage() {
                       )}
                     />
 
+                    {isWarehouseFrozen && (
+                      <Alert variant="destructive" className="border-red-300 bg-red-50">
+                        <AlertTriangle className="h-4 w-4" />
+                        <AlertTitle>Warehouse Under Audit</AlertTitle>
+                        <AlertDescription>
+                          {frozenWarehouseName || "Selected warehouse"} is currently under physical audit. 
+                          Check-ins are not allowed until the audit is completed and the warehouse freeze is released.
+                        </AlertDescription>
+                      </Alert>
+                    )}
+
                     <div className="space-y-4">
                       <div className="flex items-center justify-between">
                         <Label>Items to Check In *</Label>
@@ -522,13 +546,15 @@ export default function CheckInPage() {
                       <Button 
                         type="submit" 
                         className="w-full"
-                        disabled={checkInMutation.isPending}
+                        disabled={checkInMutation.isPending || isWarehouseFrozen}
                       >
                         {checkInMutation.isPending ? (
                           <>
                             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                             Processing Check In...
                           </>
+                        ) : isWarehouseFrozen ? (
+                          "Check-in Blocked - Warehouse Under Audit"
                         ) : (
                           "Check In Items"
                         )}
