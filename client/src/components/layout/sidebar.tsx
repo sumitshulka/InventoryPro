@@ -538,6 +538,20 @@ export default function Sidebar({ user, isOpen, onClose }: SidebarProps) {
                         </li>
                         <li>
                           <Link 
+                            href="/audit-report"
+                            className={cn(
+                              "flex items-center px-3 py-2 rounded-md",
+                              isActive("/audit-report") 
+                                ? "bg-primary/10 border-l-4 border-primary text-primary" 
+                                : "text-gray-700 hover:text-primary hover:bg-primary/5"
+                            )}
+                          >
+                            <span className="material-icons mr-3">summarize</span>
+                            <span className="whitespace-nowrap">Audit Reports</span>
+                          </Link>
+                        </li>
+                        <li>
+                          <Link 
                             href="/audit-users"
                             className={cn(
                               "flex items-center px-3 py-2 rounded-md",
