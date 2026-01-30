@@ -1053,8 +1053,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ? transactionData.sourceWarehouseId 
           : null;
       
+      console.log("Freeze check - Transaction type:", transactionData.transactionType, "Warehouse ID to check:", warehouseIdToCheck);
+      
       if (warehouseIdToCheck) {
         const activeAudit = await storage.getActiveAuditForWarehouse(warehouseIdToCheck);
+        console.log("Active audit for warehouse", warehouseIdToCheck, ":", activeAudit ? `${activeAudit.auditCode} (status: ${activeAudit.status})` : "None");
         if (activeAudit) {
           const actionType = transactionData.transactionType === 'check-in' ? 'Checkins' : 'Checkouts';
           return res.status(400).json({ 
@@ -1065,19 +1068,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // For transfer transactions, check both source and destination warehouses
       if (transactionData.transactionType === 'transfer') {
+        console.log("Transfer freeze check - Source:", transactionData.sourceWarehouseId, "Dest:", transactionData.destinationWarehouseId);
         if (transactionData.sourceWarehouseId) {
           const sourceAudit = await storage.getActiveAuditForWarehouse(transactionData.sourceWarehouseId);
+          console.log("Source warehouse audit:", sourceAudit ? `${sourceAudit.auditCode} (status: ${sourceAudit.status})` : "None");
           if (sourceAudit) {
             return res.status(400).json({ 
-              message: "Warehouse is under physical audit. Transfers can happen only after audit is completed."
+              message: "Source warehouse is under physical audit. Transfers can happen only after audit is completed."
             });
           }
         }
         if (transactionData.destinationWarehouseId) {
           const destAudit = await storage.getActiveAuditForWarehouse(transactionData.destinationWarehouseId);
+          console.log("Destination warehouse audit:", destAudit ? `${destAudit.auditCode} (status: ${destAudit.status})` : "None");
           if (destAudit) {
             return res.status(400).json({ 
-              message: "Warehouse is under physical audit. Transfers can happen only after audit is completed."
+              message: "Destination warehouse is under physical audit. Transfers can happen only after audit is completed."
             });
           }
         }
@@ -3465,18 +3471,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Check if source or destination warehouse is under active audit
       const destinationWarehouseId = parseInt(req.body.destinationWarehouseId);
+      console.log("Transfers endpoint freeze check - Source:", sourceWarehouseId, "Dest:", destinationWarehouseId);
       
       const sourceAudit = await storage.getActiveAuditForWarehouse(sourceWarehouseId);
+      console.log("Transfers: Source warehouse audit:", sourceAudit ? `${sourceAudit.auditCode} (status: ${sourceAudit.status})` : "None");
       if (sourceAudit) {
         return res.status(400).json({ 
-          message: "Warehouse is under physical audit. Transfers can happen only after audit is completed."
+          message: "Source warehouse is under physical audit. Transfers can happen only after audit is completed."
         });
       }
       
       const destAudit = await storage.getActiveAuditForWarehouse(destinationWarehouseId);
+      console.log("Transfers: Destination warehouse audit:", destAudit ? `${destAudit.auditCode} (status: ${destAudit.status})` : "None");
       if (destAudit) {
         return res.status(400).json({ 
-          message: "Warehouse is under physical audit. Transfers can happen only after audit is completed."
+          message: "Destination warehouse is under physical audit. Transfers can happen only after audit is completed."
         });
       }
       
