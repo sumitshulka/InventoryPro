@@ -685,6 +685,7 @@ export default function AuditSpreadsheetPage() {
                     {isReconciliationMode && <TableHead className="text-right">System Qty</TableHead>}
                     <TableHead className="text-right">Physical Qty</TableHead>
                     {isReconciliationMode && <TableHead className="text-right">Discrepancy</TableHead>}
+                    <TableHead>Reason/Notes</TableHead>
                     <TableHead>Status</TableHead>
                     {!isReconciliationMode && <TableHead>Confirmed By</TableHead>}
                     {!isReconciliationMode && <TableHead>Actions</TableHead>}
@@ -694,7 +695,7 @@ export default function AuditSpreadsheetPage() {
                 <TableBody>
                   {filteredVerifications.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={isReconciliationMode ? 8 : 8} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={isReconciliationMode ? 9 : 9} className="text-center py-8 text-muted-foreground">
                         {verifications.length === 0 
                           ? "No items to verify in this audit."
                           : "No items match your search criteria."}
@@ -796,6 +797,19 @@ export default function AuditSpreadsheetPage() {
                             </span>
                           </TableCell>
                         )}
+                        
+                        {/* Reason/Notes */}
+                        <TableCell className="max-w-[200px]">
+                          {verification.notes ? (
+                            <span className="text-sm text-muted-foreground truncate block" title={verification.notes}>
+                              {verification.notes}
+                            </span>
+                          ) : (
+                            <span className="text-xs text-muted-foreground italic">
+                              {verification.status === 'pending' ? '-' : 'No reason provided'}
+                            </span>
+                          )}
+                        </TableCell>
                         
                         {/* Status */}
                         <TableCell>
@@ -1208,12 +1222,16 @@ export default function AuditSpreadsheetPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="notes">Notes (Optional)</Label>
+                <Label htmlFor="notes" className="flex items-center gap-2">
+                  Reason/Notes
+                  <span className="text-xs text-muted-foreground">(Provide reason if qty differs from expected)</span>
+                </Label>
                 <Textarea
                   id="notes"
-                  placeholder="Any additional notes..."
+                  placeholder="Explain any discrepancy - e.g., damaged items, missing stock, found extra units, etc."
                   value={formData.notes}
                   onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
+                  className="min-h-[80px]"
                 />
               </div>
             </div>
