@@ -7798,26 +7798,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const user = req.user as User;
       const sessionId = parseInt(req.params.id);
 
-      // Only audit managers and audit users can access
-      if (!['audit_manager', 'audit_user'].includes(user.role)) {
-        return res.status(403).json({ message: "Only audit managers and users can access verifications" });
-      }
-
       const session = await storage.getAuditSessionById(sessionId);
       if (!session) {
         return res.status(404).json({ message: "Audit session not found" });
       }
 
-      // Check warehouse access
-      if (user.role === 'audit_manager') {
-        const assignments = await storage.getAuditManagerWarehouses(user.id);
-        if (!assignments.some(a => a.warehouseId === session.warehouseId)) {
-          return res.status(403).json({ message: "You don't have access to this audit" });
+      // Admin can only access completed audit sessions for reports
+      if (user.role === 'admin') {
+        if (session.status !== 'completed') {
+          return res.status(403).json({ message: "Admin can only view reports for completed audits" });
         }
-      } else if (user.role === 'audit_user') {
-        const assignments = await storage.getAuditUserAssignments(user.id);
-        if (!assignments.some(a => a.warehouseId === session.warehouseId)) {
-          return res.status(403).json({ message: "You don't have access to this audit" });
+        // Admin has access to all completed sessions - continue to fetch data
+      } else if (!['audit_manager', 'audit_user'].includes(user.role)) {
+        return res.status(403).json({ message: "Only audit managers and users can access verifications" });
+      } else {
+        // Check warehouse access for audit_manager and audit_user
+        if (user.role === 'audit_manager') {
+          const assignments = await storage.getAuditManagerWarehouses(user.id);
+          if (!assignments.some(a => a.warehouseId === session.warehouseId)) {
+            return res.status(403).json({ message: "You don't have access to this audit" });
+          }
+        } else if (user.role === 'audit_user') {
+          const assignments = await storage.getAuditUserAssignments(user.id);
+          if (!assignments.some(a => a.warehouseId === session.warehouseId)) {
+            return res.status(403).json({ message: "You don't have access to this audit" });
+          }
         }
       }
 
