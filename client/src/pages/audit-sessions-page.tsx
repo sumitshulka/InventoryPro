@@ -4,6 +4,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { format } from "date-fns";
+import { useLocation } from "wouter";
 import AppLayout from "@/components/layout/app-layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,11 +15,12 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
-import { Plus, ClipboardCheck, Calendar, Warehouse, AlertTriangle, CheckCircle, Clock, XCircle, ShieldCheck } from "lucide-react";
+import { Plus, ClipboardCheck, Calendar, Warehouse, AlertTriangle, CheckCircle, Clock, XCircle, ShieldCheck, MoreVertical, CalendarPlus, FileText, Ban } from "lucide-react";
 
 const createAuditSchema = z.object({
   warehouseId: z.number().min(1, "Please select a warehouse"),
@@ -35,8 +37,13 @@ type CreateAuditForm = z.infer<typeof createAuditSchema>;
 
 export default function AuditSessionsPage() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isExtendDialogOpen, setIsExtendDialogOpen] = useState(false);
+  const [isCancelDialogOpen, setIsCancelDialogOpen] = useState(false);
+  const [selectedSession, setSelectedSession] = useState<any>(null);
+  const [newEndDate, setNewEndDate] = useState("");
   const { toast } = useToast();
   const { user } = useAuth();
+  const [, setLocation] = useLocation();
 
   const { data: warehouses = [] } = useQuery<any[]>({
     queryKey: ["/api/warehouses"]
@@ -101,6 +108,62 @@ export default function AuditSessionsPage() {
     }
   });
 
+  const extendEndDateMutation = useMutation({
+    mutationFn: async ({ id, endDate }: { id: number; endDate: string }) => {
+      return await apiRequest("PATCH", `/api/audit/sessions/${id}/extend`, { endDate });
+    },
+    onSuccess: () => {
+      toast({
+        title: "End Date Extended",
+        description: "The audit end date has been extended successfully."
+      });
+      setIsExtendDialogOpen(false);
+      setSelectedSession(null);
+      setNewEndDate("");
+      refetchSessions();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to extend end date",
+        variant: "destructive"
+      });
+    }
+  });
+
+  const cancelAuditMutation = useMutation({
+    mutationFn: async (id: number) => {
+      return await apiRequest("PATCH", `/api/audit/sessions/${id}/cancel`, {});
+    },
+    onSuccess: () => {
+      toast({
+        title: "Audit Cancelled",
+        description: "The audit session has been cancelled. Existing entries are preserved but no further actions are allowed."
+      });
+      setIsCancelDialogOpen(false);
+      setSelectedSession(null);
+      refetchSessions();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to cancel audit",
+        variant: "destructive"
+      });
+    }
+  });
+
+  const handleExtendClick = (session: any) => {
+    setSelectedSession(session);
+    setNewEndDate(session.endDate ? format(new Date(session.endDate), 'yyyy-MM-dd') : '');
+    setIsExtendDialogOpen(true);
+  };
+
+  const handleCancelClick = (session: any) => {
+    setSelectedSession(session);
+    setIsCancelDialogOpen(true);
+  };
+
   const onSubmit = (data: CreateAuditForm) => {
     createAuditMutation.mutate(data);
   };
@@ -111,6 +174,8 @@ export default function AuditSessionsPage() {
         return <Badge className="bg-blue-100 text-blue-800"><Clock className="w-3 h-3 mr-1" /> Open</Badge>;
       case 'in_progress':
         return <Badge className="bg-yellow-100 text-yellow-800"><Clock className="w-3 h-3 mr-1" /> In Progress</Badge>;
+      case 'reconciliation':
+        return <Badge className="bg-purple-100 text-purple-800"><ClipboardCheck className="w-3 h-3 mr-1" /> Reconciliation</Badge>;
       case 'completed':
         return <Badge className="bg-green-100 text-green-800"><CheckCircle className="w-3 h-3 mr-1" /> Completed</Badge>;
       case 'cancelled':
@@ -355,24 +420,42 @@ export default function AuditSessionsPage() {
                       <TableCell>{getStatusBadge(session.status)}</TableCell>
                       <TableCell>{session.creatorName || '-'}</TableCell>
                       <TableCell>
-                        {session.status === 'open' && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => updateStatusMutation.mutate({ id: session.id, status: 'cancelled' })}
-                          >
-                            Cancel
-                          </Button>
-                        )}
-                        {session.status === 'in_progress' && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => updateStatusMutation.mutate({ id: session.id, status: 'completed' })}
-                          >
-                            Complete
-                          </Button>
-                        )}
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm">
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            {session.status === 'completed' && (
+                              <DropdownMenuItem onClick={() => setLocation(`/audit-report?sessionId=${session.id}`)}>
+                                <FileText className="w-4 h-4 mr-2" />
+                                View Reports
+                              </DropdownMenuItem>
+                            )}
+                            {['open', 'in_progress', 'reconciliation'].includes(session.status) && (
+                              <>
+                                <DropdownMenuItem onClick={() => handleExtendClick(session)}>
+                                  <CalendarPlus className="w-4 h-4 mr-2" />
+                                  Extend End Date
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem 
+                                  onClick={() => handleCancelClick(session)}
+                                  className="text-red-600"
+                                >
+                                  <Ban className="w-4 h-4 mr-2" />
+                                  Cancel Audit
+                                </DropdownMenuItem>
+                              </>
+                            )}
+                            {session.status === 'cancelled' && (
+                              <DropdownMenuItem disabled className="text-muted-foreground">
+                                No actions available
+                              </DropdownMenuItem>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </TableCell>
                     </TableRow>
                   ))
@@ -381,6 +464,85 @@ export default function AuditSessionsPage() {
             </Table>
           </CardContent>
         </Card>
+
+        {/* Extend End Date Dialog */}
+        <Dialog open={isExtendDialogOpen} onOpenChange={setIsExtendDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Extend Audit End Date</DialogTitle>
+              <DialogDescription>
+                Extend the end date for audit "{selectedSession?.title}" ({selectedSession?.auditCode}).
+                Current end date: {selectedSession?.endDate ? format(new Date(selectedSession.endDate), 'MMM dd, yyyy') : '-'}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="newEndDate">New End Date</Label>
+                <Input
+                  id="newEndDate"
+                  type="date"
+                  value={newEndDate}
+                  onChange={(e) => setNewEndDate(e.target.value)}
+                  min={selectedSession?.endDate ? format(new Date(selectedSession.endDate), 'yyyy-MM-dd') : undefined}
+                />
+                <p className="text-sm text-muted-foreground">
+                  The new end date must be later than the current end date.
+                </p>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsExtendDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button 
+                onClick={() => selectedSession && extendEndDateMutation.mutate({ id: selectedSession.id, endDate: newEndDate })}
+                disabled={extendEndDateMutation.isPending || !newEndDate}
+              >
+                {extendEndDateMutation.isPending ? "Extending..." : "Extend End Date"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Cancel Audit Dialog */}
+        <Dialog open={isCancelDialogOpen} onOpenChange={setIsCancelDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle className="text-red-600">Cancel Audit Session</DialogTitle>
+              <DialogDescription>
+                Are you sure you want to cancel audit "{selectedSession?.title}" ({selectedSession?.auditCode})?
+              </DialogDescription>
+            </DialogHeader>
+            <div className="py-4">
+              <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="w-5 h-5 text-yellow-600 mt-0.5" />
+                  <div>
+                    <p className="font-medium text-yellow-800">Important:</p>
+                    <ul className="text-sm text-yellow-700 mt-1 list-disc list-inside space-y-1">
+                      <li>All existing entries and verifications will be preserved</li>
+                      <li>No further actions will be allowed by audit managers</li>
+                      <li>The warehouse freeze will be released</li>
+                      <li>This action cannot be undone</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsCancelDialogOpen(false)}>
+                Keep Audit
+              </Button>
+              <Button 
+                variant="destructive"
+                onClick={() => selectedSession && cancelAuditMutation.mutate(selectedSession.id)}
+                disabled={cancelAuditMutation.isPending}
+              >
+                {cancelAuditMutation.isPending ? "Cancelling..." : "Cancel Audit"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </AppLayout>
   );

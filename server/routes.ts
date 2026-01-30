@@ -7800,6 +7800,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Audit session not found" });
       }
 
+      // Block actions on cancelled or completed audits
+      if (session.status === 'cancelled' || session.status === 'completed') {
+        return res.status(400).json({ message: `Cannot modify verifications for ${session.status} audit sessions` });
+      }
+
       // Check if record is locked by another user
       if (verification.lockedBy && verification.lockedBy !== user.id && user.role !== 'audit_manager') {
         return res.status(403).json({ message: "This record is locked by another user" });
@@ -7864,6 +7869,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Verification not found" });
       }
 
+      const session = await storage.getAuditSessionById(verification.auditSessionId);
+      if (session && (session.status === 'cancelled' || session.status === 'completed')) {
+        return res.status(400).json({ message: `Cannot modify verifications for ${session.status} audit sessions` });
+      }
+
       // Check if user can edit (either audit_manager or the confirmer)
       if (user.role === 'audit_user' && verification.confirmedBy && verification.confirmedBy !== user.id) {
         return res.status(403).json({ message: "You can only edit notes for items you confirmed" });
@@ -7906,6 +7916,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const verification = await storage.getAuditVerificationById(verificationId);
       if (!verification) {
         return res.status(404).json({ message: "Verification not found" });
+      }
+
+      const session = await storage.getAuditSessionById(verification.auditSessionId);
+      if (session && (session.status === 'cancelled' || session.status === 'completed')) {
+        return res.status(400).json({ message: `Cannot override verifications for ${session.status} audit sessions` });
       }
 
       const { batchNumber, physicalQuantity, notes, overrideNotes } = req.body;
@@ -8022,6 +8037,95 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Extend audit session end date (admin only)
+  app.patch("/api/audit/sessions/:id/extend", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const sessionId = parseInt(req.params.id);
+
+      if (user.role !== 'admin') {
+        return res.status(403).json({ message: "Only admin can extend audit end dates" });
+      }
+
+      const session = await storage.getAuditSessionById(sessionId);
+      if (!session) {
+        return res.status(404).json({ message: "Audit session not found" });
+      }
+
+      if (!['open', 'in_progress', 'reconciliation'].includes(session.status)) {
+        return res.status(400).json({ message: "Can only extend end date for active audits" });
+      }
+
+      const { endDate } = req.body;
+      if (!endDate) {
+        return res.status(400).json({ message: "New end date is required" });
+      }
+
+      const newEndDate = new Date(endDate);
+      const currentEndDate = session.endDate ? new Date(session.endDate) : new Date();
+      
+      if (newEndDate <= currentEndDate) {
+        return res.status(400).json({ message: "New end date must be later than current end date" });
+      }
+
+      const updated = await storage.updateAuditSession(sessionId, { endDate: newEndDate });
+
+      await storage.createAuditActionLog({
+        auditSessionId: sessionId,
+        auditVerificationId: null,
+        actionType: 'extend_end_date',
+        performedBy: user.id,
+        previousValues: JSON.stringify({ endDate: session.endDate }),
+        newValues: JSON.stringify({ endDate: newEndDate }),
+        notes: `End date extended by admin from ${session.endDate ? new Date(session.endDate).toDateString() : 'N/A'} to ${newEndDate.toDateString()}`
+      });
+
+      res.json({ message: "End date extended successfully", session: updated });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Cancel audit session (admin only)
+  app.patch("/api/audit/sessions/:id/cancel", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const sessionId = parseInt(req.params.id);
+
+      if (user.role !== 'admin') {
+        return res.status(403).json({ message: "Only admin can cancel audit sessions" });
+      }
+
+      const session = await storage.getAuditSessionById(sessionId);
+      if (!session) {
+        return res.status(404).json({ message: "Audit session not found" });
+      }
+
+      if (!['open', 'in_progress', 'reconciliation'].includes(session.status)) {
+        return res.status(400).json({ message: "Can only cancel active audits" });
+      }
+
+      const updated = await storage.updateAuditSession(sessionId, { 
+        status: 'cancelled',
+        completedAt: new Date()
+      });
+
+      await storage.createAuditActionLog({
+        auditSessionId: sessionId,
+        auditVerificationId: null,
+        actionType: 'cancel_audit',
+        performedBy: user.id,
+        previousValues: JSON.stringify({ status: session.status }),
+        newValues: JSON.stringify({ status: 'cancelled' }),
+        notes: `Audit cancelled by admin. Previous status: ${session.status}`
+      });
+
+      res.json({ message: "Audit session cancelled successfully", session: updated });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

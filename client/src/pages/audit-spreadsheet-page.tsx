@@ -520,6 +520,11 @@ export default function AuditSpreadsheetPage() {
   // Check if in reconciliation mode
   const isReconciliationMode = session?.status === 'reconciliation';
   
+  // Check if audit is cancelled (block all editing)
+  const isCancelled = session?.status === 'cancelled';
+  const isCompleted = session?.status === 'completed';
+  const isReadOnly = isCancelled || isCompleted;
+  
   // Counts based on mode
   const confirmedCount = isReconciliationMode 
     ? verifications.filter(v => v.status === 'complete').length
@@ -575,7 +580,7 @@ export default function AuditSpreadsheetPage() {
               )}
             </div>
           </div>
-          {!isReconciliationMode && allItemsVerified && user?.role === 'audit_manager' && (
+          {!isReconciliationMode && allItemsVerified && user?.role === 'audit_manager' && !isReadOnly && (
             <Button 
               onClick={() => startReconciliationMutation.mutate()}
               disabled={startReconciliationMutation.isPending}
@@ -586,6 +591,26 @@ export default function AuditSpreadsheetPage() {
             </Button>
           )}
         </div>
+
+        {isCancelled && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center gap-3">
+            <AlertTriangle className="h-5 w-5 text-red-500" />
+            <div>
+              <p className="font-medium text-red-800">This audit has been cancelled</p>
+              <p className="text-sm text-red-600">No further actions can be taken on this audit session.</p>
+            </div>
+          </div>
+        )}
+        
+        {isCompleted && (
+          <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-center gap-3">
+            <CheckCircle className="h-5 w-5 text-green-500" />
+            <div>
+              <p className="font-medium text-green-800">This audit has been completed</p>
+              <p className="text-sm text-green-600">View audit reports for details.</p>
+            </div>
+          </div>
+        )}
 
         {isReconciliationMode ? (
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -793,7 +818,7 @@ export default function AuditSpreadsheetPage() {
                                 variant="ghost" 
                                 className="h-8 w-8 p-0 text-green-600"
                                 onClick={() => handleInlineSave(verification)}
-                                disabled={inlineSaveMutation.isPending}
+                                disabled={inlineSaveMutation.isPending || isReadOnly}
                               >
                                 <Save className="h-4 w-4" />
                               </Button>
@@ -808,8 +833,9 @@ export default function AuditSpreadsheetPage() {
                             </div>
                           ) : (
                             <div 
-                              className="flex items-center gap-2 justify-end cursor-pointer hover:bg-muted/50 rounded px-2 py-1"
+                              className={`flex items-center gap-2 justify-end rounded px-2 py-1 ${!isReadOnly ? 'cursor-pointer hover:bg-muted/50' : ''}`}
                               onClick={() => {
+                                if (isReadOnly) return;
                                 const canEditInline = verification.status === 'pending' || 
                                   verification.canEdit || 
                                   user?.role === 'audit_manager';
@@ -819,7 +845,7 @@ export default function AuditSpreadsheetPage() {
                               }}
                             >
                               <span>{verification.physicalQuantity !== null ? verification.physicalQuantity : '-'}</span>
-                              {(verification.status === 'pending' || verification.canEdit || user?.role === 'audit_manager') && (
+                              {!isReadOnly && (verification.status === 'pending' || verification.canEdit || user?.role === 'audit_manager') && (
                                 <Edit className="h-3 w-3 text-muted-foreground" />
                               )}
                             </div>
@@ -912,7 +938,11 @@ export default function AuditSpreadsheetPage() {
                         {/* Actions - only in verification mode */}
                         {!isReconciliationMode && (
                           <TableCell>
-                            {verification.status === 'pending' ? (
+                            {isReadOnly ? (
+                              <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                <Lock className="w-3 h-3" /> {isCancelled ? 'Cancelled' : 'Completed'}
+                              </span>
+                            ) : verification.status === 'pending' ? (
                               <Button size="sm" onClick={() => handleConfirmClick(verification)}>
                                 <CheckCircle className="w-3 h-3 mr-1" /> Confirm
                               </Button>
@@ -935,7 +965,11 @@ export default function AuditSpreadsheetPage() {
                         {/* Recon Actions - only in reconciliation mode for audit managers */}
                         {isReconciliationMode && user?.role === 'audit_manager' && (
                           <TableCell>
-                            {verification.status === 'short' ? (
+                            {isReadOnly ? (
+                              <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                <Lock className="w-3 h-3" /> {isCancelled ? 'Cancelled' : 'Completed'}
+                              </span>
+                            ) : verification.status === 'short' ? (
                               <Button 
                                 size="sm" 
                                 variant="outline"
@@ -1147,7 +1181,7 @@ export default function AuditSpreadsheetPage() {
                 
                 <Button 
                   className="w-full bg-green-600 hover:bg-green-700"
-                  disabled={!canCompleteData?.canComplete || completeAuditMutation.isPending}
+                  disabled={!canCompleteData?.canComplete || completeAuditMutation.isPending || isReadOnly}
                   onClick={() => completeAuditMutation.mutate()}
                 >
                   {completeAuditMutation.isPending ? (
@@ -1288,7 +1322,7 @@ export default function AuditSpreadsheetPage() {
               <Button variant="outline" onClick={() => setIsConfirmDialogOpen(false)}>
                 Cancel
               </Button>
-              <Button onClick={handleConfirmSubmit} disabled={confirmMutation.isPending}>
+              <Button onClick={handleConfirmSubmit} disabled={confirmMutation.isPending || isReadOnly}>
                 {confirmMutation.isPending ? "Confirming..." : "Confirm & Lock"}
               </Button>
             </DialogFooter>
@@ -1352,7 +1386,7 @@ export default function AuditSpreadsheetPage() {
               </Button>
               <Button 
                 onClick={handleOverrideSubmit} 
-                disabled={overrideMutation.isPending || !formData.overrideNotes}
+                disabled={overrideMutation.isPending || !formData.overrideNotes || isReadOnly}
                 className="bg-amber-600 hover:bg-amber-700"
               >
                 {overrideMutation.isPending ? "Overriding..." : "Override Record"}
@@ -1425,7 +1459,7 @@ export default function AuditSpreadsheetPage() {
               </Button>
               <Button 
                 onClick={handleReconSubmit} 
-                disabled={reconCheckinMutation.isPending || reconCheckoutMutation.isPending}
+                disabled={reconCheckinMutation.isPending || reconCheckoutMutation.isPending || isReadOnly}
                 className={reconType === 'checkin' ? "bg-orange-600 hover:bg-orange-700" : "bg-red-600 hover:bg-red-700"}
               >
                 {reconCheckinMutation.isPending || reconCheckoutMutation.isPending 
@@ -1460,7 +1494,7 @@ export default function AuditSpreadsheetPage() {
               <Button variant="outline" onClick={() => setIsNotesDialogOpen(false)}>
                 Cancel
               </Button>
-              <Button onClick={handleSaveNotes} disabled={updateNotesMutation.isPending}>
+              <Button onClick={handleSaveNotes} disabled={updateNotesMutation.isPending || isReadOnly}>
                 {updateNotesMutation.isPending ? "Saving..." : "Save Notes"}
               </Button>
             </DialogFooter>

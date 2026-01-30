@@ -72,8 +72,8 @@ export default function AuditReportPage() {
   const [activeTab, setActiveTab] = useState<string>("physical");
 
   const { data: sessions = [], isLoading: sessionsLoading } = useQuery<AuditSession[]>({
-    queryKey: ['/api/audit/sessions/history'],
-    enabled: user?.role === 'audit_manager' || user?.role === 'audit_user'
+    queryKey: user?.role === 'admin' ? ['/api/audit/sessions'] : ['/api/audit/sessions/history'],
+    enabled: user?.role === 'admin' || user?.role === 'audit_manager' || user?.role === 'audit_user'
   });
 
   const selectedSession = sessions.find(s => s.id.toString() === selectedSessionId);
@@ -173,7 +173,7 @@ export default function AuditReportPage() {
     }
   };
 
-  if (!['audit_manager', 'audit_user'].includes(user?.role || '')) {
+  if (!['admin', 'audit_manager', 'audit_user'].includes(user?.role || '')) {
     return (
       <AppLayout>
         <div className="p-8">
@@ -181,7 +181,7 @@ export default function AuditReportPage() {
             <CardContent className="p-8 text-center">
               <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
               <h2 className="text-xl font-semibold mb-2">Access Denied</h2>
-              <p className="text-muted-foreground">Only audit managers and audit users can access audit reports.</p>
+              <p className="text-muted-foreground">Only administrators, audit managers and audit users can access audit reports.</p>
             </CardContent>
           </Card>
         </div>
