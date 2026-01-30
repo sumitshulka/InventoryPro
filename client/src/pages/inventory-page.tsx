@@ -548,9 +548,15 @@ export default function InventoryPage() {
                           <TableRow key={transaction.id}>
                             <TableCell>{formatDateTime(transaction.createdAt)}</TableCell>
                             <TableCell>
-                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${getTransactionTypeColor(transaction.transactionType)}`}>
-                                {transaction.transactionType === "check-in" ? "Check-in" : 
-                                 transaction.transactionType === "issue" ? "Issue" : "Transfer"}
+                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                transaction.auditSessionId 
+                                  ? (transaction.transactionType === "check-in" ? "bg-orange-100 text-orange-800" : "bg-purple-100 text-purple-800")
+                                  : getTransactionTypeColor(transaction.transactionType)
+                              }`}>
+                                {transaction.auditSessionId 
+                                  ? (transaction.transactionType === "check-in" ? "Audit Recon Check-in" : "Audit Recon Check-out")
+                                  : (transaction.transactionType === "check-in" ? "Check-in" : 
+                                     transaction.transactionType === "issue" ? "Issue" : "Transfer")}
                               </span>
                             </TableCell>
                             <TableCell className={
