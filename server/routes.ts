@@ -8466,6 +8466,182 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Approve pending transfer during audit reconciliation (Audit Manager only)
+  app.post("/api/audit/sessions/:id/approve-pending-transfer", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const sessionId = parseInt(req.params.id);
+      const { transferId, action } = req.body; // action: 'approve_outgoing' or 'accept_incoming'
+
+      if (user.role !== 'audit_manager') {
+        return res.status(403).json({ message: "Only audit managers can process pending transfers during audit" });
+      }
+
+      const session = await storage.getAuditSessionById(sessionId);
+      if (!session) {
+        return res.status(404).json({ message: "Audit session not found" });
+      }
+
+      if (session.status !== 'reconciliation') {
+        return res.status(400).json({ message: "Can only process pending transfers during reconciliation phase" });
+      }
+
+      // Verify audit manager has access to this warehouse
+      const assignments = await storage.getAuditManagerWarehouses(user.id);
+      if (!assignments.some(a => a.warehouseId === session.warehouseId)) {
+        return res.status(403).json({ message: "You don't have access to this audit session" });
+      }
+
+      // Get the transfer
+      const transfer = await storage.getTransfer(transferId);
+      if (!transfer) {
+        return res.status(404).json({ message: "Transfer not found" });
+      }
+
+      // Get transfer items
+      const transferItems = await storage.getTransferItems(transferId);
+      if (!transferItems || transferItems.length === 0) {
+        return res.status(400).json({ message: "Transfer has no items" });
+      }
+
+      const verifications = await storage.getAuditVerificationsBySession(sessionId);
+
+      if (action === 'approve_outgoing') {
+        // For outgoing transfers (source = audited warehouse)
+        if (transfer.sourceWarehouseId !== session.warehouseId) {
+          return res.status(400).json({ message: "This is not an outgoing transfer from the audited warehouse" });
+        }
+
+        if (transfer.status !== 'pending') {
+          return res.status(400).json({ message: "Transfer is not in pending status" });
+        }
+
+        // Process each transfer item
+        for (const tItem of transferItems) {
+          const verification = verifications.find(v => v.itemId === tItem.itemId);
+          if (!verification) continue;
+
+          // Deduct from source inventory
+          const sourceInventory = await storage.getInventoryByItemAndWarehouse(tItem.itemId, session.warehouseId);
+          if (sourceInventory) {
+            const newQty = Math.max(0, sourceInventory.quantity - tItem.requestedQuantity);
+            await storage.updateInventory(sourceInventory.id, { quantity: newQty });
+          }
+
+          // Update verification's system quantity
+          const newSystemQty = verification.systemQuantity - tItem.requestedQuantity;
+          await storage.updateAuditVerification(verification.id, {
+            systemQuantity: newSystemQty,
+            discrepancy: verification.physicalQuantity !== null 
+              ? verification.physicalQuantity - newSystemQty 
+              : null,
+            status: verification.physicalQuantity !== null
+              ? (verification.physicalQuantity === newSystemQty ? 'complete' 
+                 : verification.physicalQuantity < newSystemQty ? 'short' : 'excess')
+              : verification.status
+          });
+        }
+
+        // Update transfer status to approved
+        await storage.updateTransfer(transferId, { 
+          status: 'approved',
+          approvedBy: user.id,
+          approvedAt: new Date()
+        });
+
+        // Log the action
+        await storage.createAuditActionLog({
+          auditSessionId: sessionId,
+          auditVerificationId: null,
+          actionType: 'approve_outgoing_transfer',
+          performedBy: user.id,
+          newValues: JSON.stringify({
+            transferId,
+            transferCode: transfer.transferCode,
+            itemCount: transferItems.length
+          })
+        });
+
+        res.json({ 
+          message: `Outgoing transfer ${transfer.transferCode} approved. System quantities updated.`
+        });
+
+      } else if (action === 'accept_incoming') {
+        // For incoming transfers (destination = audited warehouse)
+        if (transfer.destinationWarehouseId !== session.warehouseId) {
+          return res.status(400).json({ message: "This is not an incoming transfer to the audited warehouse" });
+        }
+
+        if (transfer.status !== 'in-transit') {
+          return res.status(400).json({ message: "Transfer must be in-transit to accept" });
+        }
+
+        // Process each transfer item
+        for (const tItem of transferItems) {
+          const verification = verifications.find(v => v.itemId === tItem.itemId);
+          
+          // Add to destination inventory
+          const destInventory = await storage.getInventoryByItemAndWarehouse(tItem.itemId, session.warehouseId);
+          if (destInventory) {
+            const newQty = destInventory.quantity + tItem.requestedQuantity;
+            await storage.updateInventory(destInventory.id, { quantity: newQty });
+          } else {
+            // Create new inventory record
+            await storage.createInventory({
+              itemId: tItem.itemId,
+              warehouseId: session.warehouseId,
+              quantity: tItem.requestedQuantity
+            });
+          }
+
+          // Update verification's system quantity if it exists
+          if (verification) {
+            const newSystemQty = verification.systemQuantity + tItem.requestedQuantity;
+            await storage.updateAuditVerification(verification.id, {
+              systemQuantity: newSystemQty,
+              discrepancy: verification.physicalQuantity !== null 
+                ? verification.physicalQuantity - newSystemQty 
+                : null,
+              status: verification.physicalQuantity !== null
+                ? (verification.physicalQuantity === newSystemQty ? 'complete' 
+                   : verification.physicalQuantity < newSystemQty ? 'short' : 'excess')
+                : verification.status
+            });
+          }
+        }
+
+        // Update transfer status to completed
+        await storage.updateTransfer(transferId, { 
+          status: 'completed',
+          completedAt: new Date()
+        });
+
+        // Log the action
+        await storage.createAuditActionLog({
+          auditSessionId: sessionId,
+          auditVerificationId: null,
+          actionType: 'accept_incoming_transfer',
+          performedBy: user.id,
+          newValues: JSON.stringify({
+            transferId,
+            transferCode: transfer.transferCode,
+            itemCount: transferItems.length
+          })
+        });
+
+        res.json({ 
+          message: `Incoming transfer ${transfer.transferCode} accepted. System quantities updated.`
+        });
+
+      } else {
+        return res.status(400).json({ message: "Invalid action. Use 'approve_outgoing' or 'accept_incoming'" });
+      }
+    } catch (error: any) {
+      console.error('Process pending transfer error:', error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Check warehouse freeze status
   app.get("/api/warehouses/:id/freeze-status", requireAuth, async (req, res) => {
     try {

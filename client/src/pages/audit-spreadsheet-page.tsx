@@ -481,6 +481,32 @@ export default function AuditSpreadsheetPage() {
     }
   });
 
+  // Mutation to approve/accept pending transfers during reconciliation
+  const processPendingTransferMutation = useMutation({
+    mutationFn: async ({ transferId, action }: { transferId: number; action: 'approve_outgoing' | 'accept_incoming' }) => {
+      return await apiRequest("POST", `/api/audit/sessions/${sessionId}/approve-pending-transfer`, {
+        transferId,
+        action
+      });
+    },
+    onSuccess: (data: any) => {
+      toast({
+        title: "Transfer Processed",
+        description: data.message || "Pending transfer has been processed and system quantities updated."
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/audit/sessions", sessionId, "verifications"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/audit/sessions", sessionId, "pending-transactions"] });
+      refetchCanComplete();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to process pending transfer",
+        variant: "destructive"
+      });
+    }
+  });
+
   const handleReconEntry = (verification: Verification, type: 'checkin' | 'checkout') => {
     setReconItem(verification);
     setReconType(type);
@@ -1129,19 +1155,78 @@ export default function AuditSpreadsheetPage() {
                     <Package className="h-4 w-4" />
                     Pending Transfers
                   </h4>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    Transfers affecting this warehouse. Outgoing transfers reduce inventory, incoming transfers increase inventory.
+                  </p>
                   <div className="space-y-2">
-                    {pendingTransactions.transfers.map((tx: any) => (
-                      <div key={tx.id} className="flex items-center justify-between p-3 bg-blue-50 border border-blue-200 rounded">
-                        <div>
-                          <span className="font-medium">{tx.itemName}</span>
-                          <span className="text-muted-foreground ml-2">({tx.itemSku})</span>
-                          <span className="ml-2 text-blue-700 font-medium">Qty: {tx.quantity}</span>
+                    {pendingTransactions.transfers.map((tx: any) => {
+                      const isOutgoing = tx.sourceWarehouseId === session?.warehouseId;
+                      const isIncoming = tx.destinationWarehouseId === session?.warehouseId;
+                      const canApproveOutgoing = isOutgoing && tx.status === 'pending';
+                      const canAcceptIncoming = isIncoming && tx.status === 'in-transit';
+                      
+                      return (
+                        <div key={tx.id} className={`flex items-center justify-between p-3 rounded ${
+                          isOutgoing ? 'bg-purple-50 border border-purple-200' : 'bg-cyan-50 border border-cyan-200'
+                        }`}>
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <Badge variant="outline" className={isOutgoing ? "bg-purple-100 text-purple-700" : "bg-cyan-100 text-cyan-700"}>
+                                {isOutgoing ? 'Outgoing' : 'Incoming'}
+                              </Badge>
+                              <span className="font-medium">{tx.itemName}</span>
+                              <span className="text-muted-foreground">({tx.itemSku})</span>
+                              <span className={`font-medium ${isOutgoing ? 'text-purple-700' : 'text-cyan-700'}`}>
+                                Qty: {tx.quantity}
+                              </span>
+                            </div>
+                            <div className="text-sm text-muted-foreground mt-1">
+                              {tx.sourceWarehouseName} → {tx.destinationWarehouseName} 
+                              <span className="ml-2 italic">({tx.status})</span>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {canApproveOutgoing && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="bg-purple-50 border-purple-300 text-purple-700 hover:bg-purple-100"
+                                onClick={() => processPendingTransferMutation.mutate({ transferId: tx.id, action: 'approve_outgoing' })}
+                                disabled={processPendingTransferMutation.isPending}
+                              >
+                                {processPendingTransferMutation.isPending ? (
+                                  <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                                ) : (
+                                  <CheckCircle className="h-4 w-4 mr-1" />
+                                )}
+                                Approve Outgoing
+                              </Button>
+                            )}
+                            {canAcceptIncoming && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="bg-cyan-50 border-cyan-300 text-cyan-700 hover:bg-cyan-100"
+                                onClick={() => processPendingTransferMutation.mutate({ transferId: tx.id, action: 'accept_incoming' })}
+                                disabled={processPendingTransferMutation.isPending}
+                              >
+                                {processPendingTransferMutation.isPending ? (
+                                  <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                                ) : (
+                                  <CheckCircle className="h-4 w-4 mr-1" />
+                                )}
+                                Accept Incoming
+                              </Button>
+                            )}
+                            {!canApproveOutgoing && !canAcceptIncoming && (
+                              <span className="text-sm text-muted-foreground italic">
+                                {tx.status === 'approved' ? 'Awaiting shipment' : tx.status}
+                              </span>
+                            )}
+                          </div>
                         </div>
-                        <div className="text-sm text-muted-foreground">
-                          {tx.sourceWarehouseName} → {tx.destinationWarehouseName}
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               )}
