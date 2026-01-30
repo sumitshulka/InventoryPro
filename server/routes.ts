@@ -6,6 +6,8 @@ import { licenseManager } from "./license-manager.js";
 import { requireValidLicense, checkUserLimit, checkProductLimit } from "./license-middleware.js";
 import { getEmailService } from "./email-service";
 import { z } from "zod";
+import { generatePhysicalQuantityPDF, generateVarianceReportPDF, generateFinalAuditReportPDF } from "./pdf/audit-reports";
+import { generatePhysicalQuantityExcel, generateVarianceReportExcel, generateFinalAuditReportExcel } from "./excel/audit-reports";
 import { 
   User,
   insertItemSchema, 
@@ -7437,6 +7439,240 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.setHeader('Content-Disposition', `attachment; filename="audit-report-${session.auditCode}.csv"`);
       res.send(csvContent);
     } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Physical Quantity Entry Report (PDF/Excel)
+  app.get("/api/audit/sessions/:id/reports/physical-quantity", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const sessionId = parseInt(req.params.id);
+      const format = (req.query.format as string) || 'pdf';
+
+      const session = await storage.getAuditSessionById(sessionId);
+      if (!session) {
+        return res.status(404).json({ message: "Audit session not found" });
+      }
+
+      if (user.role === 'audit_manager') {
+        const assignments = await storage.getAuditManagerWarehouses(user.id);
+        if (!assignments.some(a => a.warehouseId === session.warehouseId)) {
+          return res.status(403).json({ message: "You don't have access to this audit" });
+        }
+      } else if (user.role === 'audit_user') {
+        const assignments = await storage.getAuditUserAssignments(user.id);
+        if (!assignments.some(a => a.warehouseId === session.warehouseId)) {
+          return res.status(403).json({ message: "You don't have access to this audit" });
+        }
+      } else if (user.role !== 'admin') {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const verifications = await storage.getAuditVerificationsBySession(sessionId);
+      const warehouse = await storage.getWarehouse(session.warehouseId);
+      const orgSettings = await storage.getOrganizationSettings();
+
+      const verificationsWithDetails = await Promise.all(verifications.map(async (v, index) => {
+        const item = await storage.getItem(v.itemId);
+        const confirmer = v.confirmedBy ? await storage.getUser(v.confirmedBy) : null;
+        return {
+          id: v.id,
+          itemId: v.itemId,
+          itemCode: item?.sku || '',
+          itemName: item?.name || '',
+          batchNumber: v.batchNumber,
+          systemQuantity: v.systemQuantity,
+          physicalQuantity: v.physicalQuantity,
+          discrepancy: v.discrepancy,
+          status: v.status,
+          confirmedBy: v.confirmedBy,
+          confirmerName: confirmer?.name || null,
+          confirmedAt: v.confirmedAt?.toISOString() || null,
+          notes: v.notes
+        };
+      }));
+
+      const reportData = {
+        session: { ...session, warehouseName: warehouse?.name || 'Unknown' },
+        verifications: verificationsWithDetails,
+        organization: {
+          organizationName: orgSettings?.organizationName || 'Organization',
+          logo: orgSettings?.logo,
+          currency: orgSettings?.currency || 'INR',
+          currencySymbol: orgSettings?.currencySymbol || '₹'
+        }
+      };
+
+      if (format === 'excel') {
+        const buffer = await generatePhysicalQuantityExcel(reportData);
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename="physical-quantity-${session.auditCode}.xlsx"`);
+        res.send(buffer);
+      } else {
+        const buffer = await generatePhysicalQuantityPDF(reportData);
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="physical-quantity-${session.auditCode}.pdf"`);
+        res.send(buffer);
+      }
+    } catch (error: any) {
+      console.error('Error generating physical quantity report:', error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Variance Report (PDF/Excel)
+  app.get("/api/audit/sessions/:id/reports/variance", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const sessionId = parseInt(req.params.id);
+      const format = (req.query.format as string) || 'pdf';
+
+      const session = await storage.getAuditSessionById(sessionId);
+      if (!session) {
+        return res.status(404).json({ message: "Audit session not found" });
+      }
+
+      if (user.role === 'audit_manager') {
+        const assignments = await storage.getAuditManagerWarehouses(user.id);
+        if (!assignments.some(a => a.warehouseId === session.warehouseId)) {
+          return res.status(403).json({ message: "You don't have access to this audit" });
+        }
+      } else if (user.role === 'audit_user') {
+        const assignments = await storage.getAuditUserAssignments(user.id);
+        if (!assignments.some(a => a.warehouseId === session.warehouseId)) {
+          return res.status(403).json({ message: "You don't have access to this audit" });
+        }
+      } else if (user.role !== 'admin') {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const verifications = await storage.getAuditVerificationsBySession(sessionId);
+      const warehouse = await storage.getWarehouse(session.warehouseId);
+      const orgSettings = await storage.getOrganizationSettings();
+
+      const verificationsWithDetails = await Promise.all(verifications.map(async (v, index) => {
+        const item = await storage.getItem(v.itemId);
+        const confirmer = v.confirmedBy ? await storage.getUser(v.confirmedBy) : null;
+        return {
+          id: v.id,
+          itemId: v.itemId,
+          itemCode: item?.sku || '',
+          itemName: item?.name || '',
+          batchNumber: v.batchNumber,
+          systemQuantity: v.systemQuantity,
+          physicalQuantity: v.physicalQuantity,
+          discrepancy: v.discrepancy,
+          status: v.status,
+          confirmedBy: v.confirmedBy,
+          confirmerName: confirmer?.name || null,
+          confirmedAt: v.confirmedAt?.toISOString() || null,
+          notes: v.notes
+        };
+      }));
+
+      const reportData = {
+        session: { ...session, warehouseName: warehouse?.name || 'Unknown' },
+        verifications: verificationsWithDetails,
+        organization: {
+          organizationName: orgSettings?.organizationName || 'Organization',
+          logo: orgSettings?.logo,
+          currency: orgSettings?.currency || 'INR',
+          currencySymbol: orgSettings?.currencySymbol || '₹'
+        }
+      };
+
+      if (format === 'excel') {
+        const buffer = await generateVarianceReportExcel(reportData);
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename="variance-report-${session.auditCode}.xlsx"`);
+        res.send(buffer);
+      } else {
+        const buffer = await generateVarianceReportPDF(reportData);
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="variance-report-${session.auditCode}.pdf"`);
+        res.send(buffer);
+      }
+    } catch (error: any) {
+      console.error('Error generating variance report:', error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Final Audit Report (PDF/Excel)
+  app.get("/api/audit/sessions/:id/reports/final", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const sessionId = parseInt(req.params.id);
+      const format = (req.query.format as string) || 'pdf';
+
+      const session = await storage.getAuditSessionById(sessionId);
+      if (!session) {
+        return res.status(404).json({ message: "Audit session not found" });
+      }
+
+      if (user.role === 'audit_manager') {
+        const assignments = await storage.getAuditManagerWarehouses(user.id);
+        if (!assignments.some(a => a.warehouseId === session.warehouseId)) {
+          return res.status(403).json({ message: "You don't have access to this audit" });
+        }
+      } else if (user.role === 'audit_user') {
+        const assignments = await storage.getAuditUserAssignments(user.id);
+        if (!assignments.some(a => a.warehouseId === session.warehouseId)) {
+          return res.status(403).json({ message: "You don't have access to this audit" });
+        }
+      } else if (user.role !== 'admin') {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const verifications = await storage.getAuditVerificationsBySession(sessionId);
+      const warehouse = await storage.getWarehouse(session.warehouseId);
+      const orgSettings = await storage.getOrganizationSettings();
+
+      const verificationsWithDetails = await Promise.all(verifications.map(async (v, index) => {
+        const item = await storage.getItem(v.itemId);
+        const confirmer = v.confirmedBy ? await storage.getUser(v.confirmedBy) : null;
+        return {
+          id: v.id,
+          itemId: v.itemId,
+          itemCode: item?.sku || '',
+          itemName: item?.name || '',
+          batchNumber: v.batchNumber,
+          systemQuantity: v.systemQuantity,
+          physicalQuantity: v.physicalQuantity,
+          discrepancy: v.discrepancy,
+          status: v.status,
+          confirmedBy: v.confirmedBy,
+          confirmerName: confirmer?.name || null,
+          confirmedAt: v.confirmedAt?.toISOString() || null,
+          notes: v.notes
+        };
+      }));
+
+      const reportData = {
+        session: { ...session, warehouseName: warehouse?.name || 'Unknown' },
+        verifications: verificationsWithDetails,
+        organization: {
+          organizationName: orgSettings?.organizationName || 'Organization',
+          logo: orgSettings?.logo,
+          currency: orgSettings?.currency || 'INR',
+          currencySymbol: orgSettings?.currencySymbol || '₹'
+        }
+      };
+
+      if (format === 'excel') {
+        const buffer = await generateFinalAuditReportExcel(reportData);
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename="final-audit-report-${session.auditCode}.xlsx"`);
+        res.send(buffer);
+      } else {
+        const buffer = await generateFinalAuditReportPDF(reportData);
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="final-audit-report-${session.auditCode}.pdf"`);
+        res.send(buffer);
+      }
+    } catch (error: any) {
+      console.error('Error generating final audit report:', error);
       res.status(500).json({ message: error.message });
     }
   });
