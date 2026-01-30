@@ -172,9 +172,11 @@ export default function MovementReportPage() {
       
       switch (transaction.transactionType) {
         case "check-in":
+        case "audit_checkin":
           counts.checkIn++;
           break;
         case "issue":
+        case "audit_checkout":
           counts.issue++;
           break;
         case "transfer":
@@ -425,10 +427,10 @@ export default function MovementReportPage() {
                       <TableCell className="font-medium">{transaction.transactionCode}</TableCell>
                       <TableCell>
                         <div className="flex items-center space-x-2">
-                          {transaction.transactionType === "check-in" && (
+                          {(transaction.transactionType === "check-in" || transaction.transactionType === "audit_checkin") && (
                             <ArrowUpCircle className="h-4 w-4 text-green-600" />
                           )}
-                          {transaction.transactionType === "issue" && (
+                          {(transaction.transactionType === "issue" || transaction.transactionType === "audit_checkout") && (
                             <ArrowDownCircle className="h-4 w-4 text-red-600" />
                           )}
                           {transaction.transactionType === "transfer" && (
@@ -436,7 +438,9 @@ export default function MovementReportPage() {
                           )}
                           <span className={`px-2 py-1 text-xs rounded-full ${getTransactionTypeColor(transaction.transactionType)}`}>
                             {transaction.transactionType === "check-in" ? "Check-in" : 
-                             transaction.transactionType === "issue" ? "Issue" : "Transfer"}
+                             transaction.transactionType === "audit_checkin" ? "Audit Recon Check-in" :
+                             transaction.transactionType === "issue" ? "Issue" : 
+                             transaction.transactionType === "audit_checkout" ? "Audit Recon Check-out" : "Transfer"}
                           </span>
                         </div>
                       </TableCell>

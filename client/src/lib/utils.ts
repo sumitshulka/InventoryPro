@@ -53,8 +53,12 @@ export function getTransactionTypeColor(type: string) {
   switch (type.toLowerCase()) {
     case "check-in":
       return "bg-green-100 text-green-800";
+    case "audit_checkin":
+      return "bg-orange-100 text-orange-800";
     case "issue":
       return "bg-red-100 text-red-800";
+    case "audit_checkout":
+      return "bg-purple-100 text-purple-800";
     case "transfer":
       return "bg-blue-100 text-blue-800";
     default:

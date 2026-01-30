@@ -1824,7 +1824,8 @@ export class DatabaseStorage implements IStorage {
       .where(
         or(
           eq(auditSessions.status, 'open'),
-          eq(auditSessions.status, 'in_progress')
+          eq(auditSessions.status, 'in_progress'),
+          eq(auditSessions.status, 'reconciliation')
         )
       );
     
