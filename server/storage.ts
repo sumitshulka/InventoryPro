@@ -1577,6 +1577,28 @@ export class DatabaseStorage implements IStorage {
   }
 
   async assignWarehouseToAuditManager(data: InsertAuditManagerWarehouse): Promise<AuditManagerWarehouse> {
+    // Check if assignment already exists (active or inactive)
+    const existing = await db.select().from(auditManagerWarehouses)
+      .where(and(
+        eq(auditManagerWarehouses.auditManagerId, data.auditManagerId),
+        eq(auditManagerWarehouses.warehouseId, data.warehouseId)
+      ))
+      .limit(1);
+
+    if (existing.length > 0) {
+      // If inactive, reactivate it; if active, just return it
+      if (!existing[0].isActive) {
+        const [updated] = await db.update(auditManagerWarehouses)
+          .set({ isActive: true, assignedBy: data.assignedBy })
+          .where(eq(auditManagerWarehouses.id, existing[0].id))
+          .returning();
+        return updated;
+      }
+      // Already active, return existing
+      return existing[0];
+    }
+
+    // No existing record, create new one
     const [assignment] = await db.insert(auditManagerWarehouses).values(data).returning();
     return assignment;
   }
